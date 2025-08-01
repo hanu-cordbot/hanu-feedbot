@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Edit System Prompt</title></head>
+<body>
+  <h1>Edit System Prompt</h1>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  <form method="post">
+    <div id="sectionsContainer">
+      {% if sections %}
+        {% for sec in sections %}
+          <div class="section">
+            <label>Section Name:<br>
+              <input type="text" name="section_name" value="{{ sec.name }}" required>
+            </label><br>
+            <label>Content:<br>
+              <textarea name="section_content" rows="5" cols="80" required>{{ sec.content }}</textarea>
+            </label>
+            <div class="preview"></div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="section">
+          <label>Section Name:<br>
+            <input type="text" name="section_name" required>
+          </label><br>
+          <label>Content:<br>
+            <textarea name="section_content" rows="5" cols="80" required></textarea>
+          </label>
+          <div class="preview"></div>
+        </div>
+      {% endif %}
+    </div>
+    <button id="addSection">Add Section</button>
+    <button type="submit">Save</button>
+  </form>
+  <p><a href="{{ url_for('dashboard') }}">Back to Dashboard</a></p>
+  <!-- Template for new sections -->
+  <div id="sectionTemplate" class="section" style="display:none">
+    <label>Section Name:<br>
+      <input type="text" name="section_name">
+    </label><br>
+    <label>Content:<br>
+      <textarea name="section_content" rows="5" cols="80"></textarea>
+    </label>
+    <div class="preview"></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    function updatePreview(textarea) {
+      const preview = textarea.closest('.section').querySelector('.preview');
+      preview.innerHTML = marked.parse(textarea.value);
+    }
+    document.addEventListener('input', function(e) {
+      if (e.target.matches('textarea[name="section_content"]')) {
+        updatePreview(e.target);
+      }
+    });
+    document.getElementById('addSection').addEventListener('click', function(e) {
+      e.preventDefault();
+      const tmpl = document.getElementById('sectionTemplate');
+      const clone = tmpl.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.style.display = '';
+      clone.querySelector('input[name="section_name"]').value = '';
+      clone.querySelector('textarea[name="section_content"]').value = '';
+      clone.querySelector('.preview').innerHTML = '';
+      document.getElementById('sectionsContainer').appendChild(clone);
+    });
+  </script>
+</body>
+</html>

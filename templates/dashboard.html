@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FeedBot Dashboard</title>
+  <style>
+    ul.feed-list { list-style:none; padding:0; margin:0; }
+    /* Grid layout only for main feed list (non-grouped) */
+    ul.feed-list:not([data-group]) li { display: grid; grid-template-columns: 30px 250px 100px 1fr 80px 140px 140px; align-items: center; margin-bottom: 5px; column-gap: 10px; }
+    ul.feed-list li form, ul.feed-list li select, ul.feed-list li a { margin: 0 5px; }
+    .utilities button { margin-right: 10px; }
+    /* Tree view for grouped feeds */
+    .feed-tree { list-style:none; padding:0; margin:0; }
+    .feed-tree > li { margin:5px 0; border-top:1px solid #ccc; padding-top:10px; }
+    .feed-tree > li:first-child { border-top:none; padding-top:0; }
+    .feed-tree ul { list-style:none; padding-left:20px; margin:0; }
+    /* Tree view .group-name hidden */
+    .feed-tree .group-name { display: none; }
+    /* Top group header styling */
+    .group-header {
+      font-weight: bold;
+      cursor: pointer;
+      background: #e0e0e0;
+      padding: 5px 5px 5px 20px; /* indent header */
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      display: block;
+    }
+    .group-header::before {
+      content: "▼";
+      display: inline-block;
+      width: 1em;
+      margin-right: 5px;
+    }
+    /* Collapse groups by hiding only UL contents */
+    .feed-tree li.collapsed > ul.feed-list.grouped { height: 0; overflow: hidden; }
+    .feed-tree li.collapsed > .group-header::before { content: "▶"; }
+    /* Group header action menu */
+    .group-header { position: relative; }
+    .group-menu { display: none; position: absolute; right: 5px; top: 100%; background: #fff; border: 1px solid #ccc; z-index: 10; }
+    .group-menu button { display: block; width: 100%; padding: 5px 10px; border: none; background: none; text-align: left; }
+    /* Grid layout for grouped feeds */
+    ul.feed-list.grouped li {
+      display: grid;
+      grid-template-columns: 30px 250px 100px 1fr 80px 140px 140px;
+      align-items: center;
+      margin-bottom: 5px;
+      column-gap: 10px;
+    }
+    ul.feed-list.grouped li div {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    /* Flat view column grid and overflow handling */
+    ul.feed-list:not([data-group]) li.header-row,
+    ul.feed-list:not([data-group]) li:not(.header-row) {
+      display: grid;
+      grid-template-columns: 30px 250px 100px 1fr 80px 140px 140px;
+      align-items: center;
+      margin-bottom: 5px;
+      column-gap: 10px;
+    }
+    ul.feed-list:not([data-group]) li div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+</head>
+<body>
+  <h1>FeedBot Dashboard</h1>
+  {% if status %}
+    <p><strong>Bot Status:</strong> {{ status }}{% if status_ttl and status_ttl > 0 %} (expires in {{ status_ttl }}s){% endif %}</p>
+  {% endif %}
+  <p>Processed Posts Count: {{ seen_count }}</p>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="{{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <h2>Manage Feeds</h2>
+  <div id="dashboard-content">
+   <p>View:
+    <a href="{{ url_for('dashboard', view='grouped', sort=sort_by) }}" class="ajax-link" {% if not flat_view %}style="font-weight:bold"{% endif %}>Grouped</a> |
+    <a href="{{ url_for('dashboard', view='flat', sort=sort_by) }}" class="ajax-link" {% if flat_view %}style="font-weight:bold"{% endif %}>Flat</a>
+   </p>
+   <p>Sort by:
+    <a href="{{ url_for('dashboard', view=('flat' if flat_view else 'grouped'), sort='name') }}" class="ajax-link" {% if sort_by=='name' %}style="font-weight:bold"{% endif %}>Name</a> |
+    <a href="{{ url_for('dashboard', view=('flat' if flat_view else 'grouped'), sort='url') }}" class="ajax-link" {% if sort_by=='url' %}style="font-weight:bold"{% endif %}>URL</a> |
+    <a href="{{ url_for('dashboard', view=('flat' if flat_view else 'grouped'), sort='channel') }}" class="ajax-link" {% if sort_by=='channel' %}style="font-weight:bold"{% endif %}>Channel</a> |
+    <a href="{{ url_for('dashboard', view=('flat' if flat_view else 'grouped'), sort='last') }}" class="ajax-link" {% if sort_by=='last' %}style="font-weight:bold"{% endif %}>Newest</a> |
+    <a href="{{ url_for('dashboard', view=('flat' if flat_view else 'grouped'), sort='oldest') }}" class="ajax-link" {% if sort_by=='oldest' %}style="font-weight:bold"{% endif %}>Oldest</a>
+   </p>
+   <form action="{{ url_for('add_group') }}" method="post" style="margin-bottom:1em;">
+    <input type="text" name="group_name" placeholder="New group name" required>
+    <button type="submit">Add Group</button>
+  </form>
+  {% if cpu is not none and memory is not none %}
+    <h2>Resource Metrics</h2>
+    <p>CPU Usage: {{ cpu }}%</p>
+    <p>Memory Usage: {{ memory }} MB</p>
+  {% endif %}
+  <form action="{{ url_for('add_feed') }}" method="post" style="margin-bottom:1em;">
+    <input type="text" name="feed_url" placeholder="New feed URL" size="50" required>
+    <button type="submit">Add Feed</button>
+  </form>
+  {% if not flat_view %}
+  <ul class="feed-tree" id="group-list">
+    {% for gname, feeds in groups.items() %}
+    <li data-group="{{ gname }}">
+      <div class="group-header" data-group="{{ gname }}">
+        <span class="header-label">{{ gname }} ({{ feeds|length }})</span>
+        <button class="menu-btn">⋮</button>
+        <div class="group-menu">
+          <button class="rename-group">Rename</button>
+          <button class="delete-group">Delete</button>
+        </div>
+      </div>
+      <ul class="feed-list grouped" data-group="{{ gname }}">
+        {% for item in feed_items if feed_group_map.get(item.url)==gname %}
+        <li data-url="{{ item.url }}">
+          <div><input type="checkbox" class="batch-checkbox" data-url="{{ item.url }}"></div>
+          <div><span class="feed-title" data-url="{{ item.url }}">Loading title...</span></div>
+          <div><span class="feed-date" data-url="{{ item.url }}">Loading date...</span></div>
+          <div><a href="{{ item.url }}" target="_blank">Link</a></div>
+          <div>
+            <form action="{{ url_for('remove_feed') }}" method="post">
+              <input type="hidden" name="feed_url" value="{{ item.url }}">
+              <button type="submit">Remove</button>
+            </form>
+          </div>
+          <div>
+            <form action="{{ url_for('map_feed_channel') }}" method="post">
+              <input type="hidden" name="feed_url" value="{{ item.url }}">
+              <select name="channel_id" onchange="this.form.submit()">
+                <option value="">--No Mapping--</option>
+                {% for ch in channels %}
+                  <option value="{{ ch.id }}" {% if feed_map.get(item.url) == ch.id %}selected{% endif %}>{{ ch.name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div><!-- Group is fixed --></div>
+        </li>
+        {% endfor %}
+      </ul>
+    </li>
+    {% endfor %}
+    <li>
+      <div class="group-header" data-group="">Unmapped ({{ unmapped_count }})</div>
+      <ul class="feed-list grouped" data-group="">
+        {% for item in feed_items if not feed_group_map.get(item.url) %}
+        <li data-url="{{ item.url }}">
+          <div><input type="checkbox" class="batch-checkbox" data-url="{{ item.url }}"></div>
+          <div><span class="feed-title" data-url="{{ item.url }}">Loading title...</span></div>
+          <div><span class="feed-date" data-url="{{ item.url }}">Loading date...</span></div>
+          <div><a href="{{ item.url }}" target="_blank">Link</a></div>
+          <div>
+            <form action="{{ url_for('remove_feed') }}" method="post">
+              <input type="hidden" name="feed_url" value="{{ item.url }}">
+              <button type="submit">Remove</button>
+            </form>
+          </div>
+          <div>
+            <form action="{{ url_for('map_feed_channel') }}" method="post">
+              <input type="hidden" name="feed_url" value="{{ item.url }}">
+              <select name="channel_id" onchange="this.form.submit()">
+                <option value="">--No Mapping--</option>
+                {% for ch in channels %}
+                  <option value="{{ ch.id }}" {% if feed_map.get(item.url) == ch.id %}selected{% endif %}>{{ ch.name }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+          <div><!-- Group is fixed --></div>
+        </li>
+        {% endfor %}
+      </ul>
+    </li>
+  </ul>
+  {% else %}
+  <ul class="feed-list">
+    {% if flat_view %}
+    <!-- Header row -->
+    <div id="batch-controls" style="margin-bottom:1em;">
+      <select id="batch-group-select">
+        <option value="">--Select Group--</option>
+        {% for gname in groups.keys() %}
+        <option value="{{ gname }}">{{ gname }}</option>
+        {% endfor %}
+        <option value="">Unmapped</option>
+      </select>
+      <button id="batch-apply" type="button">Apply to selected</button>
+    </div>
+    <li class="header-row">
+      <div><input type="checkbox" id="select-all-flat"></div>
+      <div><strong>Title</strong></div>
+      <div><strong>Date</strong></div>
+      <div><strong>Feed</strong></div>
+      <div><strong>Page</strong></div>
+      <div><strong>Action</strong></div>
+      <div><strong>Channel</strong></div>
+      <div><strong>Group</strong></div>
+    </li>
+    {% endif %}
+    {% for item in feed_items %}
+    <li data-url="{{ item.url }}">
+      <div><input type="checkbox" class="batch-checkbox" data-url="{{ item.url }}"></div>
+      <div class="col-title"><span class="feed-title" data-url="{{ item.url }}">Loading title...</span></div>
+      <div class="col-date"><span class="feed-date" data-url="{{ item.url }}">Loading date...</span></div>
+      <div class="col-url"><a href="{{ item.url }}" target="_blank">{{ item.url }}</a></div>
+      <div class="col-action">
+        <form action="{{ url_for('remove_feed') }}" method="post">
+          <input type="hidden" name="feed_url" value="{{ item.url }}">
+          <button type="submit">Remove</button>
+        </form>
+      </div>
+      <div class="col-channel">
+        <form action="{{ url_for('map_feed_channel') }}" method="post">
+          <input type="hidden" name="feed_url" value="{{ item.url }}">
+          <select name="channel_id" onchange="this.form.submit()">
+            <option value="">--No Mapping--</option>
+            {% for ch in channels %}
+              <option value="{{ ch.id }}" {% if feed_map.get(item.url) == ch.id %}selected{% endif %}>{{ ch.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+      <div class="col-group">
+        <form action="{{ url_for('map_feed_group') }}" method="post">
+          <input type="hidden" name="feed_url" value="{{ item.url }}">
+          <select name="group_name" onchange="this.form.submit()">
+            <option value="">--No Group--</option>
+            {% for gname, feeds in groups.items() %}
+              <option value="{{ gname }}" {% if feed_group_map.get(item.url) == gname %}selected{% endif %}>{{ gname }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  </div> <!-- #dashboard-content -->
+  <script>
+  (function(){
+    function initAjax(){
+      const container=document.getElementById('dashboard-content');
+      document.querySelectorAll('a.ajax-link').forEach(link=>{
+        link.addEventListener('click',e=>{
+          e.preventDefault();
+          const url=link.href;
+          container.style.opacity=0;
+          fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}})
+            .then(res=>res.text())
+            .then(html=>{
+              const parser=new DOMParser();
+              const doc=parser.parseFromString(html,'text/html');
+              const newContent=doc.getElementById('dashboard-content').innerHTML;
+              container.innerHTML=newContent;
+              window.history.pushState(null,'',url);
+              container.style.opacity=1;
+              initAjax();
+            });
+        });
+      });
+    }
+    document.addEventListener('DOMContentLoaded',()=>{
+      const container=document.getElementById('dashboard-content');
+      if(container) container.style.transition='opacity 0.3s';
+      initAjax();
+    });
+  })();
+  </script>
+
+  <h2>Actions</h2>
+  <p><a href="{{ url_for('edit_prompt') }}">Edit System Prompt</a></p>
+  <p><a href="{{ url_for('stats') }}">View System Stats</a></p>
+  <h2>Manage Channels</h2>
+  <form action="{{ url_for('add_channel') }}" method="post">
+    <input type="text" name="channel_id" placeholder="Channel ID" required>
+    <button type="submit">Add Channel</button>
+  </form>
+  <ul>
+    {% for ch in channels %}
+      <li>
+        {{ ch.name }} [{{ ch.detected_type }}] (ID: {{ ch.id }})
+        <form action="{{ url_for('remove_channel') }}" method="post" style="display:inline; margin-left:10px;">
+          <input type="hidden" name="channel_id" value="{{ ch.id }}">
+          <button type="submit">Remove</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+  <h2>Utilities</h2>
+  <div class="utilities">
+    <form id="clear-cache-form" action="{{ url_for('clear_cache') }}" method="post">
+      <button type="submit">Clear Cache</button>
+    </form>
+    <form id="run-job-form" action="{{ url_for('run_job_dashboard') }}" method="post">
+      <button type="submit">Run Bot Job</button>
+    </form>
+    <form id="reset-summary-form" action="{{ url_for('reset_summary') }}" method="post">
+      <button type="submit">Reset Daily Summary</button>
+    </form>
+    <form id="refresh-feed-meta-form" action="{{ url_for('refresh_feed_meta') }}" method="post">
+      <button type="submit">Refresh Feed Metadata</button>
+    </form>
+  </div>
+
+  <script>
+    // Helper to fetch and update feed metadata
+    function fetchMeta() {
+      fetch("{{ url_for('feed_meta') }}")
+        .then(res => res.json())
+    .then(meta => {
+      document.querySelectorAll('.feed-title').forEach(el => {
+        const url = el.dataset.url;
+        el.textContent = meta[url]?.title || url;
+      });
+      document.querySelectorAll('.feed-date').forEach(el => {
+        const url = el.dataset.url;
+        const dateStr = meta[url]?.last_post;
+        if (dateStr) {
+          let d = new Date(dateStr);
+          d.setHours(d.getHours() + 7); // convert to GMT+7
+          const now = new Date();
+          const diffMs = now - d;
+          const diffSec = Math.floor(diffMs / 1000);
+          const diffMin = Math.floor(diffSec / 60);
+          const diffHrs = Math.floor(diffMin / 60);
+          const diffDays = Math.floor(diffHrs / 24);
+          let rel;
+          if (diffSec < 60) rel = `${diffSec}s ago`;
+          else if (diffMin < 60) rel = `${diffMin}m ago`;
+          else if (diffHrs < 24) rel = `${diffHrs}h ago`;
+          else rel = `${diffDays}d ago`;
+          el.textContent = rel;
+          el.title = d.toLocaleString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh' });
+        } else {
+          el.textContent = 'N/A';
+        }
+      });
+        }).catch(console.error);
+    }
+    // Initial fetch and periodic polling
+    fetchMeta();
+    setInterval(fetchMeta, 60000); // every minute
+    // Also refresh metadata when admin triggers Run Bot Job
+    const runBtn = document.querySelector("form[action='{{ url_for('run_job_dashboard') }}'] button");
+    if(runBtn) runBtn.addEventListener('click', fetchMeta);
+
+    // Initialize Sortable for simple list sorting
+    const simpleList = document.querySelector('.feed-list:not([data-group])');
+    if(simpleList) {
+      new Sortable(simpleList, {
+        animation: 150
+      });
+    }
+    // Initialize Sortable for grouping lists
+    document.querySelectorAll('ul.feed-list[data-group]').forEach(list => {
+      new Sortable(list, {
+        group: 'feeds',
+        animation: 150,
+        sort: false,
+        onEnd: evt => {
+          const url = evt.item.dataset.url;
+          const oldGroup = evt.from.dataset.group;
+          const newGroup = evt.to.dataset.group;
+          const data = new FormData();
+          data.append('feed_url', url);
+          data.append('group_name', newGroup);
+          fetch("{{ url_for('map_feed_group') }}", {method:'POST', body: data})
+            .then(() => {
+              // Update counts dynamically
+              document.querySelectorAll('.feed-tree .group-name').forEach(span => {
+                const txt = span.textContent;
+                const m = txt.match(/^(.+) \((\d+)\)$/);
+                if(m) {
+                  const [_, name, countStr] = m;
+                  let count = parseInt(countStr, 10);
+                  if(name === oldGroup) count = Math.max(0, count - 1);
+                  if(name === newGroup) count = count + 1;
+                  span.textContent = `${name} (${count})`;
+                }
+              });
+            })
+            .catch(console.error);
+        }
+      });
+    });
+    // Enable manual drag-and-drop of groups
+    new Sortable(document.getElementById('group-list'), {
+      animation: 150,
+      handle: '.group-header',
+      onEnd: evt => {
+        // TODO: send new order to server if needed
+      }
+    });
+    // Group header menu toggles
+    document.querySelectorAll('.menu-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const menu = e.target.nextElementSibling;
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      });
+    });
+    // Rename and delete actions
+    document.querySelectorAll('.rename-group').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const gdiv = e.target.closest('.group-header');
+        const oldName = gdiv.dataset.group;
+        const newName = prompt('New name for group', oldName);
+        if(newName && newName !== oldName) {
+          const form = document.createElement('form'); form.method='post'; form.action='{{ url_for("rename_group") }}';
+          form.innerHTML = `<input type='hidden' name='old_name' value='${oldName}'><input type='hidden' name='new_name' value='${newName}'>`;
+          document.body.appendChild(form); form.submit();
+        }
+      });
+    });
+    document.querySelectorAll('.delete-group').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const gdiv = e.target.closest('.group-header');
+        const name = gdiv.dataset.group;
+        if(confirm(`Delete group '${name}'?`)) {
+          const form = document.createElement('form'); form.method='post'; form.action='{{ url_for("remove_group") }}';
+          form.innerHTML = `<input type='hidden' name='group_name' value='${name}'>`;
+          document.body.appendChild(form); form.submit();
+        }
+      });
+    });
+    // Make groups collapsible via top header
+    document.querySelectorAll('.feed-tree .group-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const li = header.closest('.feed-tree > li');
+        li.classList.toggle('collapsed');
+      });
+    });
+    // Batch selection handlers
+    document.getElementById('select-all-flat')?.addEventListener('change', function(e) {
+      const checked = e.target.checked;
+      document.querySelectorAll('.batch-checkbox').forEach(cb => cb.checked = checked);
+    });
+    document.getElementById('batch-apply')?.addEventListener('click', function() {
+      const group = document.getElementById('batch-group-select').value;
+      const urls = Array.from(document.querySelectorAll('.batch-checkbox:checked')).map(cb => cb.dataset.url);
+      if(urls.length === 0) return alert('No feeds selected');
+      urls.forEach(url => {
+        const data = new FormData();
+        data.append('feed_url', url);
+        data.append('group_name', group);
+        fetch("{{ url_for('map_feed_group') }}", {method:'POST', body: data})
+          .catch(console.error);
+      });
+      document.querySelectorAll('.batch-checkbox').forEach(cb => cb.checked = false);
+    });
+    // Shift-click range selection
+    let lastCheckbox = null;
+    document.querySelectorAll('.batch-checkbox').forEach(cb => {
+      cb.addEventListener('click', e => {
+        if(e.shiftKey && lastCheckbox) {
+          const boxes = Array.from(document.querySelectorAll('.batch-checkbox'));
+          const start = boxes.indexOf(cb);
+          const end = boxes.indexOf(lastCheckbox);
+          const [from,to] = start < end ? [start,end] : [end,start];
+          boxes.slice(from,to+1).forEach(box => box.checked = lastCheckbox.checked);
+        }
+        lastCheckbox = cb;
+      });
+    });
+    // Bulk apply changes to selected feeds
+    document.querySelectorAll('select[name="group_name"]').forEach(sel => {
+      sel.addEventListener('change', function() {
+        const newGroup = this.value;
+        document.querySelectorAll('.batch-checkbox:checked').forEach(cb => {
+          const url = cb.dataset.url;
+          const data = new FormData();
+          data.append('feed_url', url);
+          data.append('group_name', newGroup);
+          fetch("{{ url_for('map_feed_group') }}", {method:'POST', body: data}).catch(console.error);
+        });
+      });
+    });
+    document.querySelectorAll('select[name="channel_id"]').forEach(sel => {
+      sel.addEventListener('change', function() {
+        const newCh = this.value;
+        document.querySelectorAll('.batch-checkbox:checked').forEach(cb => {
+          const url = cb.dataset.url;
+          const data = new FormData();
+          data.append('feed_url', url);
+          data.append('channel_id', newCh);
+          fetch("{{ url_for('map_feed_channel') }}", {method:'POST', body: data}).catch(console.error);
+        });
+      });
+    });
+    // AJAXify utilities: intercept forms and send POST without full reload
+    (function(){
+      const forms = [
+        { id: 'clear-cache-form', msg: 'Cache cleared', callback: fetchMeta },
+        { id: 'run-job-form', msg: 'Job queued', callback: fetchMeta },
+        { id: 'reset-summary-form', msg: 'Summary reset' },
+        { id: 'refresh-feed-meta-form', msg: 'Metadata refresh queued', callback: fetchMeta }
+      ];
+      forms.forEach(cfg => {
+        const form = document.getElementById(cfg.id);
+        if(form) {
+          form.addEventListener('submit', async e => {
+            e.preventDefault();
+            try {
+              const res = await fetch(form.action, { method: 'POST' });
+              if(res.ok) {
+                alert(cfg.msg);
+                if(typeof cfg.callback === 'function') cfg.callback();
+              } else {
+                alert('Error: ' + res.status);
+              }
+            } catch(err) {
+              alert('Request failed: ' + err);
+            }
+          });
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

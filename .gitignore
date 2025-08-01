@@ -1,0 +1,46 @@
+# Environment variables and secrets
+.env
+
+# Virtual environments
+.venv/
+
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Databases
+*.db
+*.sqlite3
+
+# Logs and temps
+*.log
+*.pid
+*.swp
+
+# Data files
+*.pkl
+cookies.txt  # If this is for session data, ignore it
+
+# Packaging
+*.egg-info/
+*.egg
+*.dist-info/
+
+# Testing and coverage
+*.coverage
+*.mypy_cache/
+*.pytest_cache/
+
+# IDE settings
+*.vscode/
+*.idea/
+
+# OS-specific
+*.DS_Store
+
+# Optional additions (uncomment if relevant)
+# node_modules/  # If mixing with JS
+# build/         # For compiled outputs
+# dist/          # Distribution directories

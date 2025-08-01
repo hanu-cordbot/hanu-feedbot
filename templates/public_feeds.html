@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Feed List</title>
+    <style>
+    ul.feed-list { list-style:none; padding:0; margin:0; }
+    /* title | date | channel | link */
+    ul.feed-list:not([data-group]) li,
+    ul.feed-list.grouped li { display: grid; grid-template-columns: 250px 150px 150px 1fr; align-items: center; margin-bottom: 5px; column-gap: 10px; }
+    ul.feed-tree { list-style:none; padding:0; margin:0; }
+    .group-header { font-weight:bold; margin-top:10px; }
+    /* style for unmapped items: lower opacity until hover */
+    .feed-list li.unmapped,
+    .feed-tree li[data-group="unmapped"] .feed-list li {
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .feed-list li.unmapped:hover,
+    .feed-tree li[data-group="unmapped"] .feed-list li:hover {
+      opacity: 1;
+    }
+    ul.feed-list li div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <h1>Feeds</h1>
+  <p>View: 
+    <a href="{{ url_for('index', view='grouped', sort=sort_by, order=order, group_by=group_by) }}" class="ajax-link" {% if not flat_view %}style="font-weight:bold"{% endif %}>Grouped</a> |
+    <a href="{{ url_for('index', view='flat', sort=sort_by, order=order) }}" class="ajax-link" {% if flat_view %}style="font-weight:bold"{% endif %}>Flat</a>
+   </p>
+   <p>Sort by: 
+    <a href="{{ url_for('index', view=view, sort='name', order=order, group_by=group_by) }}" class="ajax-link" {% if sort_by=='name' %}style="font-weight:bold"{% endif %}>Name</a> |
+    <a href="{{ url_for('index', view=view, sort='url', order=order, group_by=group_by) }}" class="ajax-link" {% if sort_by=='url' %}style="font-weight:bold"{% endif %}>URL</a> |
+    <a href="{{ url_for('index', view=view, sort='last', order='desc', group_by=group_by) }}" class="ajax-link" {% if sort_by=='last' %}style="font-weight:bold"{% endif %}>Newest</a> |
+    <a href="{{ url_for('index', view=view, sort='last', order='asc', group_by=group_by) }}" class="ajax-link" {% if order=='asc' %}style="font-weight:bold"{% endif %}>Oldest</a>
+   </p>
+   <!-- Order toggle -->
+   <p>Order: 
+    <a href="{{ url_for('index', view=view, sort=sort_by, order=order=='asc' and 'desc' or 'asc', group_by=group_by) }}" class="ajax-link" title="Toggle order">
+      {% if order=='asc' %}&#x25B2;{% else %}&#x25BC;{% endif %}
+    </a>
+   </p>
+   {% if not flat_view %}
+   <!-- New grouping selector -->
+   <p>Group by:
+    <a href="{{ url_for('index', view=view, sort=sort_by, group_by='group', order=order) }}" class="ajax-link" {% if group_by=='group' %}style="font-weight:bold"{% endif %}>Manual</a> |
+    <a href="{{ url_for('index', view=view, sort=sort_by, group_by='channel', order=order) }}" class="ajax-link" {% if group_by=='channel' %}style="font-weight:bold"{% endif %}>Channel</a>
+   </p>
+   {% endif %}
+   <!-- Container around the feed list only -->
+   <div id="feed-list-container">
+   {% if not flat_view %}
+   <ul class="feed-tree">
+     {% if group_by=='group' %}
+       {# Manual grouping: show defined groups without channel subgroups #}
+       {% for grp, flist in groups.items() %}
+       <li data-group="{{ grp }}">
+         <div class="group-header">{{ grp or 'Unmapped' }} ({{ flist|length }})</div>
+         <ul class="feed-list grouped">
+           <li class="header-row">
+             <div><strong>Name</strong></div>
+             <div><strong>Latest Post</strong></div>
+             <div><strong>Channel</strong></div>
+             <div><strong>Page</strong></div>
+           </li>
+           {% for item in feed_items if feed_group_map.get(item.url)==grp %}
+           <li>
+             <div>{{ item.title }}</div>
+             <div><span class="feed-date" data-url="{{ item.url }}" title="{{ item.last_post.strftime('%Y-%m-%d %H:%M') if item.last_post else '' }}">{{ item.last_post|relativetime }}</span></div>
+             <div>{{ channel_name_map.get(feed_map.get(item.url), '—') }}</div>
+             <div><a href="{{ meta[item.url].entry_url or meta[item.url].page_url or item.url }}" target="_blank">Page</a></div>
+           </li>
+           {% endfor %}
+         </ul>
+       </li>
+       {% endfor %}
+     {% else %}
+       {# Channel-based grouping: show mapped channels first #}
+       {% for ch, items in group_channels.items() if ch is not none %}
+         <li data-group="{{ ch }}">
+           <div class="group-header">{{ channel_name_map.get(ch, '—') }} ({{ items|length }})</div>
+           <ul class="feed-list grouped">
+             <li class="header-row">
+               <div><strong>Name</strong></div>
+               <div><strong>Latest Post</strong></div>
+               <div><strong>Channel</strong></div>
+               <div><strong>Page</strong></div>
+             </li>
+             {% for item in items %}
+             <li>
+               <div>{{ item.title }}</div>
+               <div><span class="feed-date" data-url="{{ item.url }}" title="{{ item.last_post.strftime('%Y-%m-%d %H:%M') if item.last_post else '' }}">{{ item.last_post|relativetime }}</span></div>
+               <div>{{ channel_name_map.get(ch, '—') }}</div>
+               <div><a href="{{ meta[item.url].entry_url or meta[item.url].page_url or item.url }}" target="_blank">Page</a></div>
+             </li>
+             {% endfor %}
+           </ul>
+         </li>
+       {% endfor %}
+       {# Now show unmapped at bottom #}
+       {% if group_channels.get(None) %}
+         <li data-group="unmapped">
+           <div class="group-header" title="Feeds in this group are not mapped to any Discord channel and will not be sent.">Unmapped ({{ group_channels[None]|length }})</div>
+           <ul class="feed-list grouped">
+             <li class="header-row">
+               <div><strong>Name</strong></div>
+               <div><strong>Latest Post</strong></div>
+               <div><strong>Channel</strong></div>
+               <div><strong>Page</strong></div>
+             </li>
+             {% for item in group_channels[None] %}
+             <li>
+               <div>{{ item.title }}</div>
+               <div><span class="feed-date" data-url="{{ item.url }}" title="{{ item.last_post.strftime('%Y-%m-%d %H:%M') if item.last_post else '' }}">{{ item.last_post|relativetime }}</span></div>
+               <div>—</div>
+               <div><a href="{{ meta[item.url].entry_url or meta[item.url].page_url or item.url }}" target="_blank">Page</a></div>
+             </li>
+             {% endfor %}
+           </ul>
+         </li>
+       {% endif %}
+     {% endif %}
+   </ul>
+   {% else %}
+     <ul class="feed-list">
+     <li class="header-row">
+       <div><strong>Name</strong></div>
+       <div><strong>Latest Post</strong></div>
+       <div><strong>Channel</strong></div>
+       <div><strong>Page</strong></div>
+     </li>
+     {% for item in feed_items %}
+           <li class="{% if not feed_map.get(item.url) %}unmapped{% endif %}">
+             <div>{{ item.title }}</div>
+             <div><span class="feed-date" data-url="{{ item.url }}" title="{{ item.last_post.strftime('%Y-%m-%d %H:%M') if item.last_post else '' }}">{{ item.last_post.strftime('%Y-%m-%d %H:%M') if item.last_post else '' }}</span></div>
+             <div>{{ channel_name_map.get(feed_map.get(item.url), '—') }}</div>
+             <div><a href="{{ meta[item.url].entry_url or meta[item.url].page_url or item.url }}" target="_blank">Page</a></div>
+           </li>
+     {% endfor %}
+   </ul>
+   {% endif %}
+   </div> <!-- #feed-list-container -->
+   <script>
+   (function(){
+    var container = document.getElementById('feed-list-container');
+    container.style.transition = 'opacity 0.15s';
+     function init(){
+      document.querySelectorAll('a.ajax-link').forEach(link=>{
+         link.addEventListener('click',e=>{
+           e.preventDefault();
+           var url = link.href;
+           container.style.opacity=0;
+           fetch(url,{headers:{'X-Requested-With':'XMLHttpRequest'}})
+             .then(r=>r.text()).then(html=>{
+               var doc = new DOMParser().parseFromString(html,'text/html');
+               var newContent = doc.getElementById('feed-list-container').innerHTML;
+               container.innerHTML = newContent;
+               window.history.pushState(null,'',url);
+               container.style.opacity=1;
+               init();
+             });
+         });
+       });
+     }
+     document.addEventListener('DOMContentLoaded', init);
+   })();
+   </script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>System Stats</title>
+</head>
+<body>
+  <h1>System Stats</h1>
+  <p><strong>Bot Status:</strong> {{ status }}{% if status_ttl and status_ttl > 0 %} (expires in {{ status_ttl }}s){% endif %}</p>
+  <h2>Resource Metrics</h2>
+  <p>CPU Usage: {{ cpu }}%</p>
+  <p>Memory Usage: {{ memory }} MB</p>
+  <h2>Counts</h2>
+  <p>Total Feeds: {{ feed_count }}</p>
+  <p>Total Channels: {{ channel_count }}</p>
+  <p><a href="{{ url_for('dashboard') }}">Back to Dashboard</a></p>
+</body>
+</html>
