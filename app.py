@@ -14,7 +14,6 @@ import redis
 from redis import Redis
 from typing import cast, Optional
 from bot.formatter import build_prompt  # Import build_prompt function
-from flask import Flask, jsonify, abort, render_template, request, redirect, url_for, Response, session, flash
 from celery_app import run_discord_bot_job, fetch_feed_meta  # also import fetch_feed_meta
 
 # Data directory for persistent storage (mount a volume here)

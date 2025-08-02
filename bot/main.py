@@ -175,6 +175,7 @@ async def run_bot_job():
         await process_feeds_once(client)
         print("Job complete. Logging out.")
         await client.close()
+        print("🔌 Discord client closed after job.")
 
     await client.start(BOT_TOKEN)
 
@@ -426,7 +427,14 @@ async def process_feeds_once(client: discord.Client):
                 body, tldr = split_reply(reply)
             
             # CRITICAL: Post FULL content ONLY to Details thread - NEVER to main channel
-            await push(client, details_thread, entry, body, tldr, post_time)
+            # Post full detailed content to Details thread and capture message instance
+            detailed_msg = None
+            print(f"🔔 Posting detailed content for GUID {entry.get('guid')} to thread {details_thread.id}")
+            try:
+                detailed_msg = await push(client, details_thread, entry, body, tldr, post_time)
+                print(f"🔔 Posted detailed content for GUID {entry.get('guid')}, message ID {getattr(detailed_msg, 'id', None)}")
+            except Exception as e:
+                print(f"🚨 Error posting detailed content for GUID {entry.get('guid')}: {e}")
             
             # Generate summary for main channel
             raw_text = entry.get('raw', '')
@@ -444,23 +452,36 @@ async def process_feeds_once(client: discord.Client):
             
             # Build summary content with separator - ONLY summary goes to main channel
             separator = "\n\u200b\n\u200b\n\u200b\n\u200b"
+            # Build summary content with separator - ONLY summary goes to main channel
+            fb_link = entry.get('link', '#')
+            # Link to detailed Discord message if available
+            if detailed_msg and getattr(detailed_msg, 'jump_url', None):
+                link_line = f"-# [Details]({detailed_msg.jump_url}) | <{fb_link}>"
+            else:
+                link_line = f"-# <{fb_link}>"
             summary_content = (
                 f"## {idx}. {summary_line}\n"
-                f"-# <{entry.get('link','#')}>" + separator
+                f"{link_line}" + separator
             )
             
             # Send ONLY summary via webhook to main channel
+            print(f"🔔 Obtaining webhook for channel {ch.id}")
             webhook_url = await get_or_create_webhook_url(ch)
+            print(f"🔔 Webhook URL obtained for channel {ch.id}: {webhook_url}")
             webhook = discord.Webhook.from_url(webhook_url, client=client)
-            
             # Split content into <=2000-char chunks to avoid Discord limits
-            for i in range(0, len(summary_content), 2000):
-                chunk = summary_content[i:i+2000]
-                await webhook.send(
-                    content=chunk,
-                    username=entry.get('page_name'),
-                    avatar_url=avatar_for(entry)
-                )
+            chunks = [summary_content[i:i+2000] for i in range(0, len(summary_content), 2000)]
+            for idx_chunk, chunk in enumerate(chunks, start=1):
+                print(f"🔔 Sending summary chunk {idx_chunk}/{len(chunks)} to main channel {ch.id}")
+                try:
+                    await webhook.send(
+                        content=chunk,
+                        username=entry.get('page_name'),
+                        avatar_url=avatar_for(entry)
+                    )
+                    print(f"🔔 Sent summary chunk {idx_chunk}/{len(chunks)}")
+                except Exception as e:
+                    print(f"🚨 Error sending summary chunk {idx_chunk} for GUID {entry.get('guid')}: {e}")
             
             # Persist seen GUID and sleep to avoid rate limits
             seen_guids.add(entry['guid'])
