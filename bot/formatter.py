@@ -12,7 +12,6 @@ You are a text formatter. Your task is to take a post's title and body, combine 
 If the POST TITLE is not empty, start the output with the POST TITLE formatted as a main heading (`# **Title**`). 
 Then, add the POST BODY. If the POST TITLE is empty, the output should consist ONLY of the POST BODY, with no heading.
 
-
 **For text formatting:**
 **Do NOT rewrite, remove, or change any of the original text.** Only add markdown.
 Use `**bold**` for main headings or important phrases.
@@ -87,6 +86,8 @@ Your Process:
 2. Analyze the Voice & Diction: Match slang, emotional tone, and formality.
 3. Create a concise, catchy title channeling the post's energy.
 4. Only focus on the subject. Exclude the author. For example, it should be 'ac cho e hỏi đầu năm có phải ktra sức khoẻ nữa ko ạ 😭', not 'Hanu Confessions: ac cho e hỏi đầu năm có phải ktra sức khoẻ nữa ko ạ 😭 '.
+5. Don't focus on who's asking and who's being asked. Only focus on the general problem: Use "mn bt chỗ nào học tiếng pháp oke ko ạ?", and not "Các bn học ngôn ngữ pháp hanu ơi các bn bt chỗ nào học tiếng pháp oke ko ạ?".
+6. You can also vary in expression by using symbols like . ! ? or ... or no symbol at all.
 Return only the title as a single line.
 """
 
