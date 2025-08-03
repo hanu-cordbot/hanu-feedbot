@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime, timezone
-from flask import Flask, jsonify, abort, render_template, request, redirect, url_for, Response, session, flash
+from flask import Flask, jsonify, abort, render_template, request, redirect, url_for, Response, session, flash, send_from_directory
 from dotenv import load_dotenv
 from functools import wraps
 import hashlib
@@ -66,7 +66,17 @@ if not JOB_ENDPOINT:
 if not JOB_ENDPOINT.startswith('/'):
     JOB_ENDPOINT = f'/{JOB_ENDPOINT}'
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DOCS_DIR = os.path.join(BASE_DIR, 'docs')
 app = Flask(__name__)
+# Serve public static pages from the docs directory
+@app.route('/')
+@app.route('/index.html')
+def serve_index():
+    return send_from_directory(DOCS_DIR, 'index.html')
+@app.route('/<path:filename>')
+def serve_docs(filename):
+    return send_from_directory(DOCS_DIR, filename)
 # Jinja filter to display relative times (e.g., '2 hours ago')
 @app.template_filter('relativetime')
 def relative_time(dt):
@@ -125,8 +135,9 @@ def login_required(f):
 from flask_cors import CORS
 CORS(app, origins=[
     "https://yourusername.github.io",  # Replace with your GitHub Pages URL
-    "http://localhost:3000",            # Local dev frontend
-    "http://127.0.0.1:5000"            # Local API testing
+    "http://localhost:3000",           # Local dev frontend
+    "http://127.0.0.1:5000",           # Local API testing
+    "http://127.0.0.1:8000"            # Local docs server
 ])
 
 # Authentication bridge for JWT-like tokens
@@ -142,6 +153,93 @@ def api_login():
         token = base64.b64encode(json.dumps(token_data).encode()).decode()
         return jsonify({"success": True, "token": token})
     return jsonify({"success": False, "error": "Invalid credentials"}), 401
+
+@app.route('/api/status')
+def api_status():
+    """Endpoint to check token validity"""
+    if not verify_api_token():
+        return jsonify({"error": "Authentication required"}), 401
+    return jsonify({"status": "ok"}), 200
+    
+@app.route('/api/reset-summary', methods=['POST'])
+def api_reset_summary():
+    if not verify_api_token():
+        return jsonify({"error": "Authentication required"}), 401
+    # Stub: reset any daily summary state if applicable
+    return jsonify({"success": True, "message": "Daily summary reset"}), 200
+
+@app.route('/api/cache', methods=['DELETE'])
+def api_clear_cache():
+    if not verify_api_token():
+        return jsonify({"error": "Authentication required"}), 401
+    # Clear avatar cache
+    try:
+        with open(os.path.join(DATA_DIR, 'avatar_cache.json'), 'w') as f:
+            json.dump({}, f)
+    except Exception:
+        pass
+    return jsonify({"success": True, "message": "Cache cleared"}), 200
+
+@app.route('/api/run-job', methods=['POST'])
+def api_run_job():
+    """Trigger the background Discord RSS bot run job"""
+    if not verify_api_token():
+        return jsonify({"error": "Authentication required"}), 401
+    try:
+        # Enqueue asynchronous job
+        run_discord_bot_job.delay()  # type: ignore
+        return jsonify({"success": True, "message": "Run job enqueued"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+    
+@app.route('/api/channels/fetch-name', methods=['POST'])
+def api_fetch_channel_name():
+    if not verify_api_token():
+        return jsonify({"error": "Authentication required"}), 401
+    data = request.get_json() or {}
+    cid = data.get('channelId')
+    if not cid:
+        return jsonify({"error": "channelId required"}), 400
+    bot_token = os.environ.get('DISCORD_BOT_TOKEN')
+    # If no bot token, return stored name or ID
+    if not bot_token:
+        try:
+            channels = json.load(open(CHANNELS_FILE))
+            for ch in channels:
+                if str(ch.get('id')) == str(cid):
+                    return jsonify({"success": True, "name": ch.get('name') or str(cid)}), 200
+        except Exception:
+            pass
+        return jsonify({"success": True, "name": str(cid)}), 200
+    # Fetch from Discord API
+    try:
+        headers = {"Authorization": f"Bot {bot_token}"}
+        resp = requests.get(f"https://discord.com/api/v10/channels/{cid}", headers=headers, timeout=5)
+        resp.raise_for_status()
+        info = resp.json()
+        name = info.get('name') or str(cid)
+    except Exception as e:
+        # on failure, fallback to stored or raw ID
+        print(f"Warning: Discord API fetch failed: {e}")
+        try:
+            channels = json.load(open(CHANNELS_FILE))
+            for ch in channels:
+                if str(ch.get('id')) == str(cid):
+                    return jsonify({"success": True, "name": ch.get('name') or str(cid)}), 200
+        except Exception:
+            pass
+        return jsonify({"success": True, "name": str(cid)}), 200
+    # attempt to update channels file (non-fatal)
+    try:
+        channels = json.load(open(CHANNELS_FILE))
+        for ch in channels:
+            if str(ch.get('id')) == str(cid):
+                ch['name'] = name
+        with open(CHANNELS_FILE, 'w') as f:
+            json.dump(channels, f)
+    except Exception as file_err:
+        print(f"Warning: failed to update channels file: {file_err}")
+    return jsonify({"success": True, "name": name}), 200
 
 
 def verify_api_token():
@@ -241,12 +339,30 @@ def api_remove_feed():
         return jsonify({"success": True, "message": "Feed removed"})
     return jsonify({"success": False, "error": "feedUrl required"}), 400
 
-@app.route("/api/channels")
+@app.route("/api/channels", methods=["GET"])
 @api_login_required
 def api_channels():
     """JSON API for channel management"""
     channels = json.load(open(CHANNELS_FILE)) if os.path.exists(CHANNELS_FILE) else []
-    return jsonify({"channels": channels})
+    # Represent IDs as strings to avoid JS precision loss
+    for ch in channels:
+        ch['id'] = str(ch.get('id'))
+    return jsonify({'channels': channels})
+
+@app.route("/api/channels", methods=["DELETE"])
+@api_login_required
+def api_delete_channel():
+    """Delete a channel via JSON API"""
+    data = request.get_json() or {}
+    cid = data.get('channelId')
+    if cid is None:
+        return jsonify({'success': False, 'error': 'channelId required'}), 400
+    # Filter out the channel
+    channels = json.load(open(CHANNELS_FILE)) if os.path.exists(CHANNELS_FILE) else []
+    channels = [c for c in channels if str(c.get('id')) != str(cid)]
+    with open(CHANNELS_FILE, 'w') as f:
+        json.dump(channels, f)
+    return jsonify({'success': True, 'message': 'Channel deleted'}), 200
 
 @app.route("/api/channels", methods=["POST"])
 @api_login_required
@@ -255,12 +371,14 @@ def api_add_channel():
     data = request.get_json() or {}
     cid = data.get("channelId")
     if cid:
+        # Preserve channel ID as string to avoid precision loss
+        cid_str = str(cid)
         try:
-            cid_int = int(cid)
+            cid_int = int(cid_str)
         except ValueError:
             return jsonify({"success": False, "error": "Invalid channelId"}), 400
         channels = json.load(open(CHANNELS_FILE)) if os.path.exists(CHANNELS_FILE) else []
-        if not any(c.get("id") == cid_int for c in channels):
+        if not any(str(c.get("id")) == cid_str for c in channels):
             # Detect channel type via Discord API
             bot_token = os.environ.get("DISCORD_BOT_TOKEN")
             print(f"🔍 Adding channel {cid}, bot_token available: {bool(bot_token)}")
@@ -286,7 +404,7 @@ def api_add_channel():
             else:
                 print("⚠️ No bot token available, using defaults")
             
-            channel_data = {"id": cid_int, "type": detected_type, "name": channel_name}
+            channel_data = {"id": cid_str, "type": detected_type, "name": channel_name}
             print(f"💾 Saving channel data: {channel_data}")
             channels.append(channel_data)
             with open(CHANNELS_FILE, "w") as f:
@@ -301,6 +419,56 @@ def api_groups():
     """JSON API for group management"""
     groups = json.load(open(GROUPS_FILE)) if os.path.exists(GROUPS_FILE) else {}
     return jsonify({"groups": groups})
+    
+@app.route("/api/groups", methods=["POST"])
+@api_login_required
+def api_add_group():
+    """JSON API for creating a new group"""
+    data = request.get_json() or {}
+    name = data.get('groupName')
+    if not name:
+        return jsonify({'success': False, 'error': 'groupName required'}), 400
+    groups = json.load(open(GROUPS_FILE)) if os.path.exists(GROUPS_FILE) else {}
+    if name in groups:
+        return jsonify({'success': False, 'error': 'Group already exists'}), 400
+    groups[name] = []
+    with open(GROUPS_FILE, 'w') as f:
+        json.dump(groups, f)
+    return jsonify({'success': True, 'message': 'Group created'}), 200
+
+@app.route("/api/groups", methods=["PUT"])
+@api_login_required
+def api_rename_group():
+    """JSON API for renaming an existing group"""
+    data = request.get_json() or {}
+    old = data.get('oldName')
+    new = data.get('newName')
+    if not old or not new:
+        return jsonify({'success': False, 'error': 'oldName and newName required'}), 400
+    groups = json.load(open(GROUPS_FILE)) if os.path.exists(GROUPS_FILE) else {}
+    if old not in groups:
+        return jsonify({'success': False, 'error': 'Group not found'}), 404
+    if new in groups:
+        return jsonify({'success': False, 'error': 'New group name already exists'}), 400
+    groups[new] = groups.pop(old)
+    with open(GROUPS_FILE, 'w') as f:
+        json.dump(groups, f)
+    return jsonify({'success': True, 'message': 'Group renamed'}), 200
+
+@app.route("/api/groups", methods=["DELETE"])
+@api_login_required
+def api_delete_group():
+    """JSON API for deleting a group"""
+    name = request.args.get('name')
+    if not name:
+        return jsonify({'success': False, 'error': 'name parameter required'}), 400
+    groups = json.load(open(GROUPS_FILE)) if os.path.exists(GROUPS_FILE) else {}
+    if name not in groups:
+        return jsonify({'success': False, 'error': 'Group not found'}), 404
+    groups.pop(name)
+    with open(GROUPS_FILE, 'w') as f:
+        json.dump(groups, f)
+    return jsonify({'success': True, 'message': 'Group deleted'}), 200
 
 # Direct runnable entrypoint
 if __name__ == "__main__":

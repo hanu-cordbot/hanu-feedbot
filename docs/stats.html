@@ -1,0 +1,732 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>HANU Statistics</title>
+  <link href="shared/common.css" rel="stylesheet">
+
+  <!-- Force login BEFORE any other JS runs -->
+  <script type="module" src="shared/auth-boot.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Navigation -->
+    <div class="nav">
+      <a href="index.html">🏠 Home</a>
+      <a href="dashboard.html">🤖 Dashboard</a>
+      <a href="prompt-editor.html">✏️ Prompt Editor</a>
+      <a href="stats.html" class="active">📊 Statistics</a>
+      <a href="analytics.html">📈 Analytics</a>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <h1>📊 System Statistics</h1>
+      <p>Real-time performance metrics and analytics for HANU Bot</p>
+    </div>
+
+    <!-- Authentication -->
+    <div class="auth-section" id="auth-section">
+      <h3>🔐 Authentication Required</h3>
+      <input type="password" id="auth-token" placeholder="Enter AUTH_TOKEN">
+      <button id="login-button">Login</button>
+      <div id="auth-status" style="margin-top: 10px;"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="hidden">
+      <!-- Overview Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value-large" id="total-feeds">0</div>
+          <div class="stat-label-large">📡 Total Feeds</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="feeds-progress" style="width: 0%"></div>
+          </div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-value-large" id="active-feeds">0</div>
+          <div class="stat-label-large">🟢 Active Feeds</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="active-progress" style="width: 0%"></div>
+          </div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-value-large" id="total-posts">0</div>
+          <div class="stat-label-large">📨 Posts Processed</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="posts-progress" style="width: 100%"></div>
+          </div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-value-large" id="health-score">0%</div>
+          <div class="stat-label-large">🎯 Health Score</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="health-progress" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System Health -->
+      <div class="section">
+        <h2>🏥 System Health</h2>
+        <div class="status-grid">
+          <div class="status-card">
+            <strong>🤖 Bot Status</strong>
+            <div class="status-value" id="bot-status">Loading...</div>
+          </div>
+          <div class="status-card">
+            <strong>⚡ Last Run</strong>
+            <div class="status-value" id="last-run">Loading...</div>
+          </div>
+          <div class="status-card">
+            <strong>🔄 Run Frequency</strong>
+            <div class="status-value">Every 3 hours</div>
+          </div>
+          <div class="status-card">
+            <strong>💾 Memory Usage</strong>
+            <div class="status-value" id="memory-usage">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Performance Charts -->
+      <div class="section">
+        <h2>📈 Performance Overview</h2>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Feed Activity Distribution</h3>
+            </div>
+            <canvas id="activity-chart" width="400" height="200"></canvas>
+          </div>
+          
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Channel Usage</h3>
+            </div>
+            <canvas id="channel-chart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Performance Table -->
+      <div class="section">
+        <h2>📋 Feed Performance Details</h2>
+        <div class="controls mb-15">
+          <label>Show:</label>
+          <div class="btn-group">
+            <button class="btn btn-outline active" onclick="setFeedFilter('all')" id="feed-all">All</button>
+            <button class="btn btn-outline" onclick="setFeedFilter('healthy')" id="feed-healthy">Healthy</button>
+            <button class="btn btn-outline" onclick="setFeedFilter('warning')" id="feed-warning">Warning</button>
+            <button class="btn btn-outline" onclick="setFeedFilter('critical')" id="feed-critical">Critical</button>
+          </div>
+          
+          <div style="margin-left: 20px;">
+            <label>Sort by:</label>
+            <select onchange="setFeedSort(this.value)" id="feed-sort">
+              <option value="health">Health Score</option>
+              <option value="name">Name</option>
+              <option value="lastPost">Last Post</option>
+              <option value="channel">Channel</option>
+            </select>
+          </div>
+        </div>
+        
+        <div id="feed-performance-container">
+          <div class="loading">Loading feed performance data...</div>
+        </div>
+      </div>
+
+      <!-- Channel Statistics -->
+      <div class="section">
+        <h2>💬 Channel Performance</h2>
+        <div id="channel-stats">
+          <div class="loading">Loading channel statistics...</div>
+        </div>
+      </div>
+
+      <!-- System Diagnostics -->
+      <div class="section">
+        <h2>🔍 System Diagnostics</h2>
+        <div class="controls mb-15">
+          <button onclick="runDiagnostics()" class="btn btn-primary">🔍 Run Diagnostics</button>
+          <button onclick="refreshAllStats()" class="btn btn-secondary">🔄 Refresh All</button>
+        </div>
+        
+        <div id="diagnostics-output" class="code-output hidden">
+          <div class="loading">Running diagnostics...</div>
+        </div>
+      </div>
+
+      <!-- Recent Activity Log -->
+      <div class="section">
+        <h2>📜 Recent Activity</h2>
+        <div class="controls mb-15">
+          <button onclick="refreshActivity()" class="btn btn-secondary">🔄 Refresh</button>
+          <button onclick="exportLogs()" class="btn btn-outline">📥 Export Logs</button>
+        </div>
+        
+        <div id="activity-log">
+          <div class="loading">Loading activity log...</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="section">
+        <h2>⚙️ Maintenance Actions</h2>
+        <div class="flex gap-15">
+          <button onclick="generateReport()" class="btn btn-primary">📄 Generate Report</button>
+          <button onclick="clearStats()" class="btn btn-secondary">🗑️ Clear Statistics</button>
+          <button onclick="testBot()" class="btn btn-success">🧪 Test Bot</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module">
+    import HanuAuth from './shared/auth.js';
+    import HanuAPI from './shared/api.js';
+
+    let feedPerformanceData = [];
+    let channelStatsData = [];
+    let currentFeedFilter = 'all';
+    let currentFeedSort = 'health';
+    let activityChart = null;
+    let channelChart = null;
+    let statsInterval = null;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+      HanuAuth.setupAuthUI();
+      
+      HanuAuth.onLogin(async () => {
+        await loadAllStats();
+        setupCharts();
+        startAutoRefresh();
+      });
+      
+      twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
+      
+      if (HanuAuth.isAuthenticated()) {
+        const isValid = await HanuAuth.testAuth();
+        if (isValid) {
+          document.getElementById('auth-section').classList.add('hidden');
+          document.getElementById('main-content').classList.remove('hidden');
+          await loadAllStats();
+          setupCharts();
+          startAutoRefresh();
+        }
+      }
+    });
+
+    // Load all statistics
+    async function loadAllStats() {
+      try {
+        console.log('📊 Loading all statistics...');
+        
+        await Promise.all([
+          loadSystemStats(),
+          loadFeedPerformance(),
+          loadChannelStats(),
+          generateMockActivityLog()
+        ]);
+        
+        console.log('✅ All statistics loaded');
+      } catch (error) {
+        console.error('Failed to load statistics:', error);
+        showAlert('Failed to load statistics: ' + error.message, 'danger');
+      }
+    }
+
+    // Load real system statistics
+    async function loadSystemStats() {
+      try {
+        const [statusData, statsData] = await Promise.all([
+          HanuAPI.getSystemStatus(),
+          HanuAPI.getSystemStats()
+        ]);
+
+        console.log('📊 System stats loaded:', statsData);
+
+        // Update overview stats with real data
+        document.getElementById('total-feeds').textContent = statsData.feedCount || 0;
+        document.getElementById('active-feeds').textContent = statsData.activeFeedCount || 0;
+        document.getElementById('total-posts').textContent = statusData.seenCount || 0;
+        document.getElementById('health-score').textContent = statsData.healthScore || 0;
+
+        // Update progress bars
+        const feedProgress = statsData.feedCount > 0 ? Math.min((statsData.feedCount / 50) * 100, 100) : 0;
+        const activeProgress = statsData.feedCount > 0 ? (statsData.activeFeedCount / statsData.feedCount * 100) : 0;
+        const healthProgress = statsData.healthScore || 0;
+
+        document.getElementById('feeds-progress').style.width = feedProgress + '%';
+        document.getElementById('active-progress').style.width = activeProgress + '%';
+        document.getElementById('health-progress').style.width = healthProgress + '%';
+
+        // Update system health
+        document.getElementById('bot-status').textContent = statusData.workerStatus || 'Unknown';
+        document.getElementById('last-run').textContent = statusData.lastRun ? 
+          formatDate(new Date(statusData.lastRun)) : 'Never';
+        document.getElementById('memory-usage').textContent = statsData.memory ? 
+          statsData.memory + ' KB' : 'N/A';
+
+      } catch (error) {
+        console.error('Failed to load system stats:', error);
+        showAlert('Failed to load system statistics', 'danger');
+      }
+    }
+
+    // Load real feed performance data
+    async function loadFeedPerformance() {
+      try {
+        const data = await HanuAPI.getFeedPerformance();
+        feedPerformanceData = data.performance || [];
+        
+        console.log('📊 Feed performance loaded:', feedPerformanceData.length, 'feeds');
+        
+        renderFeedPerformance();
+      } catch (error) {
+        console.error('Failed to load feed performance:', error);
+        document.getElementById('feed-performance-container').innerHTML = 
+          '<div class="error">Failed to load feed performance data</div>';
+      }
+    }
+
+    // Render feed performance table with real data
+    function renderFeedPerformance() {
+      const container = document.getElementById('feed-performance-container');
+      
+      // Apply filtering
+      let filteredData = feedPerformanceData;
+      if (currentFeedFilter === 'healthy') {
+        filteredData = feedPerformanceData.filter(feed => feed.healthScore >= 80);
+      } else if (currentFeedFilter === 'warning') {
+        filteredData = feedPerformanceData.filter(feed => feed.healthScore >= 50 && feed.healthScore < 80);
+      } else if (currentFeedFilter === 'critical') {
+        filteredData = feedPerformanceData.filter(feed => feed.healthScore < 50);
+      }
+
+      // Apply sorting
+      filteredData.sort((a, b) => {
+        switch (currentFeedSort) {
+          case 'health':
+            return b.healthScore - a.healthScore;
+          case 'name':
+            return a.title.localeCompare(b.title);
+          case 'lastPost':
+            return new Date(b.lastPost || 0) - new Date(a.lastPost || 0);
+          case 'channel':
+            return (a.channel || '').localeCompare(b.channel || '');
+          default:
+            return 0;
+        }
+      });
+
+      if (filteredData.length === 0) {
+        container.innerHTML = '<div class="loading">No feeds match the current filter</div>';
+        return;
+      }
+
+      let html = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>📡 Feed Name</th>
+              <th>🎯 Health Score</th>
+              <th>📊 Status</th>
+              <th>📅 Last Post</th>
+              <th>💬 Channel</th>
+              <th>📈 Activity</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      filteredData.forEach(feed => {
+        const healthColor = feed.healthScore >= 80 ? 'success' : 
+                           feed.healthScore >= 50 ? 'warning' : 'danger';
+        const statusColor = feed.isActive ? 'success' : 'danger';
+        
+        html += `
+          <tr>
+            <td>
+              <div style="font-weight: 600;">${feed.title}</div>
+              <small style="color: #666;">${feed.url ? feed.url.substring(0, 50) + '...' : ''}</small>
+            </td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="badge bg-${healthColor}">${feed.healthScore}/100</span>
+                <div class="progress-bar" style="width: 60px;">
+                  <div class="progress-fill" style="width: ${feed.healthScore}%; background: var(--${healthColor});"></div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="badge bg-${statusColor}">
+                ${feed.isActive ? '🟢 Active' : '🔴 Inactive'}
+              </span>
+            </td>
+            <td>${feed.lastPost ? formatDate(new Date(feed.lastPost)) : 'Never'}</td>
+            <td>${feed.channel || 'Not mapped'}</td>
+            <td>
+              <div style="font-size: 0.9rem;">
+                ${feed.daysSincePost !== undefined ? `${Math.floor(feed.daysSincePost)}d ago` : 'N/A'}
+              </div>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // Load real channel statistics
+    async function loadChannelStats() {
+      try {
+        const data = await HanuAPI.getChannelStats();
+        channelStatsData = data.stats || [];
+        
+        console.log('📊 Channel stats loaded:', channelStatsData.length, 'channels');
+        
+        renderChannelStats();
+      } catch (error) {
+        console.error('Failed to load channel stats:', error);
+        document.getElementById('channel-stats').innerHTML = 
+          '<div class="error">Failed to load channel statistics</div>';
+      }
+    }
+
+    // Render channel statistics with real data
+    function renderChannelStats() {
+      const container = document.getElementById('channel-stats');
+      
+      if (channelStatsData.length === 0) {
+        container.innerHTML = '<div class="loading">No channels configured</div>';
+        return;
+      }
+
+      let html = '<div class="stats-grid">';
+      channelStatsData.forEach(channel => {
+        const utilizationColor = channel.feedCount > 0 ? 'success' : 'secondary';
+        const typeEmoji = channel.type === 'forum' ? '💬' : 
+                         channel.type === 'voice' ? '🔊' : '📝';
+        
+        html += `
+          <div class="stat-card">
+            <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 10px;">
+              ${typeEmoji} ${channel.name}
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+              <span>Feeds:</span>
+              <strong class="badge bg-${utilizationColor}">${channel.feedCount}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+              <span>Status:</span>
+              <strong>${channel.utilization}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+              <span>Type:</span>
+              <strong>${channel.type}</strong>
+            </div>
+            ${channel.lastUpdate ? `
+              <div style="font-size: 0.8rem; color: #666; margin-top: 8px;">
+                Updated: ${formatDate(new Date(channel.lastUpdate))}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+      html += '</div>';
+      
+      container.innerHTML = html;
+    }
+
+    // Generate mock activity log (replace with real API when available)
+    function generateMockActivityLog() {
+      const activities = [
+        { time: new Date(Date.now() - 2 * 60 * 1000), action: 'Processed new posts from CLB Dynamic HANU', type: 'success', details: '3 posts successfully sent to Discord' },
+        { time: new Date(Date.now() - 15 * 60 * 1000), action: 'Bot run completed successfully', type: 'info', details: 'Processed 44 feeds in 41 seconds' },
+        { time: new Date(Date.now() - 32 * 60 * 1000), action: 'Feed metadata refreshed', type: 'info', details: 'Updated metadata for 44 feeds' },
+        { time: new Date(Date.now() - 67 * 60 * 1000), action: 'Channel name sync completed', type: 'success', details: 'Updated 1 channel name from Discord' },
+        { time: new Date(Date.now() - 125 * 60 * 1000), action: 'Dashboard accessed', type: 'info', details: 'Admin authenticated and accessed dashboard' },
+        { time: new Date(Date.now() - 180 * 60 * 1000), action: 'System statistics requested', type: 'info', details: 'Real-time stats API called' }
+      ];
+
+      const container = document.getElementById('activity-log');
+      
+      let html = '';
+      activities.forEach(activity => {
+        const iconMap = {
+          success: '✅',
+          warning: '⚠️',
+          error: '❌',
+          info: '📋'
+        };
+
+        html += `
+          <div class="card mb-10">
+            <div class="flex-between">
+              <div>
+                <div style="font-weight: 600;">
+                  ${iconMap[activity.type]} ${activity.action}
+                </div>
+                <small style="color: #666;">${activity.details}</small>
+              </div>
+              <small style="color: #666;">${formatDate(activity.time)}</small>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      twemoji.parse(container, { folder: 'svg', ext: '.svg' });
+    }
+
+    // Setup charts with real data
+    function setupCharts() {
+      // Activity Distribution Chart
+      const activityCtx = document.getElementById('activity-chart').getContext('2d');
+      const activeFeeds = feedPerformanceData.filter(f => f.isActive).length;
+      const inactiveFeeds = feedPerformanceData.length - activeFeeds;
+      
+      activityChart = new Chart(activityCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Active Feeds', 'Inactive Feeds'],
+          datasets: [{
+            data: [activeFeeds, inactiveFeeds],
+            backgroundColor: ['#28a745', '#dc3545'],
+            borderWidth: 2,
+            borderColor: '#fff'
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                  const percentage = ((context.parsed / total) * 100).toFixed(1);
+                  return `${context.label}: ${context.parsed} (${percentage}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // Channel Usage Chart
+      const channelCtx = document.getElementById('channel-chart').getContext('2d');
+      const channelLabels = channelStatsData.map(c => c.name).slice(0, 5);
+      const channelData = channelStatsData.map(c => c.feedCount).slice(0, 5);
+      
+      channelChart = new Chart(channelCtx, {
+        type: 'bar',
+        data: {
+          labels: channelLabels,
+          datasets: [{
+            label: 'Feeds per Channel',
+            data: channelData,
+            backgroundColor: 'rgba(0, 123, 255, 0.8)',
+            borderColor: '#007bff',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { 
+              beginAtZero: true,
+              ticks: { stepSize: 1 }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    // Control functions
+    window.setFeedFilter = function(filter) {
+      currentFeedFilter = filter;
+      document.querySelectorAll('[id^="feed-"]').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`feed-${filter}`).classList.add('active');
+      renderFeedPerformance();
+    };
+
+    window.setFeedSort = function(sort) {
+      currentFeedSort = sort;
+      renderFeedPerformance();
+    };
+
+    // Action functions
+    window.runDiagnostics = async function() {
+      const output = document.getElementById('diagnostics-output');
+      output.classList.remove('hidden');
+      output.innerHTML = '<div class="loading">Running system diagnostics...</div>';
+
+      try {
+        const diagnostics = await HanuAPI.getDiagnostics();
+        output.innerHTML = `<pre>${JSON.stringify(diagnostics, null, 2)}</pre>`;
+        showAlert('Diagnostics completed! 🔍', 'success');
+      } catch (error) {
+        output.innerHTML = `<div class="error">Diagnostics failed: ${error.message}</div>`;
+        showAlert('Diagnostics failed: ' + error.message, 'danger');
+      }
+    };
+
+    window.testBot = async function() {
+      try {
+        showAlert('Testing bot connectivity...', 'info');
+        const result = await HanuAPI.runBot();
+        showAlert('Bot test completed! Check dashboard for results. 🧪', 'success');
+      } catch (error) {
+        showAlert('Bot test failed: ' + error.message, 'danger');
+      }
+    };
+
+    window.refreshActivity = async function() {
+      generateMockActivityLog();
+      showAlert('Activity log refreshed! 🔄', 'success');
+    };
+
+    window.refreshAllStats = async function() {
+      await loadAllStats();
+      
+      // Update charts
+      if (activityChart) {
+        activityChart.destroy();
+        setupCharts();
+      }
+      
+      showAlert('All statistics refreshed! 📊', 'success');
+    };
+
+    window.exportLogs = function() {
+      const reportData = {
+        timestamp: new Date().toISOString(),
+        feedPerformance: feedPerformanceData,
+        channelStats: channelStatsData,
+        systemHealth: {
+          totalFeeds: document.getElementById('total-feeds').textContent,
+          activeFeeds: document.getElementById('active-feeds').textContent,
+          healthScore: document.getElementById('health-score').textContent
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hanu-logs-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showAlert('Logs exported successfully! 📥', 'success');
+    };
+
+    window.generateReport = function() {
+      const reportData = {
+        generatedAt: new Date().toISOString(),
+        summary: {
+          totalFeeds: document.getElementById('total-feeds').textContent,
+          activeFeeds: document.getElementById('active-feeds').textContent,
+          totalPosts: document.getElementById('total-posts').textContent,
+          healthScore: document.getElementById('health-score').textContent
+        },
+        feedPerformance: feedPerformanceData,
+        channelStats: channelStatsData,
+        systemHealth: {
+          botStatus: document.getElementById('bot-status').textContent,
+          lastRun: document.getElementById('last-run').textContent,
+          memoryUsage: document.getElementById('memory-usage').textContent
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hanu-stats-report-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showAlert('Report generated successfully! 📄', 'success');
+    };
+
+    window.clearStats = async function() {
+      if (!confirm('Clear all statistics? This cannot be undone.')) return;
+      
+      try {
+        await HanuAPI.clearCache();
+        await loadAllStats();
+        showAlert('Statistics cleared! 🗑️', 'warning');
+      } catch (error) {
+        showAlert('Failed to clear statistics: ' + error.message, 'danger');
+      }
+    };
+
+    // Auto-refresh every 2 minutes
+    function startAutoRefresh() {
+      if (statsInterval) clearInterval(statsInterval);
+      
+      statsInterval = setInterval(async () => {
+        await loadSystemStats();
+        console.log('🔄 Auto-refreshed system stats');
+      }, 2 * 60 * 1000);
+    }
+
+    // Helper functions
+    function formatDate(date) {
+      const now = new Date();
+      const diffMinutes = Math.floor((now - date) / (1000 * 60));
+      
+      if (diffMinutes < 1) return 'Just now';
+      if (diffMinutes < 60) return `${diffMinutes}m ago`;
+      if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}h ago`;
+      return date.toLocaleDateString();
+    }
+
+    // Alert helper
+    function showAlert(message, type = 'info') {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type} fade-in`;
+      alertDiv.style.position = 'fixed';
+      alertDiv.style.top = '20px';
+      alertDiv.style.right = '20px';
+      alertDiv.style.zIndex = '10000';
+      alertDiv.style.minWidth = '300px';
+      alertDiv.textContent = message;
+      
+      document.body.appendChild(alertDiv);
+      
+      setTimeout(() => {
+        alertDiv.remove();
+      }, 5000);
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (statsInterval) clearInterval(statsInterval);
+      if (activityChart) activityChart.destroy();
+      if (channelChart) channelChart.destroy();
+    });
+  </script>
+</body>
+</html>

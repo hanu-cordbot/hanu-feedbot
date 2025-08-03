@@ -1,0 +1,317 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>HANU Analytics</title>
+  <link href="shared/common.css" rel="stylesheet">
+  <script type="module" src="shared/auth-boot.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Navigation -->
+    <div class="nav">
+      <a href="index.html">🏠 Home</a>
+      <a href="dashboard.html">🤖 Dashboard</a>
+      <a href="prompt-editor.html">✏️ Prompt Editor</a>
+      <a href="stats.html">📊 Statistics</a>
+      <a href="analytics.html" class="active">📈 Analytics</a>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <h1>📈 Website Analytics</h1>
+      <p>Track user behavior and website performance</p>
+    </div>
+
+    <!-- Authentication -->
+    <div class="auth-section" id="auth-section">
+      <h3>🔐 Authentication Required</h3>
+      <input type="password" id="auth-token" placeholder="Enter AUTH_TOKEN">
+      <button id="login-button">Login</button>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="hidden">
+      <!-- Live Metrics -->
+      <div class="section">
+        <h2>🔴 Live Metrics</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value-large" id="active-users">0</div>
+            <div class="stat-label-large">👥 Active Users</div>
+            <small>Last 5 minutes</small>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value-large" id="today-views">0</div>
+            <div class="stat-label-large">👁️ Today's Views</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value-large" id="avg-load-time">0ms</div>
+            <div class="stat-label-large">⚡ Avg Load Time</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value-large" id="bounce-rate">0%</div>
+            <div class="stat-label-large">📊 Bounce Rate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="section">
+        <h2>📊 Analytics Charts</h2>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h3>Daily Page Views</h3>
+            </div>
+            <canvas id="views-chart"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Top Pages</h3>
+            </div>
+            <div id="top-pages"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- User Activity -->
+      <div class="section">
+        <h2>👥 User Activity</h2>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h3>Recent Actions</h3>
+            </div>
+            <div id="recent-actions"></div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Top Countries</h3>
+            </div>
+            <div id="top-countries"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="section">
+        <h2>⚙️ Controls</h2>
+        <div class="flex gap-15">
+          <button onclick="refreshAnalytics()" class="btn btn-primary">🔄 Refresh</button>
+          <button onclick="exportAnalytics()" class="btn btn-outline">📥 Export Data</button>
+          <select onchange="changeDateRange(this.value)">
+            <option value="7">Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import HanuAuth from './shared/auth.js';
+    import Analytics from './shared/analytics.js';
+
+    let analyticsData = {};
+    let viewsChart = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      Analytics.trackPageView();
+      
+      HanuAuth.setupAuthUI();
+      HanuAuth.onLogin(async () => {
+        await loadAnalytics();
+        startLiveUpdates();
+      });
+
+      if (HanuAuth.isAuthenticated()) {
+        const isValid = await HanuAuth.testAuth();
+        if (isValid) {
+          document.getElementById('auth-section').classList.add('hidden');
+          document.getElementById('main-content').classList.remove('hidden');
+          await loadAnalytics();
+          startLiveUpdates();
+        }
+      }
+      
+      twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
+    });
+
+    async function loadAnalytics(days = 7) {
+      try {
+        const response = await fetch(`https://hanu-cordbot.snacky496.workers.dev/api/analytics?days=${days}`, {
+          headers: { 'Authorization': `Bearer ${HanuAuth.getToken()}` }
+        });
+        
+        analyticsData = await response.json();
+        renderAnalytics();
+        
+      } catch (error) {
+        console.error('Failed to load analytics:', error);
+        Analytics.trackError(error, 'load_analytics');
+      }
+    }
+
+    function renderAnalytics() {
+      // Update summary stats
+      document.getElementById('today-views').textContent = analyticsData.summary?.totalViews || 0;
+      document.getElementById('avg-load-time').textContent = 
+        Math.round(analyticsData.summary?.avgLoadTime || 0) + 'ms';
+
+      // Render charts
+      renderViewsChart();
+      renderTopPages();
+      renderTopCountries();
+    }
+
+    function renderViewsChart() {
+      const ctx = document.getElementById('views-chart').getContext('2d');
+      
+      if (viewsChart) viewsChart.destroy();
+      
+      viewsChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: analyticsData.daily?.map(d => d.date) || [],
+          datasets: [{
+            label: 'Page Views',
+            data: analyticsData.daily?.map(d => d.views) || [],
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    function renderTopPages() {
+      const container = document.getElementById('top-pages');
+      const topPages = analyticsData.summary?.topPages || [];
+      
+      let html = '<div class="list-group">';
+      topPages.forEach(([page, views]) => {
+        html += `
+          <div class="list-item">
+            <span>${page}</span>
+            <span class="badge bg-primary">${views}</span>
+          </div>
+        `;
+      });
+      html += '</div>';
+      
+      container.innerHTML = html;
+    }
+
+    function renderTopCountries() {
+      const container = document.getElementById('top-countries');
+      const topCountries = analyticsData.summary?.topCountries || [];
+      
+      let html = '<div class="list-group">';
+      topCountries.forEach(([country, views]) => {
+        const flag = getCountryFlag(country);
+        html += `
+          <div class="list-item">
+            <span>${flag} ${country}</span>
+            <span class="badge bg-info">${views}</span>
+          </div>
+        `;
+      });
+      html += '</div>';
+      
+      container.innerHTML = html;
+    }
+
+    function startLiveUpdates() {
+      // Update live metrics every 30 seconds
+      setInterval(async () => {
+        try {
+          const response = await fetch('https://hanu-cordbot.snacky496.workers.dev/api/analytics/dashboard', {
+            headers: { 'Authorization': `Bearer ${HanuAuth.getToken()}` }
+          });
+          const liveData = await response.json();
+          
+          document.getElementById('active-users').textContent = liveData.liveMetrics?.activeUsers || 0;
+          document.getElementById('today-views').textContent = liveData.liveMetrics?.todayViews || 0;
+          
+          renderRecentActions(liveData.liveMetrics?.recentActions || []);
+          
+        } catch (error) {
+          console.error('Live update failed:', error);
+        }
+      }, 30000);
+    }
+
+    function renderRecentActions(actions) {
+      const container = document.getElementById('recent-actions');
+      
+      let html = '<div class="activity-feed">';
+      actions.forEach(action => {
+        const timeAgo = formatTimeAgo(new Date(action.timestamp));
+        html += `
+          <div class="activity-item">
+            <div class="activity-icon">🎯</div>
+            <div class="activity-content">
+              <div class="activity-title">${action.action}</div>
+              <div class="activity-time">${timeAgo}</div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      
+      container.innerHTML = html;
+    }
+
+    // Control functions
+    window.refreshAnalytics = async function() {
+      Analytics.trackDashboardAction('refresh_analytics');
+      await loadAnalytics();
+    };
+
+    window.exportAnalytics = function() {
+      Analytics.trackDashboardAction('export_analytics');
+      
+      const blob = new Blob([JSON.stringify(analyticsData, null, 2)], { 
+        type: 'application/json' 
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hanu-analytics-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.changeDateRange = function(days) {
+      Analytics.trackDashboardAction('change_date_range', { days });
+      loadAnalytics(parseInt(days));
+    };
+
+    // Helper functions
+    function getCountryFlag(countryCode) {
+      const flags = {
+        'VN': '🇻🇳', 'US': '🇺🇸', 'GB': '🇬🇧', 'DE': '🇩🇪',
+        'FR': '🇫🇷', 'JP': '🇯🇵', 'CN': '🇨🇳', 'KR': '🇰🇷'
+      };
+      return flags[countryCode] || '🌍';
+    }
+
+    function formatTimeAgo(date) {
+      const seconds = Math.floor((Date.now() - date) / 1000);
+      if (seconds < 60) return 'just now';
+      if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+      if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+      return `${Math.floor(seconds / 86400)}d ago`;
+    }
+  </script>
+</body>
+</html>
