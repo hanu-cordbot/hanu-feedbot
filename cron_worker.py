@@ -45,8 +45,12 @@ async def main():
         print("🤖 Starting standalone bot job...")
         await run_bot_job()
         print("✅ Bot job completed successfully")
+        # Exit cleanly on success
+        sys.exit(0)
     except Exception as e:
         print(f"❌ Bot job failed: {e}")
+        # Exit with error code
+        sys.exit(1)
     finally:
         release_lock(lock_fd)
 

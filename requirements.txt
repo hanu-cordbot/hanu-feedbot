@@ -11,3 +11,4 @@ gunicorn
 celery
 redis
 requests
+Flask-Cors
