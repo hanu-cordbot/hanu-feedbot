@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
         with:
           # Use a Personal Access Token (PAT) with repo write permissions for pushing commits
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
