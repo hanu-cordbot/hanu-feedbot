@@ -14,13 +14,25 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          # Use a Personal Access Token (PAT) with repo write permissions for pushing commits
+          # Checkout main branch of the repository and configure clean fetch
+          ref: 'main'
+          repository: 'hanu-cordbot/hanu-feedbot'
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          fetch-depth: 0
-          # Disable submodule fetch since there is no .gitmodules entry
+          ssh-strict: true
+          ssh-user: 'git'
+          persist-credentials: true
+          clean: true
+          # Explicitly disable submodule fetching to prevent errors
           submodules: false
+          # Enable sparse checkout cone mode for improved performance
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+          fetch-tags: false
+          show-progress: true
+          lfs: false
+          set-safe-directory: true
 
       - name: Setup Python
         uses: actions/setup-python@v4
