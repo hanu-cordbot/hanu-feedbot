@@ -26,6 +26,7 @@ jobs:
           clean: true
           # Explicitly disable submodule fetching to prevent errors
           submodules: false
+          fetch-submodules: false
           # Enable sparse checkout cone mode for improved performance
           sparse-checkout-cone-mode: true
           fetch-depth: 1
