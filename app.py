@@ -131,8 +131,10 @@ def login_required(f):
 
 # CORS configuration for GitHub Pages and local development
 from flask_cors import CORS
+# Allow GitHub Pages site and Railway backend URL
 CORS(app, origins=[
-    "https://yourusername.github.io",  # Replace with your GitHub Pages URL
+    "https://hanu-cordbot.github.io",  # GitHub Pages
+    "https://splendid-eagerness-production-4843.up.railway.app",  # Railway API
     "http://localhost:3000",           # Local dev frontend
     "http://127.0.0.1:5000",           # Local API testing
     "http://127.0.0.1:8000"            # Local docs server

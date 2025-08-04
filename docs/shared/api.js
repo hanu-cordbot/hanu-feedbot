@@ -3,8 +3,8 @@ import HanuAuth from './auth.js';
 
 class HanuAPI {
   constructor() {
-    // Use the same origin as hosting page for API calls
-    this.baseUrl = window.location.origin;
+    // Use configured API_BASE if available (dashboard) or same origin
+    this.baseUrl = window.DEFAULT_AUTH_BASE || window.location.origin;
   }
 
   // Get authentication headers
