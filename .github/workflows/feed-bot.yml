@@ -19,6 +19,8 @@ jobs:
           # Use a Personal Access Token (PAT) with repo write permissions for pushing commits
           token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           fetch-depth: 0
+          # Disable submodule fetch since there is no .gitmodules entry
+          submodules: false
 
       - name: Setup Python
         uses: actions/setup-python@v4
