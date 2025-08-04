@@ -1,8 +1,10 @@
 // shared/auth.js - Complete Authentication System for HANU Dashboard
 class HanuAuth {
   constructor() {
-    // Use same origin as hosting page for API calls
-    this.apiBase = (typeof window !== 'undefined' ? window.location.origin : '');
+    // Use configured API_BASE (production) or same origin as fallback
+    this.apiBase = (typeof window !== 'undefined' && window.DEFAULT_AUTH_BASE)
+      ? window.DEFAULT_AUTH_BASE
+      : (typeof window !== 'undefined' ? window.location.origin : '');
     this.callbacks = {
       onLogin: [],
       onLogout: [],
