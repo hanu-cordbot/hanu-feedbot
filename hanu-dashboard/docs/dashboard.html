@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>HANU Dashboard</title>
+  <link href="shared/common.css" rel="stylesheet">
+  <style>
+    .list-group { margin-top: 20px; }
+    .list-item { padding: 12px 0; border-bottom: 1px solid #e9ecef; }
+    .list-item:last-child { border-bottom: none; }
+    select.mapping-select { width: 100%; }
+    /* Table layout matching index.html */
+    .feeds-table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: fixed; }
+
+    /* Column width definitions for consistent alignment */
+    .feeds-table col:nth-child(1) { width: 40%; }
+    .feeds-table col:nth-child(2) { width: 10%; }
+    .feeds-table col:nth-child(3) { width: 20%; }
+    .feeds-table col:nth-child(4) { width: 20%; }
+    .feeds-table col:nth-child(5) { width: 10%; }
+  </style>
+  
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+  <!-- Force login BEFORE any other JS runs -->
+  <script type="module" src="shared/auth-boot.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Navigation -->
+    <div class="nav">
+      <a href="index.html">🏠 Home</a>
+      <a href="dashboard.html" class="active">🤖 Dashboard</a>
+      <a href="prompt-editor.html">✏️ Prompt Editor</a>
+      <a href="stats.html">📊 Statistics</a>
+      <a href="analytics.html">📈 Analytics</a>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <h1>🤖 HANU Bot Dashboard</h1>
+      <p>Control and monitor your Discord RSS bot</p>
+    </div>
+
+    <!-- Authentication -->
+    <div class="auth-section" id="auth-section">
+      <h3>🔐 Authentication Required</h3>
+      <p>Please enter your authentication token to continue:</p>
+      <input type="password" id="auth-token" placeholder="Enter AUTH_TOKEN">
+      <button id="login-button">Login</button>
+      <div id="auth-status" style="margin-top: 10px;"></div>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main-content" class="hidden">
+
+      <!-- Feed Management -->
+      <div class="section">
+        <h2>📡 Feed Management</h2>
+        <div class="controls mb-15">
+          <input type="url" id="new-feed-url" placeholder="Enter RSS feed URL" style="flex: 1; margin-right: 10px;">
+          <button onclick="addFeed()" class="btn btn-primary">➕ Add Feed</button>
+        </div>
+        <!-- Dashboard view controls -->
+        <div class="controls">
+          <label>View:</label>
+          <a href="#" onclick="setView('flat')" id="flat-link">Flat</a>
+          <a href="#" onclick="setView('grouped')" class="active" id="grouped-link">Grouped</a>
+          <label>Group by:</label>
+          <a href="#" onclick="setGroupBy('category')" id="group-category">Category</a>
+          <a href="#" onclick="setGroupBy('status')" class="active" id="group-status">Status</a>
+          <label>Sort by:</label>
+          <a href="#" onclick="setSortBy('name')" id="sort-name">Name</a>
+          <a href="#" onclick="setSortBy('date')" class="active" id="sort-date">Date ↑</a>
+          <a href="#" onclick="setSortBy('channel')" id="sort-channel">Channel</a>
+          <label>Filter:</label>
+          <a href="#" onclick="setFilter('all')" class="active" id="filter-all">All</a>
+          <a href="#" onclick="setFilter('active')" id="filter-active">Active</a>
+          <a href="#" onclick="setFilter('inactive')" id="filter-inactive">Inactive</a>
+        </div>
+        <div id="feeds-container">
+          <div class="loading">Loading feeds...</div>
+        </div>
+      </div>
+
+      <!-- Channel Management -->
+      <div class="section">
+        <h2>💬 Channel Management</h2>
+        <div class="controls mb-15">
+          <input type="text" id="new-channel-id" placeholder="Enter Discord Channel ID" style="flex: 1; margin-right: 10px;">
+          <button onclick="addChannel()" class="btn btn-primary">➕ Add Channel</button>
+        </div>
+        
+        <div id="channels-container">
+          <div class="loading">Loading channels...</div>
+        </div>
+      </div>
+
+      <!-- Group Management -->
+      <div class="section">
+        <h2>📂 Group Management</h2>
+        <div class="controls mb-15">
+          <input type="text" id="new-group-name" placeholder="Enter group name" style="flex: 1; margin-right: 10px;">
+          <button onclick="addGroup()" class="btn btn-primary">➕ Create Group</button>
+        </div>
+        
+        <div id="groups-container">
+          <div class="loading">Loading groups...</div>
+        </div>
+      </div>
+
+      <!-- Test Panel -->
+      <div class="section">
+        <h2>🧪 Testing Panel</h2>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h3>Test Discord Connection</h3>
+            </div>
+            <div class="card-body">
+              <select id="test-channel-select" class="mb-10">
+                <option value="">Select channel...</option>
+              </select>
+              <textarea id="test-message" placeholder="Enter test message" rows="3" class="mb-10"></textarea>
+            <button onclick="testRunEndpoint()" class="btn btn-warning" style="margin-top:10px;">🧪 Test /run Endpoint</button>
+            <button onclick="resetSeenData()" class="btn btn-danger" style="margin-top:10px;">�️ Reset Seen Data</button>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-header">
+              <h3>Test Feed Parsing</h3>
+            </div>
+            <div class="card-body">
+              <select id="test-feed-select" class="mb-10">
+                <option value="">Select feed...</option>
+              </select>
+              <button onclick="testFeedParsing()" class="btn btn-info">🔍 Parse Feed</button>
+              <button onclick="getRandomEntry()" class="btn btn-secondary">🎲 Random Entry</button>
+              <button onclick="sendRandomPost()" class="btn btn-primary">🚀 Send Random Post</button>
+            </div>
+          </div>
+        </div>
+        
+        <div id="test-results" class="code-output hidden mt-15">
+          <div class="loading">Running test...</div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="section">
+        <h2>📋 Recent Activity</h2>
+        <div id="activity-feed">
+          <div class="loading">Loading recent activity...</div>
+        </div>
+      </div>
+
+      <!-- System Health -->
+      <div class="section">
+        <h2>🏥 System Health</h2>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <h3>Health Metrics</h3>
+            </div>
+            <div id="health-metrics">
+              <div class="loading">Loading health metrics...</div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-header">
+              <h3>Performance Chart</h3>
+            </div>
+            <canvas id="performance-chart" width="400" height="200"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module">
+    import HanuAuth from './shared/auth.js';
+    import HanuAPI, { runBotTest } from './shared/api.js';
+
+    // Initialization: wait for DOM and auth, then load dashboard
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Setup auth UI elements
+      HanuAuth.setupAuthUI();
+      // Block until user logs in
+      await HanuAuth.requireLogin();
+      // Switch UI to main content
+      document.getElementById('auth-section').classList.add('hidden');
+      document.getElementById('main-content').classList.remove('hidden');
+      // Load all data and start refresh
+      await loadDashboardData();
+      setupPerformanceChart();
+      startAutoRefresh();
+    });
+    
+    let feedsData = [];
+    let mappingsMap = {};
+    let metadataMap = {};
+    let groupsMap = {};
+    let channelsData = [];
+    let groupsData = [];
+    let performanceChart = null;
+    let refreshInterval = null;
+
+    // View, grouping, sorting, filtering state
+    let currentView = 'grouped';
+    let currentGroupBy = 'status';
+    let currentSort = 'date';
+    let currentFilter = 'all';
+    const sortOrder = { name: 'asc', date: 'asc', channel: 'asc' };
+
+    // Control functions copied from index.html
+    function setView(view) {
+      currentView = view;
+      document.getElementById('flat-link').classList.toggle('active', view === 'flat');
+      document.getElementById('grouped-link').classList.toggle('active', view === 'grouped');
+      renderFeeds();
+    }
+
+    function setGroupBy(groupBy) {
+      currentGroupBy = groupBy;
+      document.getElementById('group-category').classList.toggle('active', groupBy === 'category');
+      document.getElementById('group-status').classList.toggle('active', groupBy === 'status');
+      renderFeeds();
+    }
+
+    function setSortBy(sort) {
+      if (currentSort === sort) sortOrder[sort] = sortOrder[sort] === 'asc' ? 'desc' : 'asc'; else currentSort = sort;
+      ['name','date','channel'].forEach(k => document.getElementById('sort-'+k).classList.toggle('active', k===sort));
+      renderFeeds();
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      ['all','active','inactive'].forEach(k => document.getElementById('filter-'+k).classList.toggle('active', k===filter));
+      renderFeeds();
+    }
+
+    function toggleGroup(groupId) {
+      const content = document.getElementById(groupId);
+      const header = content.previousElementSibling;
+      content.classList.toggle('collapsed');
+      header.classList.toggle('collapsed');
+    }
+
+    // Load all dashboard data
+    async function loadDashboardData() {
+      try {
+        console.log('📊 Loading dashboard data...');
+        
+        // Load feeds, channels, groups, mappings, and metadata in one call
+        await loadFeeds();
+        // Load other data, catching errors individually
+        await loadSystemOverview().catch(err => console.error('Overview load failed:', err));
+        await loadRecentActivity().catch(err => console.error('Activity load failed:', err));
+        await loadHealthMetrics().catch(err => console.error('Health load failed:', err));
+        
+        populateTestSelects();
+        console.log('✅ Dashboard data loaded');
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        showAlert('Failed to load dashboard data: ' + error.message, 'danger');
+      }
+    }
+
+    // Load system overview stats
+    async function loadSystemOverview() {
+      try {
+        const status = await HanuAPI.getSystemStatus(); // now defined
+        const stats = await HanuAPI.getPublicStats();
+        const container = document.getElementById('system-overview');
+
+        let html = '<div class="overview-grid">';
+        html += `<div class="overview-item"><div class="label">Service Status</div><div class="value">Worker: ${status.worker?.status || status.status}</div></div>`;
+        html += `<div class="overview-item"><div class="label">Public Feeds</div><div class="value">${stats.feedCount || stats.feeds.length}</div></div>`;
+        html += `<div class="overview-item"><div class="label">Active Feeds</div><div class="value">${stats.activeFeedCount || 0}</div></div>`;
+        html += `<div class="overview-item"><div class="label">Uptime</div><div class="value">${formatUptime(stats.uptime)}</div></div>`;
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+      } catch (error) {
+        console.error('Failed to load system overview:', error);
+        document.getElementById('system-overview').innerHTML = 
+          '<div class="error">Failed to load system overview</div>';
+      }
+    }
+
+    // Load feeds, channels, groups, mappings, and metadata
+    async function loadFeeds() {
+      const container = document.getElementById('feeds-container');
+      container.innerHTML = '<div class="loading">Loading feeds...</div>';
+      try {
+        console.log('🔎 Fetching public dashboard data');
+        const data = await HanuAPI.getPublicFeeds();
+        console.log('📥 Public data received:', data);
+        // Unpack data
+        feedsData = data.feeds || [];
+        channelsData = data.channels || [];
+        mappingsMap = data.mappings || {};
+        metadataMap = data.metadata || {};
+        groupsMap = data.groups || {};
+        // Apply mappings to feed objects
+        feedsData.forEach(feed => {
+          feed.channelId = mappingsMap[feed.url] || '';
+          feed.groupName = '';
+          for (const [gName, urls] of Object.entries(groupsMap)) {
+            if (Array.isArray(urls) && urls.includes(feed.url)) {
+              feed.groupName = gName;
+              break;
+            }
+          }
+          if (metadataMap[feed.url]?.title) {
+            feed.title = metadataMap[feed.url].title;
+          }
+        });
+        // Derive group list
+        groupsData = Object.keys(groupsMap).map(name => ({ name, urls: groupsMap[name] }));
+        // Render all UI
+        renderFeeds();
+        renderChannels();
+        renderGroups();
+        populateTestSelects();
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+        container.innerHTML = '<div class="error">Failed to load feeds</div>';
+      }
+    }
+
+    // Render feeds list with fixed columns for feed info, channel, and group
+    function renderFeeds() {
+      const container = document.getElementById('feeds-container');
+      if (feedsData.length === 0) {
+        container.innerHTML = '<div class="empty-state">No feeds configured yet. Add one above!</div>';
+        return;
+      }
+      // Apply filtering
+      let list = feedsData.filter(feed => {
+        if (currentFilter === 'all') return true;
+        const isActive = !!feed.channelId;
+        return currentFilter === 'active' ? isActive : !isActive;
+      });
+      // Apply sorting
+      list.sort((a, b) => {
+        let res = 0;
+        if (currentSort === 'name') {
+          res = (a.title || a.url).localeCompare(b.title || b.url);
+        } else if (currentSort === 'date') {
+          const dateA = new Date(metadataMap[a.url]?.last_post || 0);
+          const dateB = new Date(metadataMap[b.url]?.last_post || 0);
+          res = dateB - dateA;
+        } else if (currentSort === 'channel') {
+          const nameA = (channelsData.find(c => c.id == a.channelId)?.name || '');
+          const nameB = (channelsData.find(c => c.id == b.channelId)?.name || '');
+          res = nameA.localeCompare(nameB);
+        } else if (currentSort === 'group') {
+          res = (a.groupName || '').localeCompare(b.groupName || '');
+        }
+        return sortOrder[currentSort] === 'asc' ? res : -res;
+      });
+      if (currentView === 'grouped') {
+        renderGroupedView(list);
+      } else {
+        renderFlatView(list);
+      }
+    }
+
+    function renderFlatView(list) {
+      const container = document.getElementById('feeds-container');
+      let html = `<table class="feeds-table">
+        <colgroup>
+          <col style="width:40%">
+          <col style="width:10%">
+          <col style="width:15%">
+          <col style="width:20%">
+          <col style="width:10%">
+          <col style="width:5%">
+        </colgroup>
+        <thead><tr>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Last Post</th>
+          <th>Channel</th>
+          <th>Group</th>
+          <th>Actions</th>
+        </tr></thead><tbody>`;
+      list.forEach(feed => {
+        const title = feed.title || 'Untitled Feed';
+        const url = feed.url;
+        const isActive = !!feed.channelId;
+        html += `
+          <tr>
+            <td><div class="feed-name">${title}</div><div class="feed-url" style="color:#6c757d;font-size:0.9rem;">${url}</div></td>
+            <td><span class="status ${isActive ? 'status-active' : 'status-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+            <td class="feed-date">${formatDate(metadataMap[feed.url]?.last_post)}</td>
+            <td><select class="mapping-select" onchange="updateFeedMapping('${feed.url}', this.value)"><option value="">Not mapped</option>${channelsData.map(c => `<option value="${c.id}" ${c.id==feed.channelId?'selected':''}>${c.name||c.id}</option>`).join('')}</select></td>
+            <td><select class="mapping-select" onchange="updateFeedGroup('${feed.url}', this.value)"><option value="">No group</option>${groupsData.map(g => `<option value="${g.name}" ${g.name===feed.groupName?'selected':''}>${g.name}</option>`).join('')}</select></td>
+            <td><button onclick="removeFeed('${feed.url}')" class="btn btn-sm btn-danger">🗑️</button></td>
+          </tr>`;
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function renderGroupedView(list) {
+      const container = document.getElementById('feeds-container');
+      const groups = {};
+      list.forEach(feed => {
+        const key = currentGroupBy === 'category' ? (feed.groupName || 'Other') : (feed.channelId ? 'Mapped' : 'Unmapped');
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(feed);
+      });
+      let html = '';
+      Object.keys(groups).sort().forEach(group => {
+        const feeds = groups[group];
+        const id = `group-${group.replace(/\s+/g,'-').toLowerCase()}`;
+        const count = feeds.length;
+      html += `
+          <div class="group-section">
+            <div class="group-header" onclick="toggleGroup('${id}')">
+              <span class="group-arrow">▼</span> ${group} <span class="group-count">${count}</span>
+            </div>
+            <div class="group-content" id="${id}">
+              <table class="feeds-table">
+                <colgroup>
+                  <col style="width:40%">
+                  <col style="width:10%">
+                  <col style="width:15%">
+                  <col style="width:20%">
+                  <col style="width:10%">
+                  <col style="width:5%">
+                </colgroup>
+                <thead><tr>
+                  <th>Name</th>
+                  <th>Status</th>
+                  <th>Last Post</th>
+                  <th>Channel</th>
+                  <th>Group</th>
+                  <th>Actions</th>
+                </tr></thead><tbody>`;
+        feeds.forEach(feed => {
+          const title = feed.title || 'Untitled Feed';
+          const url = feed.url;
+          const isActive = !!feed.channelId;
+          html += `
+                <tr>
+                  <td><div class="feed-name">${title}</div><div class="feed-url" style="color:#6c757d;font-size:0.9rem;">${url}</div></td>
+                  <td><span class="status ${isActive ? 'status-active' : 'status-inactive'}">${isActive ? 'Active' : 'Inactive'}</span></td>
+                  <td class="feed-date">${formatDate(metadataMap[feed.url]?.last_post)}</td>
+                  <td><select class="mapping-select" onchange="updateFeedMapping('${feed.url}', this.value)"><option value="">Not mapped</option>${channelsData.map(c => `<option value="${c.id}" ${c.id==feed.channelId?'selected':''}>${c.name||c.id}</option>`).join('')}</select></td>
+                  <td><select class="mapping-select" onchange="updateFeedGroup('${feed.url}', this.value)"><option value="">No group</option>${groupsData.map(g => `<option value="${g.name}" ${g.name===feed.groupName?'selected':''}>${g.name}</option>`).join('')}</select></td>
+                  <td><button onclick="removeFeed('${feed.url}')" class="btn btn-sm btn-danger">🗑️</button></td>
+                </tr>`;
+        });
+        html += '</tbody></table></div></div>';
+      });
+      container.innerHTML = html;
+    }
+
+    // Load channels
+    async function loadChannels() {
+      try {
+        const data = await HanuAPI.getChannels();
+        channelsData = data.channels || [];
+        renderChannels();
+      } catch (error) {
+        console.error('Failed to load channels:', error);
+        document.getElementById('channels-container').innerHTML = 
+          '<div class="error">Failed to load channels</div>';
+      }
+    }
+
+    // Render channels list
+    function renderChannels() {
+      const container = document.getElementById('channels-container');
+      
+      if (channelsData.length === 0) {
+        container.innerHTML = '<div class="empty-state">No channels configured yet. Add one above!</div>';
+        return;
+      }
+
+      let html = '<div class="list-group">';
+      channelsData.forEach(channel => {
+        // Use loose equality to match string or number IDs
+        const feedCount = feedsData.filter(f => f.channelId == channel.id).length;
+        
+        html += `
+          <div class="list-item">
+            <div class="flex-between">
+              <div>
+                <div class="item-title">#${channel.name || 'Unknown'}</div>
+                <div class="item-subtitle">ID: ${channel.id}</div>
+                <small>${feedCount} feed(s) mapped</small>
+              </div>
+              <div class="item-actions">
+                <span class="badge bg-info">${feedCount} feeds</span>
+                <button onclick="removeChannel('${channel.id}')" class="btn btn-sm btn-danger">🗑️</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      
+      container.innerHTML = html;
+    }
+
+    // Render groups list based on feed endpoint mapping
+    function loadGroups() {
+      // Derive group names from groupsMap keys
+      groupsData = Object.keys(groupsMap || {}).map(name => ({ name }));
+      renderGroups();
+    }
+
+    // Render groups list
+    function renderGroups() {
+      const container = document.getElementById('groups-container');
+      
+      if (groupsData.length === 0) {
+        container.innerHTML = '<div class="empty-state">No groups created yet. Create one above!</div>';
+        return;
+      }
+
+      let html = '<div class="list-group">';
+      groupsData.forEach(group => {
+        // Count feeds assigned to this group
+        const feedCount = feedsData.filter(f => f.groupName === group.name).length;
+        
+        html += `
+          <div class="list-item">
+            <div class="flex-between">
+              <div>
+                <div class="item-title">📂 ${group.name}</div>
+                <small>${feedCount} feed(s) in this group</small>
+              </div>
+              <div class="item-actions">
+                <span class="badge bg-secondary">${feedCount} feeds</span>
+                <button onclick="renameGroup('${group.name}')" class="btn btn-sm btn-outline">✏️</button>
+                <button onclick="removeGroup('${group.name}')" class="btn btn-sm btn-danger">🗑️</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+      
+      container.innerHTML = html;
+    }
+
+    // Load recent activity
+    async function loadRecentActivity() {
+      // Fetch recent activity logs from backend
+      let activities;
+      try {
+        activities = await HanuAPI.getActivityLogs();
+      } catch (error) {
+        console.error('Activity load failed:', error);
+        activities = [];
+      }
+
+      const container = document.getElementById('activity-feed');
+      
+      // Build activity list UI
+      let html = '<div class="activity-list">';
+      const iconMap = { success: '✅', warning: '⚠️', error: '❌', info: '📋' };
+      activities.forEach(activity => {
+        const time = new Date(activity.time);
+        html += `
+          <details class="activity-item">
+            <summary>
+              <div class="activity-icon">${iconMap[activity.type] || ''}</div>
+              <div class="activity-summary">
+                <span class="activity-title">${activity.action}</span>
+                <span class="activity-time">${formatDate(time)}</span>
+              </div>
+            </summary>`;
+        if (typeof activity.details === 'string') {
+          html += `<div class="activity-details">${activity.details}</div>`;
+        } else {
+          html += `<div class="activity-details"><pre>${JSON.stringify(activity.details, null, 2)}</pre></div>`;
+        }
+        html += `</details>`;
+      });
+      html += '</div>';
+
+      container.innerHTML = html;
+      twemoji.parse(container, { folder: 'svg', ext: '.svg' });
+    }
+
+    // Load health metrics
+    async function loadHealthMetrics() {
+      try {
+        const health = await HanuAPI.healthCheck();
+        
+        const container = document.getElementById('health-metrics');
+        
+        let html = '<div class="health-grid">';
+        html += `
+          <div class="health-item">
+            <div class="health-label">Worker Service</div>
+            <div class="health-status ${health.worker.status === 'healthy' ? 'success' : 'danger'}">
+              ${health.worker.status === 'healthy' ? '🟢 Healthy' : '🔴 Unhealthy'}
+            </div>
+          </div>
+          <div class="health-item">
+            <div class="health-label">Railway Service</div>
+            <div class="health-status ${health.railway.status === 'healthy' ? 'success' : 'danger'}">
+              ${health.railway.status === 'healthy' ? '🟢 Healthy' : '🔴 Unhealthy'}
+            </div>
+          </div>
+        `;
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+      } catch (error) {
+        console.error('Failed to load health metrics:', error);
+        document.getElementById('health-metrics').innerHTML = 
+          '<div class="error">Failed to load health metrics</div>';
+      }
+    }
+
+    // Setup performance chart
+    function setupPerformanceChart() {
+      const ctx = document.getElementById('performance-chart').getContext('2d');
+      
+      // Destroy existing chart if present
+      if (performanceChart) performanceChart.destroy();
+      // Mock data - replace with real metrics when available
+      const labels = [];
+      const data = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        labels.push(date.toLocaleDateString());
+        data.push(Math.floor(Math.random() * 100) + 50); // Mock performance score
+      }
+      
+      performanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Performance Score',
+            data: data,
+            borderColor: '#007bff',
+            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+            tension: 0.4,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: { 
+              beginAtZero: true,
+              max: 100
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    // Populate test select dropdowns
+    function populateTestSelects() {
+      // Populate channel select
+      const channelSelect = document.getElementById('test-channel-select');
+      channelSelect.innerHTML = '<option value="">Select channel...</option>';
+      channelsData.forEach(channel => {
+        channelSelect.innerHTML += `<option value="${channel.id}">#${channel.name || channel.id}</option>`;
+      });
+
+      // Populate feed select
+      const feedSelect = document.getElementById('test-feed-select');
+      feedSelect.innerHTML = '<option value="">Select feed...</option>';
+      feedsData.forEach(feed => {
+        feedSelect.innerHTML += `<option value="${feed.url}">${feed.title || feed.url}</option>`;
+      });
+    }
+
+    // Action functions
+    window.runBot = async function() {
+      try {
+        showAlert('Starting bot run...', 'info');
+        const result = await HanuAPI.runBot();
+        showAlert('Bot run started successfully! 🚀', 'success');
+        setTimeout(loadSystemOverview, 2000); // Refresh stats after 2 seconds
+      } catch (error) {
+        showAlert('Failed to start bot: ' + error.message, 'danger');
+      }
+    };
+
+    // Test /run endpoint (triggers a bot run)
+    window.testRunEndpoint = async function() {
+      try {
+        showAlert('Triggering /run endpoint...', 'info');
+        const result = await HanuAPI.runBot();
+        document.getElementById('test-results').classList.remove('hidden');
+        document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        showAlert('Bot run triggered! 🚀', 'success');
+      } catch (error) {
+        showAlert('Failed to trigger /run: ' + error.message, 'danger');
+      }
+    };
+
+    // Reset seen data (flushes all seen posts)
+    window.resetSeenData = async function() {
+      try {
+        showAlert('Resetting seen data and thread mappings...', 'info');
+        const result = await HanuAPI.resetSeenData();
+        document.getElementById('test-results').classList.remove('hidden');
+        document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        
+        if (result.success) {
+          showAlert('Seen data and thread mappings reset! 🗑️ This will create fresh threads on next run.', 'success');
+        } else {
+          // Handle rate limit error specifically
+          if (result.error && result.error.includes("Too many API requests")) {
+            showAlert('⚠️ Only partial reset due to rate limits. This should still be enough to create new threads.', 'warning');
+          } else {
+            showAlert('Warning: ' + result.error, 'warning');
+          }
+        }
+      } catch (error) {
+        showAlert('Failed to reset data: ' + error.message, 'danger');
+      }
+    };
+
+    window.testPost = async function() {
+      try {
+        showAlert('Running test post...', 'info');
+        const result = await runBotTest(HanuAuth.getToken());
+        showAlert('Test post queued! Check Discord for the message. 🧪', 'success');
+      } catch (error) {
+        showAlert('Test post failed: ' + error.message, 'danger');
+      }
+    };
+
+    window.refreshStatus = async function() {
+      await loadDashboardData();
+      showAlert('Dashboard refreshed! 🔄', 'success');
+    };
+
+    window.exportData = async function() {
+      try {
+        const data = await HanuAPI.exportData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `hanu-export-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showAlert('Data exported successfully! 📥', 'success');
+      } catch (error) {
+        showAlert('Export failed: ' + error.message, 'danger');
+      }
+    };
+
+    window.addFeed = async function() {
+      const url = document.getElementById('new-feed-url').value.trim();
+      if (!url) {
+        showAlert('Please enter a feed URL', 'warning');
+        return;
+      }
+
+      try {
+        await HanuAPI.addFeed(url);
+        document.getElementById('new-feed-url').value = '';
+        await loadFeeds();
+        populateTestSelects();
+        showAlert('Feed added successfully! 📡', 'success');
+      } catch (error) {
+        showAlert('Failed to add feed: ' + error.message, 'danger');
+      }
+    };
+
+    window.removeFeed = async function(feedUrl) {
+      if (!confirm('Remove this feed?')) return;
+
+      try {
+        await HanuAPI.removeFeed(feedUrl);
+        await loadFeeds();
+        populateTestSelects();
+        showAlert('Feed removed successfully! 🗑️', 'success');
+      } catch (error) {
+        showAlert('Failed to remove feed: ' + error.message, 'danger');
+      }
+    };
+
+    window.addChannel = async function() {
+      const channelId = document.getElementById('new-channel-id').value.trim();
+      if (!channelId) {
+        showAlert('Please enter a channel ID', 'warning');
+        return;
+      }
+
+      try {
+        await HanuAPI.addChannel(channelId);
+        document.getElementById('new-channel-id').value = '';
+        await loadChannels();
+        populateTestSelects();
+        showAlert('Channel added successfully! 💬', 'success');
+      } catch (error) {
+        showAlert('Failed to add channel: ' + error.message, 'danger');
+      }
+    };
+
+    window.removeChannel = async function(channelId) {
+      if (!confirm('Remove this channel?')) return;
+
+      try {
+        await HanuAPI.removeChannel(channelId);
+        await loadChannels();
+        populateTestSelects();
+        showAlert('Channel removed successfully! 🗑️', 'success');
+      } catch (error) {
+        showAlert('Failed to remove channel: ' + error.message, 'danger');
+      }
+    };
+
+    window.addGroup = async function() {
+      const groupName = document.getElementById('new-group-name').value.trim();
+      if (!groupName) {
+        showAlert('Please enter a group name', 'warning');
+        return;
+      }
+
+      try {
+        await HanuAPI.addGroup(groupName);
+        document.getElementById('new-group-name').value = '';
+        await loadFeeds();
+        showAlert('Group created successfully! 📂', 'success');
+      } catch (error) {
+        showAlert('Failed to create group: ' + error.message, 'danger');
+      }
+    };
+
+    window.renameGroup = async function(oldName) {
+      const newName = prompt('Enter new group name:', oldName);
+      if (!newName || newName === oldName) return;
+
+      try {
+        await HanuAPI.renameGroup(oldName, newName);
+        await loadFeeds();
+        showAlert('Group renamed successfully! ✏️', 'success');
+      } catch (error) {
+        showAlert('Failed to rename group: ' + error.message, 'danger');
+      }
+    };
+
+    window.removeGroup = async function(groupName) {
+      if (!confirm(`Remove group "${groupName}"?`)) return;
+
+      try {
+        await HanuAPI.removeGroup(groupName);
+        await loadFeeds();
+        showAlert('Group removed successfully! 🗑️', 'success');
+      } catch (error) {
+        showAlert('Failed to remove group: ' + error.message, 'danger');
+      }
+    };
+
+    // Update feed-to-channel mapping
+    window.updateFeedMapping = async function(feedUrl, channelId) {
+      try {
+        await HanuAPI.updateFeedMapping(feedUrl, channelId || null);
+        await loadChannels();
+        await loadFeeds();
+        showAlert('Feed channel mapping updated', 'success');
+      } catch (error) {
+        showAlert('Failed to update channel mapping: ' + error.message, 'danger');
+      }
+    };
+
+    // Update feed-to-group mapping
+    window.updateFeedGroup = async function(feedUrl, groupName) {
+      try {
+        await HanuAPI.updateFeedGroup(feedUrl, groupName || null);
+        await loadGroups();
+        await loadFeeds();
+        showAlert('Feed group mapping updated', 'success');
+      } catch (error) {
+        showAlert('Failed to update group mapping: ' + error.message, 'danger');
+      }
+    };
+
+    window.testDiscordMessage = async function() {
+      const channelId = document.getElementById('test-channel-select').value;
+      const message = document.getElementById('test-message').value.trim();
+
+      if (!channelId || !message) {
+        showAlert('Please select a channel and enter a message', 'warning');
+        return;
+      }
+
+      try {
+        const result = await HanuAPI.testDiscord(channelId, message);
+        document.getElementById('test-results').classList.remove('hidden');
+        document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        showAlert('Test message sent successfully! 📤', 'success');
+      } catch (error) {
+        showAlert('Failed to send test message: ' + error.message, 'danger');
+      }
+    };
+
+    window.testFeedParsing = async function() {
+      const feedUrl = document.getElementById('test-feed-select').value;
+      if (!feedUrl) {
+        showAlert('Please select a feed', 'warning');
+        return;
+      }
+
+      try {
+        const result = await HanuAPI.getTestEntries(feedUrl);
+        document.getElementById('test-results').classList.remove('hidden');
+        document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        showAlert('Feed parsed successfully! 🔍', 'success');
+      } catch (error) {
+        showAlert('Failed to parse feed: ' + error.message, 'danger');
+      }
+    };
+
+    window.getRandomEntry = async function() {
+      try {
+        const result = await HanuAPI.getRandomEntry();
+        document.getElementById('test-results').classList.remove('hidden');
+        document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+        showAlert('Random entry retrieved! 🎲', 'success');
+      } catch (error) {
+        showAlert('Failed to get random entry: ' + error.message, 'danger');
+      }
+    };
+
+    window.sendRandomPost = async function() {
+      const channelId = document.getElementById('test-channel-select').value;
+      if (!channelId) {
+        showAlert('Please select a channel', 'warning');
+        return;
+      }
+      try {
+        // Use the /run endpoint to trigger a random post with main pipeline formatting
+        const response = await runBotTest(HanuAuth.getToken(), '', channelId);
+        const data = await response.json();
+        document.getElementById('test-results').classList.remove('hidden');
+        document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+        showAlert('Random post sent to Discord! 🚀', 'success');
+      } catch (error) {
+        showAlert('Failed to send random post: ' + error.message, 'danger');
+      }
+    };
+
+    // Auto-refresh every 2 minutes
+    function startAutoRefresh() {
+      if (refreshInterval) clearInterval(refreshInterval);
+      
+      refreshInterval = setInterval(async () => {
+        await loadSystemOverview();
+        console.log('🔄 Auto-refreshed dashboard');
+      }, 2 * 60 * 1000);
+    }
+
+    // Helper functions
+    function formatDate(date) {
+      // Ensure input is converted to a Date object
+      const dt = new Date(date);
+      if (isNaN(dt)) return '';
+      const now = new Date();
+      const diffMinutes = Math.floor((now - dt) / (1000 * 60));
+      
+      if (diffMinutes < 1) return 'Just now';
+      if (diffMinutes < 60) return `${diffMinutes}m ago`;
+      if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}h ago`;
+      return dt.toLocaleDateString();
+    }
+
+    function formatUptime(uptime) {
+      // Convert seconds to human-readable format
+      const totalSeconds = Math.floor(uptime);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      
+      return `${hours}h ${minutes}m ${seconds}s`;
+    }
+
+    // Alert helper
+    function showAlert(message, type = 'info') {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert alert-${type} fade-in`;
+      alertDiv.style.position = 'fixed';
+      alertDiv.style.top = '20px';
+      alertDiv.style.right = '20px';
+      alertDiv.style.zIndex = '10000';
+      alertDiv.style.minWidth = '300px';
+      alertDiv.textContent = message;
+      
+      document.body.appendChild(alertDiv);
+      
+      setTimeout(() => {
+        alertDiv.remove();
+      }, 5000);
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (refreshInterval) clearInterval(refreshInterval);
+      if (performanceChart) performanceChart.destroy();
+    });
+    
+    // Expose control functions globally for inline onclick handlers
+    window.setView = setView;
+    window.setGroupBy = setGroupBy;
+    window.setSortBy = setSortBy;
+    window.setFilter = setFilter;
+    window.toggleGroup = toggleGroup;
+    window.sendRandomPost = sendRandomPost;
+  </script>
+</body>
+</html>
