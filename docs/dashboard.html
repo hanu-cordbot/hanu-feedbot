@@ -226,7 +226,10 @@
       // Load all data and start refresh
       await loadDashboardData();
       setupPerformanceChart();
-      startAutoRefresh();
+      // Only auto-refresh in non-GitHub Pages environments to allow backend idling
+      if (!window.location.hostname.endsWith('github.io')) {
+        startAutoRefresh();
+      }
     });
     
     let feedsData = [];

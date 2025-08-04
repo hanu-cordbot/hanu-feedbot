@@ -212,7 +212,10 @@
     // Load data on page load
     document.addEventListener('DOMContentLoaded', async () => {
       await loadData();
-      setInterval(loadData, 5 * 60 * 1000); // Auto-refresh every 5 minutes
+      // Only auto-refresh in non-GitHub Pages environments to allow backend idling
+      if (!window.location.hostname.endsWith('github.io')) {
+        setInterval(loadData, 5 * 60 * 1000); // Auto-refresh every 5 minutes
+      }
     });
 
     async function loadData() {
