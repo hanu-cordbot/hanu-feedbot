@@ -10,13 +10,16 @@ async function bootAuth() {
   if (document.readyState === 'loading') {
     await new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve));
   }
-  // Auto-login via password if provided
-  if (window.DEFAULT_AUTH_BASE && window.DEFAULT_AUTH_PASSWORD) {
+  // Auto-login via password if provided (skip when resetting auth)
+  const reset = window.location.search.toLowerCase().includes('resetauth');
+  // Read password from Worker secret (in Cloudflare env)
+  const password = globalThis.AUTH_PASSWORD;
+  if (!reset && window.DEFAULT_AUTH_BASE && password) {
     try {
       const response = await fetch(`${window.DEFAULT_AUTH_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'admin', password: window.DEFAULT_AUTH_PASSWORD })
+        body: JSON.stringify({ username: 'admin', password })
       });
       const data = await response.json();
       if (data.success && data.token) {

@@ -1,0 +1,10 @@
+# Worker metadata
+name = "hanu-api-proxy"
+main = "src/index.js"
+compatibility_date = "2025-08-04"
+account_id = "fac2cd87940bd85e71170e5cc88fe0b0"
+workers_dev = true
+
+[vars]
+# Backend Railway URL the Worker will proxy to
+RAILWAY_BASE = "https://splendid-eagerness-production-4843.up.railway.app"

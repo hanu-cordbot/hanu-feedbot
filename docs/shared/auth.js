@@ -1,6 +1,12 @@
 // shared/auth.js - Complete Authentication System for HANU Dashboard
 class HanuAuth {
   constructor() {
+    // If URL contains ?resetAuth, clear any stored token for fresh login
+    if (typeof window !== 'undefined' && window.location.search.toLowerCase().includes('resetauth')) {
+      console.log('🔄 Clearing all storage via resetAuth');
+      sessionStorage.clear();
+      localStorage.clear();
+    }
     // Use configured API_BASE (production) or same origin as fallback
     this.apiBase = (typeof window !== 'undefined' && window.DEFAULT_AUTH_BASE)
       ? window.DEFAULT_AUTH_BASE
