@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>HANU-cordbot Feed Tracker</title>
-  <script async defer src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
   <style>
     /* Discord emoji styling */
     img.emoji { height: 1em; width: 1em; margin: 0 0.05em 0 0.1em; vertical-align: -0.1em; }
@@ -212,6 +212,8 @@
     // Load data on page load
     document.addEventListener('DOMContentLoaded', async () => {
       await loadData();
+      // Parse emojis once on initial load
+      twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
       // Only auto-refresh in non-GitHub Pages environments to allow backend idling
       if (!window.location.hostname.endsWith('github.io')) {
         setInterval(loadData, 5 * 60 * 1000); // Auto-refresh every 5 minutes
@@ -244,7 +246,6 @@
         document.getElementById('feeds-container').style.display = 'block';
         
         // Parse emojis
-        twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
         
       } catch (error) {
         console.error('Failed to load data:', error);
