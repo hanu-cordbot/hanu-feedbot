@@ -16,24 +16,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Checkout main branch of the repository and configure clean fetch
+          # Use default token with write permissions to commit back
+          token: ${{ secrets.GITHUB_TOKEN }}
           ref: 'main'
-          repository: 'hanu-cordbot/hanu-feedbot'
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-          ssh-strict: true
-          ssh-user: 'git'
           persist-credentials: true
           clean: true
-          # Explicitly disable submodule fetching to prevent errors
-          submodules: false
-          fetch-submodules: false
-          # Enable sparse checkout cone mode for improved performance
+          submodules: false  # disable submodules
           sparse-checkout-cone-mode: true
           fetch-depth: 1
           fetch-tags: false
-          show-progress: true
           lfs: false
-          set-safe-directory: true
 
       - name: Setup Python
         uses: actions/setup-python@v4
