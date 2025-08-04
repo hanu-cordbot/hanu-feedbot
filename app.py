@@ -115,10 +115,8 @@ def relative_time(dt):
     return f"{years} {unit} ago"
 
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
-ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH", hashlib.sha256(b"hyperdelusionsinallofexistence").hexdigest())  # store hashed password
-# If ADMIN_PASS_HASH is provided plaintext, convert it to its SHA-256 hash
-if len(ADMIN_PASS_HASH) != 64 or not re.fullmatch(r"[0-9a-f]{64}", ADMIN_PASS_HASH):
-    ADMIN_PASS_HASH = hashlib.sha256(ADMIN_PASS_HASH.encode()).hexdigest()
+# Accept a plain-text admin password via ADMIN_PASS
+ADMIN_PASS = os.environ.get("ADMIN_PASS", "hyperdelusionsinallofexistence")
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 
@@ -147,7 +145,8 @@ def api_login():
     data = request.get_json() or {}
     username = data.get("username")
     password = data.get("password", "").encode()
-    if username == ADMIN_USER and hashlib.sha256(password).hexdigest() == ADMIN_PASS_HASH:
+    # Accept raw password match
+    if username == ADMIN_USER and password.decode() == ADMIN_PASS:
         import base64, time
         token_data = {"user": username, "exp": int(time.time()) + 3600}
         token = base64.b64encode(json.dumps(token_data).encode()).decode()
@@ -299,12 +298,19 @@ def api_public_feeds():
             except Exception:
                 last_post = None
         feed_items.append({"url": url, "title": title, "last_post": last_post})
+    # Include API timestamp for front-end last-update display (based on feed_meta cache file)
+    try:
+        mtime = os.path.getmtime(FEED_META_FILE)
+        last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+    except Exception:
+        last_update = None
     return jsonify({
         "feeds": feed_items,
         "metadata": meta,
         "groups": groups,
         "mappings": feed_map,
-        "channels": channels
+        "channels": channels,
+        "last_update": last_update
     })
 
 @app.route("/api/feeds")
@@ -472,5 +478,7 @@ def api_delete_group():
 
 # Direct runnable entrypoint
 if __name__ == "__main__":
-    print("Starting Flask server at http://127.0.0.1:5000/")
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    # Use PORT env var for local testing and bind to all interfaces
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Starting Flask server at http://0.0.0.0:{port}/")
+    app.run(host="0.0.0.0", port=port, debug=True)

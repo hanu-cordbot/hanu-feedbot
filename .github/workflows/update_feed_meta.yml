@@ -1,0 +1,31 @@
+name: Update Feed Metadata
+on:
+  schedule:
+    - cron: '0 * * * *'  # Every hour
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  update-feed-meta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Fetch feed metadata
+        run: |
+          python - <<'EOF'
+          from celery_app import fetch_feed_meta
+          fetch_feed_meta()
+          EOF
+      - name: Commit updated metadata
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          git add feed_meta.json
+          git diff --quiet || git commit -m "Update feed metadata [skip ci]"
+          git push

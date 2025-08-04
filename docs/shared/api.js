@@ -3,8 +3,8 @@ import HanuAuth from './auth.js';
 
 class HanuAPI {
   constructor() {
-    this.baseUrl = 'http://127.0.0.1:5000';
-    this.railwayUrl = 'https://web-production-b0a5.up.railway.app';
+    // Use the same origin as hosting page for API calls
+    this.baseUrl = window.location.origin;
   }
 
   // Get authentication headers
@@ -25,21 +25,10 @@ class HanuAPI {
     return headers;
   }
 
-  // Generic request method with comprehensive error handling
+  // Generic request method
   async request(endpoint, options = {}) {
-    // Determine if this should go to Railway or Cloudflare Worker by matching path without query
-    const pathOnly = endpoint.split('?')[0];
-    const railwayEndpoints = [
-      '/run', '/health', '/get-current-prompt', '/save-current-prompt',
-      '/test-gemini', '/test-entries', '/all-feeds', '/random-entry', '/test-discord'
-    ];
-    // Force /test-entries with query to be routed to Railway as well
-    // Determine railway calls by path or full URL
-    const isRailwayEndpoint = endpoint.startsWith(this.railwayUrl)
-      || endpoint.startsWith('/test-entries')
-      || railwayEndpoints.includes(pathOnly);
-    const baseUrl = isRailwayEndpoint ? this.railwayUrl : this.baseUrl;
-    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+    // Always use baseUrl defined by hosting page origin
+    const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint}`;
     
     const config = {
       headers: this.getHeaders(),
@@ -49,11 +38,6 @@ class HanuAPI {
     // Handle request body
     if (options.body && typeof options.body === 'object') {
       config.body = JSON.stringify(options.body);
-    }
-
-    // Add Railway-specific headers for certain endpoints
-    if (isRailwayEndpoint && HanuAuth.getToken()) {
-      config.headers['X-Auth'] = HanuAuth.getToken();
     }
 
     try {

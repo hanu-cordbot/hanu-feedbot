@@ -104,7 +104,13 @@
       .feeds-table th, .feeds-table td { padding: 8px; }
       .controls { flex-direction: column; align-items: stretch; }
     }
-  </style>
+  /* Hoverable dashed underline for last-update label */
+  #last-update + .stat-label {
+    display: inline-block;
+    border-bottom: 1px dashed currentColor;
+    cursor: help;
+  }
+</style>
 </head>
 <body>
   <div class="container">
@@ -194,6 +200,7 @@
     let groups = {};
     let mappings = {};
     let channels = [];
+    let lastUpdate = null;
     let currentView = 'grouped';
     let currentGroupBy = 'status';
     let currentSort = 'date';
@@ -212,6 +219,7 @@
       document.getElementById('feeds-container').style.display = 'none';
 
       try {
+        // Fetch from Flask backend using relative API path
         const response = await fetch('/api/public/feeds');
         
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -222,6 +230,7 @@
         groups = data.groups || {};
         mappings = data.mappings || {};
         channels = data.channels || [];
+        lastUpdate = data.last_update || null;
         
         renderFeeds();
         updateStats();
@@ -431,7 +440,28 @@
 
       document.getElementById('active-feeds').textContent = activeFeeds.length;
       document.getElementById('total-feeds').textContent = feeds.length;
-      document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+      // Show only time, full datetime on hover
+      const elLast = document.getElementById('last-update');
+      if (lastUpdate) {
+        const dt = new Date(lastUpdate);
+        elLast.textContent = dt.toLocaleTimeString();
+        // Full datetime tooltip on value
+        elLast.title = dt.toLocaleString();
+        // Explanatory tooltip on label
+        const label = elLast.nextElementSibling;
+        if (label && label.classList.contains('stat-label')) {
+          // Base explanation plus troubleshooting info
+          label.title = 'hanu-cordbot scans for new posts on a ~hourly basis. It is strictly impossible to speed this up, due to internal limitations of Facebook and RSS feeds.'
+            + '\nFor troubleshooting purposes, the date and time of hanu-cordbot\'s last scan was ' + dt.toLocaleString() + '.';
+        }
+      } else {
+        elLast.textContent = '--';
+        elLast.removeAttribute('title');
+        const label = elLast.nextElementSibling;
+        if (label && label.classList.contains('stat-label')) {
+          label.removeAttribute('title');
+        }
+      }
       document.getElementById('system-status').textContent = feeds.length > 0 ? '🟢 Online' : '🔴 Offline';
     }
 
@@ -485,7 +515,9 @@
 
     function formatDate(dateStr) {
       if (!dateStr) return 'Never';
-      const date = new Date(dateStr);
+      // Ensure UTC parsing: append 'Z' if missing timezone
+      const iso = /(?:Z|[+\-]\d{2}:\d{2})$/.test(dateStr) ? dateStr : dateStr + 'Z';
+      const date = new Date(iso);
       const now = new Date();
       const diffHours = Math.floor((now - date) / (1000 * 60 * 60));
       

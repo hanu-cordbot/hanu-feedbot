@@ -16,30 +16,16 @@ def create_flask_app():
     # Your Flask app configuration
     return app
 
+# Initialize Flask app
 flask_app = create_flask_app()
-
-# --- REVISED: Use Railway's Redis URL when available, with a local fallback ---
-# When deployed on Railway, the REDIS_URL will be provided automatically.
-# For local development, it falls back to localhost.
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-if "localhost" in REDIS_URL:
-    print("WARNING: REDIS_URL not found. Falling back to localhost for local development.")
-import redis
-redis_client = redis.from_url(REDIS_URL)
-
+# Celery configured with in-memory broker and backend; tasks run eagerly (no Redis needed)
 celery = Celery(
     flask_app.import_name,
-    backend=REDIS_URL,
-    broker=REDIS_URL
+    broker='memory://',
+    backend='cache+memory://'
 )
 celery.conf.update(flask_app.config)
-# Fallback for local development: if Redis is unreachable, run tasks eagerly
-try:
-    from redis import Redis as _RedisClient
-    _RedisClient.from_url(REDIS_URL).ping()
-except Exception:
-    print("WARNING: Cannot connect to Redis broker; tasks will run eagerly and synchronously.")
-    celery.conf.task_always_eager = True
+celery.conf.task_always_eager = True
 
 # --- Scheduled tasks: fetch and cache resource metrics ---
 from celery.schedules import crontab
@@ -48,11 +34,11 @@ import requests
 # --- Scheduled tasks: fetch and cache feed metadata every minute ---
 @celery.on_after_configure.connect
 def setup_feed_meta_task(sender, **kwargs):
-    # every 30 minutes
-    sender.add_periodic_task(
-        crontab(minute='*/30'),
+    # every hour
+        sender.add_periodic_task(
+        crontab(minute=0),  # run hourly
         fetch_feed_meta.s(),
-        name='update feed metadata every 30 minutes'
+        name='update feed metadata every hour'
     )
 
 @celery.on_after_configure.connect
@@ -90,7 +76,6 @@ def fetch_feed_meta():
     """Fetch feed titles and last post timestamps and cache to JSON file"""
     import json
     import feedparser
-    from datetime import datetime
     meta = {}
     try:
         with open('feeds.txt', 'r') as f:
@@ -127,9 +112,9 @@ def fetch_feed_meta():
                 lp = first.get('published_parsed') or first.get('updated_parsed')
                 if lp and isinstance(lp, (list, tuple)):
                     try:
-                        # Convert elements to int for datetime constructor
-                        ts = tuple(int(x) for x in lp[:6])
-                        last_post = datetime(*ts).isoformat()
+                        # Build ISO timestamp without timezone so JS treats as local (UTC+7 RSS feed)
+                        parts = [int(x) for x in lp[:6]]  # year, month, day, hour, minute, second
+                        last_post = f"{parts[0]:04d}-{parts[1]:02d}-{parts[2]:02d}T{parts[3]:02d}:{parts[4]:02d}:{parts[5]:02d}"
                     except Exception:
                         last_post = None
                 else:

@@ -1,12 +1,8 @@
 // shared/auth.js - Complete Authentication System for HANU Dashboard
 class HanuAuth {
   constructor() {
-    // Override API base URL if provided (e.g. for local testing)
-    if (typeof window !== 'undefined' && window.DEFAULT_AUTH_BASE) {
-      this.apiBase = window.DEFAULT_AUTH_BASE;
-    } else {
-      this.apiBase = 'https://hanu-cordbot.snacky496.workers.dev';
-    }
+    // Use same origin as hosting page for API calls
+    this.apiBase = (typeof window !== 'undefined' ? window.location.origin : '');
     this.callbacks = {
       onLogin: [],
       onLogout: [],
@@ -133,35 +129,44 @@ class HanuAuth {
     }
   }
   
-  // Login with token
-  async login(token) {
-    if (!token || !token.trim()) {
-      throw new Error('Authentication token is required');
+  // Login with token or password
+  async login(tokenOrPass) {
+    if (!tokenOrPass || !tokenOrPass.trim()) {
+      throw new Error('Authentication token or password is required');
     }
-    
-    const cleanToken = token.trim();
+    let authToken = tokenOrPass.trim();
     console.log('🔐 Attempting login...');
-    
-    // Test the token first
-    const isValid = await this.testAuthWithToken(cleanToken);
-    
-    if (!isValid) {
-      throw new Error('Invalid authentication token. Please check your token and try again.');
+    // If input contains no dots (likely raw password), request a token
+    if (!authToken.includes('.')) {
+      console.log('🔄 Password detected, requesting auth token from server...');
+      const response = await fetch(`${this.apiBase}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: authToken })
+      });
+      const data = await response.json();
+      if (!data.success || !data.token) {
+        throw new Error(data.error || 'Invalid credentials');
+      }
+      authToken = data.token;
+      console.log('✅ Received auth token from server');
     }
-    
+    // Test the token
+    const isValid = await this.testAuthWithToken(authToken);
+    if (!isValid) {
+      throw new Error('Invalid authentication token. Please login again.');
+    }
     // Save valid token
-    this.saveToken(cleanToken);
+    this.saveToken(authToken);
     console.log('✅ Login successful');
-    
     // Notify login callbacks
     this.callbacks.onLogin.forEach(callback => {
       try {
-        callback(cleanToken);
+        callback(authToken);
       } catch (error) {
         console.error('❌ Login callback error:', error);
       }
     });
-    
     return true;
   }
 
@@ -491,33 +496,3 @@ if (typeof window !== 'undefined') {
 
 // Export for ES6 modules
 export default HanuAuthInstance;
-
-// Auto-login using a global default token (optional)
-if (window.DEFAULT_AUTH_TOKEN) {
-  HanuAuthInstance.login(window.DEFAULT_AUTH_TOKEN)
-    .then(() => console.log('✅ Auto-logged in via DEFAULT_AUTH_TOKEN'))
-    .catch(err => console.warn('ℹ️ Auto-login failed:', err));
-}
-
-// Auto-login using a password (if DEFAULT_AUTH_PASSWORD is set)
-if (window.DEFAULT_AUTH_PASSWORD) {
-  (async () => {
-    try {
-      console.log('🔐 Attempting auto-login with DEFAULT_AUTH_PASSWORD');
-      const res = await fetch(`${HanuAuthInstance.apiBase}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'admin', password: window.DEFAULT_AUTH_PASSWORD })
-      });
-      const data = await res.json();
-      if (data.success && data.token) {
-        HanuAuthInstance.saveToken(data.token);
-        console.log('✅ Auto-login via password succeeded');
-      } else {
-        console.warn('❌ Auto-login via password failed:', data.error);
-      }
-    } catch (err) {
-      console.error('❌ Error during auto-login:', err);
-    }
-  })();
-}

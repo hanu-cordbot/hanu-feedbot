@@ -11,26 +11,31 @@ from collections import defaultdict
 load_dotenv()
 
 # --- REVISED: Centralized Configuration and Validation ---
+# Initialization warnings
 print("Initializing configuration...")
-try:
-    # Validate and load all required environment variables first
-    BOT_TOKEN = os.environ['DISCORD_BOT_TOKEN']
-    TARGET_CHANNEL_ID = int(os.environ['CHANNEL_ID'])
-    # These are checked here to ensure all modules can import them safely
-    os.environ['GEMINI_API_KEY']
-    os.environ['DISCORD_WEBHOOK_URL']
-    
-    MAX_AGE_HOURS = int(os.getenv("MAX_AGE_HOURS", "36"))
-    SHORT_POST_WORD_THRESHOLD = 40
-    print("✅ All required environment variables are present.")
-
-except KeyError as e:
-    print(f"🚨 FATAL ERROR: The environment variable {e} is missing.")
-    print("   Please add it to the 'Variables' tab in your Railway service dashboard.")
-    sys.exit(1)
-except (ValueError, TypeError):
-    print(f"🚨 FATAL ERROR: The CHANNEL_ID '{os.getenv('CHANNEL_ID')}' is not a valid integer.")
-    sys.exit(1)
+# Load DISCORD_BOT_TOKEN, warn if missing (Celery/Flask import should not exit)
+BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
+if not BOT_TOKEN:
+    print("⚠️  Warning: DISCORD_BOT_TOKEN is missing; run_bot_job will be disabled.")
+# Load optional TARGET_CHANNEL_ID
+channel_id_env = os.environ.get('CHANNEL_ID')
+if channel_id_env:
+    try:
+        TARGET_CHANNEL_ID = int(channel_id_env)
+    except ValueError:
+        print(f"🚨 ERROR: CHANNEL_ID '{channel_id_env}' is not a valid integer. Ignoring.")
+        TARGET_CHANNEL_ID = None
+else:
+    print("⚠️  CHANNEL_ID not set; TARGET_CHANNEL_ID will be None.")
+    TARGET_CHANNEL_ID = None
+# Warn if optional environment variables are missing
+for var in ('GEMINI_API_KEY', 'DISCORD_WEBHOOK_URL'):
+    if var not in os.environ:
+        print(f"⚠️  Warning: {var} is missing. Related features may not work.")
+# Load optional settings
+MAX_AGE_HOURS = int(os.getenv("MAX_AGE_HOURS", "36"))
+SHORT_POST_WORD_THRESHOLD = 40
+print("✅ Configuration loaded.")
 
 # --- REVISED: Correctly define file paths for persistent storage ---
 if os.path.exists("/data"):
@@ -164,6 +169,9 @@ async def get_or_create_channel_details_thread(
 
 async def run_bot_job():
     """The main logic of the bot, now encapsulated in a single function that runs once."""
+    if not BOT_TOKEN:
+        print("⚠️  Cannot start bot: DISCORD_BOT_TOKEN is not configured.")
+        return
     intents = discord.Intents.default()
     intents.messages = True
     intents.message_content = True 
