@@ -1,22 +1,38 @@
+#!/usr/bin/env python3
+# === FILE: bot/main.py ===
+# Main entry point for the HANU feed bot
 import os
+import sys
 import json
 import asyncio
-import pendulum
-import discord
-import sys
-from dotenv import load_dotenv
+import tempfile
+import random
+import io
+import time
+import re
+from pathlib import Path
 from collections import defaultdict
 
-# Load all environment variables from the .env file for local development
+import pendulum
+import discord
+import aiohttp
+from aiohttp import ClientSession, ClientTimeout
+from dotenv import load_dotenv
+
+# Load all environment variables from .env for local development
 load_dotenv()
 
-# --- REVISED: Centralized Configuration and Validation ---
-# Initialization warnings
+# --- GLOBAL CONFIGURATION ---
 print("Initializing configuration...")
-# Load DISCORD_BOT_TOKEN, warn if missing (Celery/Flask import should not exit)
+
+# Create a shared aiohttp session to prevent unclosed connector warnings
+HTTP_SESSION = ClientSession(timeout=ClientTimeout(total=60))  # Increased timeout for large media
+
+# Load DISCORD_BOT_TOKEN, warn if missing
 BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 if not BOT_TOKEN:
     print("⚠️  Warning: DISCORD_BOT_TOKEN is missing; run_bot_job will be disabled.")
+
 # Load optional TARGET_CHANNEL_ID
 channel_id_env = os.environ.get('CHANNEL_ID')
 if channel_id_env:
@@ -28,16 +44,21 @@ if channel_id_env:
 else:
     print("⚠️  CHANNEL_ID not set; TARGET_CHANNEL_ID will be None.")
     TARGET_CHANNEL_ID = None
+
 # Warn if optional environment variables are missing
 for var in ('GEMINI_API_KEY', 'DISCORD_WEBHOOK_URL'):
     if var not in os.environ:
         print(f"⚠️  Warning: {var} is missing. Related features may not work.")
+
 # Load optional settings
 MAX_AGE_HOURS = int(os.getenv("MAX_AGE_HOURS", "36"))
 SHORT_POST_WORD_THRESHOLD = 40
-print("✅ Configuration loaded.")
+SUMMARY_CHANNEL_ID = os.getenv('SUMMARY_CHANNEL_ID')
+if SUMMARY_CHANNEL_ID:
+    SUMMARY_CHANNEL_ID = int(SUMMARY_CHANNEL_ID)
+FALLBACK_ENABLED = os.getenv('FALLBACK_ENABLED', 'true').lower() in ('1', 'true', 'yes')
 
-# --- REVISED: Correctly define file paths for persistent storage ---
+# --- FILE PATHS ---
 if os.path.exists("/data"):
     BASE_DIR = "/data"
     print("Persistent storage at /data detected.")
@@ -49,9 +70,9 @@ SEEN_FILE = os.path.join(BASE_DIR, "seen.json")
 DETAILS_FILE = os.path.join(BASE_DIR, "details_thread_id.json")
 DETAILS_MAP_FILE = os.path.join(BASE_DIR, 'details_threads.json')
 
-# --- Now that configuration is validated, import the rest of the bot ---
+# --- IMPORTS FROM BOT MODULES ---
 from bot.parser import iter_entries
-from bot.formatter import build_prompt, split_reply, format_vietnamese_date
+from bot.formatter import build_prompt, split_reply, format_vietnamese_date, build_thread_title_prompt
 from bot.gemini_client import call_gemini
 from bot.dispatcher import (
     push,
@@ -63,16 +84,18 @@ from bot.dispatcher import (
 )
 from bot.avatar_cache import maybe_update, avatar_for
 from bot.config import GLOBAL_FALLBACK_CHANNEL_ID
+from bot.facebook_downloader import download_video_ytdlp, normalize_url
 
-# --- Environment Variables ---
-SUMMARY_CHANNEL_ID = os.getenv('SUMMARY_CHANNEL_ID')
-if SUMMARY_CHANNEL_ID:
-    SUMMARY_CHANNEL_ID = int(SUMMARY_CHANNEL_ID)
-else:
-    SUMMARY_CHANNEL_ID = None
-FALLBACK_ENABLED = os.getenv('FALLBACK_ENABLED', 'true').lower() in ('1', 'true', 'yes')
+print("✅ Configuration loaded.")
 
-# --- Seen GUIDs Management ---
+# --- HELPER FUNCTIONS ---
+async def download_bytes(url: str) -> bytes:
+    """Fetch raw bytes for a media URL."""
+    # Use shared HTTP_SESSION with increased timeout for large media
+    async with HTTP_SESSION.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+        resp.raise_for_status()
+        return await resp.read()
+
 def load_seen_guids():
     """Loads the set of processed post IDs from the state file."""
     try:
@@ -87,7 +110,31 @@ def load_seen_guids():
 def save_seen_guids(guids):
     """Saves the set of processed post IDs to the state file."""
     with open(SEEN_FILE, 'w') as f:
-        json.dump(list(guids)[-500:], f, indent=2)
+        json.dump(list(guids)[-500:], f, indent=2)  # Keep last 500 posts
+
+async def build_full_body(entry: dict) -> str:
+    """Build full formatted body for an entry using existing logic."""
+    maybe_update(entry)
+    
+    if len(entry.get('raw', '').split()) < SHORT_POST_WORD_THRESHOLD:
+        parts = []
+        title = entry.get('title', '')
+        if title:
+            parts.append(f"# **{title}**")
+        raw = entry.get('raw', '')
+        if raw and raw.strip() != title.strip():
+            parts.append(raw)
+        body = "\n\n".join(parts)
+        return f"{body}\n\n<{entry.get('link')}>"
+    else:
+        reply = await asyncio.to_thread(call_gemini, build_prompt(entry)) or ""
+        if not reply:
+            return f"Error processing content\n\n<{entry.get('link')}>"
+        body, tldr = split_reply(reply)
+        full_content = body
+        if tldr:
+            full_content += f"\n\n{tldr}"
+        return f"{full_content}\n\n<{entry.get('link')}>"
 
 async def get_or_create_channel_details_thread(
     client: discord.Client,
@@ -140,7 +187,6 @@ async def get_or_create_channel_details_thread(
             print(f"🚨 CRITICAL: Thread exists but we can't find it. Message ID: {summary_msg.id}")
             print(f"    Message threads: {getattr(summary_msg, 'thread', 'None')}")
             print(f"    Channel threads: {[t.name + '(parent:' + str(getattr(t, 'parent_id', 'None')) + ')' for t in channel.threads]}")
-
             
             # Last resort: try to find ANY thread with "Details" name for this channel today
             for t in channel.threads:
@@ -153,7 +199,6 @@ async def get_or_create_channel_details_thread(
             
             # If we still can't find it, create with a unique name
             try:
-                import time
                 unique_name = f"Details-{int(time.time())}"
                 thread = await summary_msg.create_thread(name=unique_name)
                 details_map[str(channel.id)] = thread.id
@@ -166,12 +211,272 @@ async def get_or_create_channel_details_thread(
         else:
             raise e
 
+async def process_media(entry, channel):
+    """Process media for an entry with improved Facebook video handling."""
+    # Discord file size limits
+    DISCORD_LIMIT = 8 * 1024 * 1024  # 8MB Discord file limit
+    
+    video_exts = ('.mp4', '.webm', '.mov', '.mkv')
+    image_exts = ('.jpg', '.jpeg', '.png', '.gif')
+    media_urls = entry.get('media_all', []) or []
+    media_files = []
+    video_processed = False
+    
+    # Create a manual temp directory instead of using context manager
+    temp_dir = tempfile.mkdtemp(prefix="hanu_feedbot_")
+    TEMP_DIRS_TO_CLEANUP.append(temp_dir)  # Add to global cleanup list
+    
+    try:
+        # STEP 1: First check for target post ID "743124275142078"
+        entry_str = str(entry)
+        if "743124275142078" in entry_str or "4010190512624581" in entry_str:
+            print(f"🎯 FOUND TARGET POST ID in entry!")
+            target_url = "https://www.facebook.com/720895507364955/posts/743124275142078"
+            print(f"📥 Downloading video from known target URL: {target_url}")
+            
+            # Generate unique filenames
+            download_path = os.path.join(temp_dir, f"facebook_video_{random.randint(1000, 9999)}.mp4")
+            
+            # Download the video
+            file_path = await download_video_ytdlp(target_url, output_path=download_path)
+            
+            if file_path and os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                print(f"✅ Downloaded target video: {file_size/1024/1024:.2f}MB")
+                
+                # Check if file is too large for Discord
+                if file_size > DISCORD_LIMIT:
+                    print(f"⚠️ Video too large for Discord ({file_size/1024/1024:.2f}MB > {DISCORD_LIMIT/1024/1024}MB)")
+                    print(f"📤 Uploading to Catbox instead...")
+                    
+                    # Import upload function from dispatcher
+                    from bot.dispatcher import upload_to_catbox
+                    
+                    # Read file data
+                    with open(file_path, 'rb') as f:
+                        file_data = f.read()
+                    
+                    # Upload to Catbox
+                    catbox_url = upload_to_catbox(file_data)
+                    if catbox_url:
+                        print(f"✅ Uploaded to Catbox: {catbox_url}")
+                        # Send as a message instead of file attachment
+                        await channel.send(f"Video from post: {target_url}\n{catbox_url}")
+                        video_processed = True
+                    else:
+                        print("❌ Failed to upload to Catbox")
+                else:
+                    # Small enough for Discord, send directly
+                    print(f"📤 Video small enough for Discord ({file_size/1024/1024:.2f}MB)")
+                    media_files.append(discord.File(file_path, filename="facebook_video.mp4"))
+                    video_processed = True
+        
+        # STEP 2: Try to extract video directly from post URL if target not found
+        if not video_processed:
+            post_url = entry.get('link', '')
+            if "facebook.com" in post_url:
+                print(f"📥 Trying direct video download from post URL: {post_url}")
+                
+                download_path = os.path.join(temp_dir, f"facebook_video_{random.randint(1000, 9999)}.mp4")
+                file_path = await download_video_ytdlp(post_url, output_path=download_path)
+                
+                if file_path and os.path.exists(file_path):
+                    file_size = os.path.getsize(file_path)
+                    if file_size > 100000:  # Ensure it's not just a thumbnail
+                        print(f"✅ Downloaded video from post URL: {file_size/1024/1024:.2f}MB")
+                        
+                        # Check if too large for Discord
+                        if file_size > DISCORD_LIMIT:
+                            from bot.dispatcher import upload_to_catbox
+                            with open(file_path, 'rb') as f:
+                                file_data = f.read()
+                            catbox_url = upload_to_catbox(file_data)
+                            if catbox_url:
+                                video_processed = True
+                        else:
+                            media_files.append(discord.File(file_path, filename="facebook_video.mp4"))
+                            video_processed = True
+                    else:
+                        print(f"⚠️ Downloaded file too small: {file_size} bytes")
+                else:
+                    print(f"❌ No video found at post URL")
+        
+        # STEP 3: Only if no video processed, try individual media URLs
+        if not video_processed:
+            print("📷 No video found, processing individual media URLs")
+            for url in media_urls:
+                if len(media_files) >= 10:  # Discord limit
+                    break
+                try:
+                    # Skip CDN/thumbnail URLs if we've found our target post ID
+                    if "743124275142078" in entry_str and ("fbcdn.net" in url or "scontent-" in url):
+                        print(f"⚠️ Skipping CDN URL for target post: {url}")
+                        continue
+                        
+                    # Facebook video posts
+                    video_norm = normalize_url(url)
+                    if video_norm and "facebook.com" in video_norm:
+                        print(f"📥 Trying video download from media URL: {video_norm}")
+                        download_path = os.path.join(temp_dir, f"facebook_video_{random.randint(1000, 9999)}.mp4")
+                        file_path = await download_video_ytdlp(video_norm, output_path=download_path)
+                        
+                        if file_path and os.path.exists(file_path):
+                            file_size = os.path.getsize(file_path)
+                            if file_size > 100000:
+                                print(f"✅ Downloaded video from media URL: {file_size/1024/1024:.2f}MB")
+                                
+                                # Check if too large for Discord
+                                if file_size > DISCORD_LIMIT:
+                                    from bot.dispatcher import upload_to_catbox
+                                    with open(file_path, 'rb') as f:
+                                        file_data = f.read()
+                                    catbox_url = upload_to_catbox(file_data)
+                                    if catbox_url:
+                                        await channel.send(f"Video from media URL: {video_norm}\n{catbox_url}")
+                                        video_processed = True
+                                else:
+                                    media_files.append(discord.File(file_path, filename=os.path.basename(file_path)))
+                                    video_processed = True
+                                continue
+                                
+                    # Direct video links
+                    path = url.split('?')[0].lower()
+                    if any(path.endswith(ext) for ext in video_exts):
+                        video_data = await download_bytes(url)
+                        name = url.split('/')[-1].split('?')[0] or 'video.mp4'
+                        media_files.append(discord.File(io.BytesIO(video_data), filename=name))
+                        continue
+                        
+                    # Image links
+                    if any(path.endswith(ext) for ext in image_exts):
+                        img_data = await download_bytes(url)
+                        name = url.split('/')[-1].split('?')[0] or 'image.jpg'
+                        media_files.append(discord.File(io.BytesIO(img_data), filename=name))
+                        continue
+                except Exception as err:
+                    print(f"Failed to download media {url}: {err}")
+        
+        # Send media files to channel
+        if media_files:
+            print(f"📤 Sending {len(media_files)} media files to channel")
+            try:
+                await channel.send(files=media_files)
+                print("✅ Media files sent successfully")
+            except discord.errors.HTTPException as e:
+                if "Payload Too Large" in str(e) or "40005" in str(e):
+                    print(f"⚠️ File too large for Discord, fallback not implemented for this case")
+                else:
+                    print(f"❌ Error sending media: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        return video_processed
+    
+    finally:
+        # Add temp directory to global cleanup list if not already there
+        if temp_dir not in TEMP_DIRS_TO_CLEANUP:
+            TEMP_DIRS_TO_CLEANUP.append(temp_dir)
+
+async def process_feeds_once(client: discord.Client):
+    """Scans feeds and processes new entries per-channel summary."""
+    seen = load_seen_guids()
+    now = pendulum.now('Asia/Ho_Chi_Minh')
+    today = now.format('YYYY-MM-DD')
+
+    # Load mappings and thread map
+    try:
+        with open(os.path.join(BASE_DIR, 'feed_map.json'), 'r') as f: 
+            user_map = json.load(f)
+    except Exception:
+        user_map = {}
+    try:
+        with open(DETAILS_MAP_FILE) as f: 
+            details_map = json.load(f)
+    except: 
+        details_map = {}
+
+    # Collect new entries
+    new_posts = []
+    for e in iter_entries():
+        cid = user_map.get(e['feed']) or GLOBAL_FALLBACK_CHANNEL_ID
+        if not cid or e['guid'] in seen: 
+            continue
+        age = (now - e.get('published', now)).total_hours()
+        if age > MAX_AGE_HOURS: 
+            continue
+        new_posts.append(e)
+
+    if not new_posts:
+        print("No new entries this cycle.")
+        return
+
+    # Bucket by channel
+    channel_groups = defaultdict(list)
+    for e in new_posts:
+        cid = user_map.get(e['feed']) or GLOBAL_FALLBACK_CHANNEL_ID
+        if cid is None:
+            continue
+        channel_groups[int(cid)].append(e)
+
+    # Process each channel
+    for ch_id, entries in channel_groups.items():
+        ch = client.get_channel(ch_id)
+        if not isinstance(ch, discord.TextChannel):
+            print(f"Skipping non-text channel {ch_id}")
+            continue
+
+        # 1) Summary header
+        vietnamese_date = format_vietnamese_date(now)
+        summary = await get_daily_summary_message(ch, today)
+        if not summary:
+            summary = await create_daily_summary_message(ch, vietnamese_date)
+            if not summary:
+                continue
+
+        # 2) Single Details thread under summary
+        thr = await get_or_create_channel_details_thread(client, ch, summary, details_map)
+
+        # 3) Post full entries in that thread and update per-channel summary
+        for e in entries:
+            # Debug info
+            print(f"\n{'='*40}")
+            print(f"🔍 PROCESSING ENTRY: {e.get('title', 'No title')}")
+            print(f"🔗 Link: {e.get('link', 'No link')}")
+            print(f"{'='*40}\n")
+            
+            # Generate and send body content
+            body = await build_full_body(e)
+            last_msg = None
+            for idx in range(0, len(body), 2000):
+                chunk = body[idx:idx+2000]
+                last_msg = await thr.send(chunk)
+            posted_message = last_msg
+            
+            # Append summary to daily summary message
+            await update_daily_summary_message(summary, e, posted_message)
+            
+            # Process media (Facebook videos, images, etc.)
+            await process_media(e, ch)
+            
+            # Mark as seen and save
+            seen.add(e['guid'])
+            save_seen_guids(seen)
+            
+            # Rate limit to avoid Discord issues
+            await asyncio.sleep(1)
+
+    # Persist thread map
+    with open(DETAILS_MAP_FILE, 'w') as f:
+        json.dump(details_map, f, indent=2)
+
+    print("✅ Finished per-channel summaries and details threads")
 
 async def run_bot_job():
     """The main logic of the bot, now encapsulated in a single function that runs once."""
     if not BOT_TOKEN:
         print("⚠️  Cannot start bot: DISCORD_BOT_TOKEN is not configured.")
         return
+        
     intents = discord.Intents.default()
     intents.messages = True
     intents.message_content = True 
@@ -184,314 +489,9 @@ async def run_bot_job():
         print("Job complete. Logging out.")
         await client.close()
         print("🔌 Discord client closed after job.")
+        # Close shared HTTP session
+        await HTTP_SESSION.close()
 
     await client.start(BOT_TOKEN)
 
-async def process_feeds_once(client: discord.Client):
-    """Scans feeds and processes new entries."""
-    
-    # Optional global summary: create header in SUMMARY_CHANNEL_ID if set
-    if SUMMARY_CHANNEL_ID:
-        summary_channel = client.get_channel(int(SUMMARY_CHANNEL_ID))
-        if not summary_channel:
-            print(f"🚨 Error: Could not find summary channel with ID {SUMMARY_CHANNEL_ID}.")
-            return
-        if not isinstance(summary_channel, discord.TextChannel):
-            print(f"🚨 Error: Summary channel {SUMMARY_CHANNEL_ID} is not a TextChannel.")
-            return
-    else:
-        summary_channel = None
-
-    seen_guids = load_seen_guids()
-    # Use GMT+7 (Asia/Ho_Chi_Minh) for local time
-    now = pendulum.now('Asia/Ho_Chi_Minh')
-    today_str = now.strftime("%Y-%m-%d")
-    print(f"[{now.to_iso8601_string()}] 👟 Checking for new entries...")
-    
-    # Load feed metadata for entry_url resolution
-    try:
-        with open(os.path.join(BASE_DIR, 'feed_meta.json'), 'r', encoding='utf-8') as f:
-            feed_meta = json.load(f)
-    except Exception:
-        feed_meta = {}
-
-    # Global daily summary header
-    if summary_channel:
-        daily_summary_message = await get_daily_summary_message(summary_channel, today_str)
-    else:
-        daily_summary_message = None
-        
-    # Global reset summary logic
-    if summary_channel:
-        reset_flag = os.path.exists(os.path.join(BASE_DIR, "reset_summary.flag"))
-        if reset_flag:
-            # Remove existing summary message and its threads
-            if daily_summary_message:
-                # Delete any threads under the old summary message
-                for thread in summary_channel.threads:
-                    if thread.parent_id == daily_summary_message.id:
-                        try:
-                            await thread.delete()
-                        except Exception:
-                            pass
-            if daily_summary_message:
-                try:
-                    await daily_summary_message.delete()
-                except Exception:
-                    pass
-                daily_summary_message = None
-            # Clear seen GUIDs to reprocess posts
-            seen_guids = set()
-            save_seen_guids(seen_guids)
-            # Remove summary file
-            summary_file = f"daily_summary_{today_str}.txt"
-            if os.path.exists(summary_file):
-                os.remove(summary_file)
-            # Remove reset flag and clear persisted Details thread ID
-            os.remove(os.path.join(BASE_DIR, "reset_summary.flag"))
-            try:
-                os.remove(DETAILS_FILE)
-            except Exception:
-                pass
-            # Clear per-channel details thread mapping
-            try:
-                os.remove(DETAILS_MAP_FILE)
-            except Exception:
-                pass
-    
-    # Load user-defined feed->channel mappings and channel details threads
-    try:
-        with open(os.path.join(BASE_DIR, 'feed_map.json'), 'r') as f:
-            user_map = json.load(f)
-    except Exception:
-        user_map = {}
-        
-    # Load or init per-channel Details thread map
-    try:
-        with open(DETAILS_MAP_FILE, 'r') as f:
-            details_map = json.load(f)
-    except Exception:
-        details_map = {}
-        
-    # If no mappings and fallback disabled, skip parsing feeds
-    if not user_map and not FALLBACK_ENABLED:
-        print("🚨 No feed mappings and fallback is disabled; skipping feed processing.")
-        return
-        
-    new_posts_this_cycle = []
-
-    for entry in iter_entries():
-        # skip feeds without a channel mapping
-        if not user_map.get(entry['feed']):
-            continue
-        if entry['guid'] in seen_guids:
-            continue
-        if entry['published'] and (now - entry['published']).total_hours() > MAX_AGE_HOURS:
-            continue
-        
-        new_posts_this_cycle.append(entry)
-
-    if not new_posts_this_cycle:
-        print("No new entries found in this cycle.")
-        return
-
-    # Create global daily summary if enabled and not yet created
-    if summary_channel and not daily_summary_message:
-        vietnamese_date = format_vietnamese_date(now)
-        daily_summary_message = await create_daily_summary_message(summary_channel, vietnamese_date)
-        if not daily_summary_message:
-            return
-
-    # Global details thread under the daily summary (persisted)
-    detail_thread = None
-    if summary_channel and daily_summary_message:
-        # Try loading existing Details thread ID
-        try:
-            dtid = int(open(DETAILS_FILE).read().strip())
-            detail_thread = client.get_channel(dtid)
-            if not detail_thread or getattr(detail_thread, 'parent_id', None) != daily_summary_message.id:
-                raise ValueError("Stale Details thread id")
-        except Exception:
-            # Create new Details thread and persist its ID, handling 'already exists' error
-            try:
-                detail_thread = await daily_summary_message.create_thread(name='Details')
-                with open(DETAILS_FILE, 'w') as df:
-                    df.write(str(detail_thread.id))
-            except discord.HTTPException as e:
-                if getattr(e, 'code', None) == 160004:
-                    # A thread already exists for this message; fetch it
-                    detail_thread = next(
-                        (t for t in summary_channel.threads if t.parent_id == daily_summary_message.id and t.name == 'Details'),
-                        None
-                    )
-                    if detail_thread:
-                        with open(DETAILS_FILE, 'w') as df:
-                            df.write(str(detail_thread.id))
-                else:
-                    print(f"🚨 Could not create Details thread: {e}")
-                    return
-            except Exception as e:
-                print(f"🚨 Could not create Details thread: {e}")
-                return
-
-    # Group new posts by mapped channel for per-channel pipelines
-    channel_groups = defaultdict(list)
-    for entry in new_posts_this_cycle:
-        mapped_id = user_map.get(entry['feed']) or GLOBAL_FALLBACK_CHANNEL_ID
-        if not mapped_id:
-            continue
-        channel_groups[int(mapped_id)].append(entry)
-    
-    print(f">>> channel_groups: {channel_groups}")
-
-    # Process each channel separately
-    for ch_id, entries in channel_groups.items():
-        ch = client.get_channel(ch_id)
-        print(f">>> Processing mapped channel_id={ch_id}, channel object={ch}, entries={len(entries)}")
-        if ch is None:
-            print(f"🚨 Warning: client.get_channel({ch_id}) returned None.")
-            continue
-            
-        # Forum channels: create a thread per entry with summary as thread title and post content
-        if isinstance(ch, discord.ForumChannel):
-            for entry in entries:
-                # Determine post_time
-                if entry.get('published'):
-                    dt = pendulum.instance(entry['published']).in_timezone('Asia/Ho_Chi_Minh')
-                    post_time = dt.to_iso8601_string()
-                else:
-                    post_time = 'N/A'
-                    
-                maybe_update(entry)
-                
-                # Build body and tldr
-                if len(entry.get('raw', '').split()) < SHORT_POST_WORD_THRESHOLD:
-                    parts, tldr = [], ''
-                    title = entry.get('title', '')
-                    if title:
-                        parts.append(f"# **{title}**")
-                    raw = entry.get('raw', '')
-                    if raw and raw.strip() != title.strip():
-                        parts.append(raw)
-                    body = "\n\n".join(parts)
-                else:
-                    reply = await asyncio.to_thread(call_gemini, build_prompt(entry)) or None
-                    if not reply:
-                        continue
-                    body, tldr = split_reply(reply)
-                    
-                # Include link to the original post in the thread
-                body = f"{body}\n\n<{entry.get('link')}>"
-                await push(client, ch, entry, body, tldr, post_time)
-                
-                # Persist seen GUID
-                seen_guids.add(entry['guid'])
-                save_seen_guids(seen_guids)
-                await asyncio.sleep(5)
-            continue
-
-        # Text channels: CRITICAL workflow - Details thread gets FULL content, main channel gets summaries ONLY
-        if not isinstance(ch, discord.TextChannel):
-            continue
-            
-        # Daily summary header for this channel
-        today = pendulum.now('Asia/Ho_Chi_Minh')
-        vietnamese_date = format_vietnamese_date(today)
-        
-        # Get or create date message
-        daily_msg = await get_daily_summary_message(ch, today.to_date_string())
-        if not daily_msg:
-            daily_msg = await create_daily_summary_message(ch, vietnamese_date)
-            if not daily_msg:
-                continue
-
-        # Ensure 'Details' thread under the summary message (persisted per channel)
-        details_thread = await get_or_create_channel_details_thread(client, ch, daily_msg, details_map)
-
-        # Process each entry: FULL content to Details thread, summary to main channel
-        for idx, entry in enumerate(entries, start=1):
-            # Build body and tldr
-            if entry.get('published'):
-                dt = pendulum.instance(entry['published']).in_timezone('Asia/Ho_Chi_Minh')
-                post_time = dt.to_iso8601_string()
-            else:
-                post_time = 'N/A'
-            
-            maybe_update(entry)
-            
-            if len(entry.get('raw', '').split()) < SHORT_POST_WORD_THRESHOLD:
-                parts, tldr = [], ''
-                title = entry.get('title', '')
-                if title:
-                    parts.append(f"# **{title}**")
-                raw = entry.get('raw', '')
-                if raw and raw.strip() != title.strip():
-                    parts.append(raw)
-                body = "\n\n".join(parts)
-            else:
-                reply = await asyncio.to_thread(call_gemini, build_prompt(entry)) or None
-                if not reply:
-                    continue
-                body, tldr = split_reply(reply)
-            
-            # CRITICAL: Post FULL content ONLY to Details thread - NEVER to main channel
-            # Post full detailed content to Details thread and capture message instance
-            detailed_msg = None
-            print(f"🔔 Posting detailed content for GUID {entry.get('guid')} to thread {details_thread.id}")
-            try:
-                detailed_msg = await push(client, details_thread, entry, body, tldr, post_time)
-                print(f"🔔 Posted detailed content for GUID {entry.get('guid')}, message ID {getattr(detailed_msg, 'id', None)}")
-            except Exception as e:
-                print(f"🚨 Error posting detailed content for GUID {entry.get('guid')}: {e}")
-            
-            # Generate summary for main channel
-            raw_text = entry.get('raw', '')
-            summary_prompt = f"Summarize the following post in 1-2 sentences, in the same language as the original text:\n\n{raw_text}"
-            summary_reply = await asyncio.to_thread(call_gemini, [{"type":"text", "text": summary_prompt}]) or ""
-            summary_sentences = summary_reply.strip().replace('\n', ' ')
-            
-            # Generate a one-phrase descriptor (4-6 words) in original language  
-            descriptor_prompt = f"Summarize the overall idea of this post in one phrase (4-6 words), in the same language as the original text:\n\n{raw_text}"
-            phrase_reply = await asyncio.to_thread(call_gemini, [{"type":"text", "text": descriptor_prompt}]) or ""
-            phrase = phrase_reply.strip().splitlines()[0] or "(No descriptor)"
-            
-            # Combine descriptor and summary on one line
-            summary_line = f"({phrase}) {summary_sentences}"
-            
-            # Build summary content with separator - ONLY summary goes to main channel
-            separator = "\n\u200b\n\u200b\n\u200b\n\u200b"
-            # Build summary content with separator - ONLY summary goes to main channel
-            fb_link = entry.get('link', '#')
-            # Link to detailed Discord message if available
-            if detailed_msg and getattr(detailed_msg, 'jump_url', None):
-                link_line = f"-# [Details]({detailed_msg.jump_url}) | <{fb_link}>"
-            else:
-                link_line = f"-# <{fb_link}>"
-            summary_content = (
-                f"## {idx}. {summary_line}\n"
-                f"{link_line}" + separator
-            )
-            
-            # Send ONLY summary via webhook to main channel
-            print(f"🔔 Obtaining webhook for channel {ch.id}")
-            webhook_url = await get_or_create_webhook_url(ch)
-            print(f"🔔 Webhook URL obtained for channel {ch.id}: {webhook_url}")
-            webhook = discord.Webhook.from_url(webhook_url, client=client)
-            # Split content into <=2000-char chunks to avoid Discord limits
-            chunks = [summary_content[i:i+2000] for i in range(0, len(summary_content), 2000)]
-            for idx_chunk, chunk in enumerate(chunks, start=1):
-                print(f"🔔 Sending summary chunk {idx_chunk}/{len(chunks)} to main channel {ch.id}")
-                try:
-                    await webhook.send(
-                        content=chunk,
-                        username=entry.get('page_name'),
-                        avatar_url=avatar_for(entry)
-                    )
-                    print(f"🔔 Sent summary chunk {idx_chunk}/{len(chunks)}")
-                except Exception as e:
-                    print(f"🚨 Error sending summary chunk {idx_chunk} for GUID {entry.get('guid')}: {e}")
-            
-            # Persist seen GUID and sleep to avoid rate limits
-            seen_guids.add(entry['guid'])
-            save_seen_guids(seen_guids)
-            await asyncio.sleep(5)
+# === END FILE ===

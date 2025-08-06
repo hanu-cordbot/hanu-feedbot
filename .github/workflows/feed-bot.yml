@@ -23,7 +23,7 @@ jobs:
           clean: true
           submodules: false  # disable submodules
           sparse-checkout-cone-mode: true
-          fetch-depth: 1
+          fetch-depth: 0  # Fetch full history to allow pushing back state changes
           fetch-tags: false
           lfs: false
 

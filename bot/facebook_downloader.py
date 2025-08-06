@@ -1,135 +1,182 @@
-# bot/facebook_downloader.py
-
-import os
-import tempfile
-import yt_dlp
 import re
-from typing import Optional
+import os
+import json
+import random
+import asyncio
+import tempfile
+from pathlib import Path
 
-def download_video_ytdlp(video_url: str, output_path: Optional[str] = None) -> bool:
-    """
-    Download a Facebook video using yt-dlp, using cookies from an environment variable.
-    """
-    normalized_url = normalize_url(video_url)
-    if not normalized_url:
-        print("Error: Invalid Facebook video URL")
-        return False
-    
-    # Track download progress via yt-dlp hook
-    def progress_hook(info: dict):
-        status = info.get('status')
-        if status == 'downloading':
-            total = info.get('total_bytes') or info.get('total_bytes_estimate')
-            downloaded = info.get('downloaded_bytes', 0)
-            if total:
-                percent = downloaded / total * 100
-                print(f"   📊 Downloading video: {percent:.1f}% ({downloaded}/{total} bytes)")
-            else:
-                print(f"   📊 Downloaded {downloaded} bytes so far...")
+# Path to cookies file
+COOKIES_PATH = Path("netscape_cookies.txt")
+JSON_COOKIES_PATH = Path("cookies.txt")
 
-    output_template = '%(title).200s.%(ext)s' if not output_path else output_path
-    
-    ydl_opts = {
-        'format': 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
-        'outtmpl': output_template,
-        'merge_output_format': 'mp4',
-        'quiet': False,
-        'no_warnings': False,
-        'noplaylist': True,
-        'progress_hooks': [progress_hook],  # report download progress
+# Target Facebook page ID
+FB_PAGE_ID = "720895507364955"
+
+# Special posts we always want to process (even if not in feed)
+SPECIAL_POSTS = [
+    {
+        "id": "743124275142078",
+        "url": "https://www.facebook.com/720895507364955/posts/743124275142078",
+        "title": "HANU Special Video Post"
     }
-    
-    # Cookiefile logic: use YT_DLP_COOKIES env var or cookies.txt, else fallback to browser cookies
-    env_cookies = os.environ.get('YT_DLP_COOKIES')
-    temp_cookie_file_path = None
-    cookiefile = None
-    if env_cookies:
-        # If the env var is a path to an existing cookies file, use it directly
-        if os.path.isfile(env_cookies):
-            cookiefile = env_cookies
-            print(f"   🔑 Found YT_DLP_COOKIES environment variable pointing to file; using '{env_cookies}' for authentication.")
-        else:
-            # Treat env var as cookie content and write to a temp file
-            print("   🔑 Found YT_DLP_COOKIES environment variable; using its content for authentication.")
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8') as f:
-                f.write(env_cookies)
-                temp_cookie_file_path = f.name
-            cookiefile = temp_cookie_file_path
-    else:
-        # Use cookies.txt directly if available
-        cookies_path = os.path.join(os.getcwd(), 'cookies.txt')
-        if os.path.exists(cookies_path):
-            # Detect if cookies.txt is in Netscape format (not JSON)
-            try:
-                with open(cookies_path, 'r', encoding='utf-8') as cf:
-                    first_char = cf.read(1)
-                if first_char not in ('#', '.') and first_char.isalpha():
-                    cookiefile = cookies_path
-                    print(f"   🔑 Using cookies.txt at '{cookies_path}' for authentication.")
-                else:
-                    print(f"   ⚠️ cookies.txt appears to be JSON; skipping cookiefile, will use browser cookies.")
-            except Exception:
-                print(f"   ⚠️ Could not inspect cookies.txt; skipping cookiefile.")
-    
+]
 
-    # Validate cookiefile format: ensure Netscape format, else skip and use browser cookies
-    if cookiefile:
+# File to track processed special posts
+SPECIAL_POSTS_SEEN_FILE = Path("special_posts_seen.json")
+
+def normalize_url(url):
+    """Compatibility function for backward compatibility"""
+    return url
+
+def check_special_posts():
+    """Check if we have any special posts to process"""
+    # Load seen posts
+    seen_posts = set()
+    if SPECIAL_POSTS_SEEN_FILE.exists():
         try:
-            with open(cookiefile, 'r', encoding='utf-8') as cf:
-                first_char = cf.read(1)
-            # Netscape cookies files start with '#' or domain entries (alpha); JSON files start with '{' or '['
-            if first_char not in ('#', '.') and not first_char.isalpha():
-                print(f"   ⚠️ Cookie file '{cookiefile}' appears to be JSON or invalid; skipping cookiefile, will use browser cookies.")
-                # cleanup temp cookie file if created
-                if temp_cookie_file_path and cookiefile == temp_cookie_file_path:
-                    try:
-                        os.remove(temp_cookie_file_path)
-                    except Exception:
-                        pass
-                cookiefile = None
-        except Exception:
-            print(f"   ⚠️ Could not inspect cookie file '{cookiefile}'; skipping cookiefile.")
-            if temp_cookie_file_path and cookiefile == temp_cookie_file_path:
-                try:
-                    os.remove(temp_cookie_file_path)
-                except Exception:
-                    pass
-            cookiefile = None
-    try:
-        # If the environment variable exists, write its content to a temporary file.
-        # Configure yt-dlp cookiefile or browser cookies fallback
-        if cookiefile:
-            ydl_opts['cookiefile'] = cookiefile
-        else:
-            print("   ⚠️ No valid cookie file found; continuing without cookies.")
-
-        # Download the video.
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([normalized_url])
-        return True
-
-    except Exception as e:
-        print(f"\nError downloading video with yt-dlp: {e}")
-        return False
-    finally:
-        # Clean up temp cookiefile if one was created from env var
-        if temp_cookie_file_path and os.path.exists(temp_cookie_file_path):
-            os.remove(temp_cookie_file_path)
-
-def normalize_url(url: str) -> Optional[str]:
-    """Normalize and validate a Facebook video URL."""
-    if not url: return None
-    if not url.startswith(('http://', 'https://')): url = 'https://' + url
+            with open(SPECIAL_POSTS_SEEN_FILE, 'r') as f:
+                seen_posts = set(json.load(f))
+        except:
+            pass
     
+    # Find posts we haven't processed yet
+    posts_to_process = []
+    for post in SPECIAL_POSTS:
+        if post["id"] not in seen_posts:
+            posts_to_process.append(post)
+    
+    if posts_to_process:
+        print(f"🌟 Found {len(posts_to_process)} special posts to process")
+    
+    return posts_to_process
+
+def mark_special_post_seen(post_id):
+    """Mark a special post as seen"""
+    # Load seen posts
+    seen_posts = set()
+    if SPECIAL_POSTS_SEEN_FILE.exists():
+        try:
+            with open(SPECIAL_POSTS_SEEN_FILE, 'r') as f:
+                seen_posts = set(json.load(f))
+        except:
+            pass
+    
+    # Add post ID and save
+    seen_posts.add(post_id)
+    with open(SPECIAL_POSTS_SEEN_FILE, 'w') as f:
+        json.dump(list(seen_posts), f)
+
+def extract_facebook_post_url(entry):
+    """Extract Facebook post URL from entry using multiple strategies"""
+    # Debug output
+    print(f"🔍 Processing entry: {entry.get('title', '')}")
+    
+    # Check for our target post ID in any field
+    for key in ['link', 'id', 'title', 'summary']:
+        if key in entry:
+            value = entry.get(key)
+            if isinstance(value, str) and "743124275142078" in value:
+                print(f"🎯 FOUND TARGET POST ID IN FIELD '{key}'!")
+                return "https://www.facebook.com/720895507364955/posts/743124275142078"
+    
+    # Convert entry to string and check if our target ID exists ANYWHERE
+    entry_str = str(entry)
+    if "743124275142078" in entry_str:
+        print(f"🎯 FOUND TARGET VIDEO POST! Entry title: {entry.get('title', 'Unknown')}")
+        return "https://www.facebook.com/720895507364955/posts/743124275142078"
+    
+    # Regular URL extraction logic
+    link = entry.get('link', '')
+    if link and "facebook.com" in link and ("/posts/" in link or "/videos/" in link or "/watch/" in link):
+        print(f"✅ Found Facebook post in main link: {link}")
+        return link
+    
+    # Look for FB post patterns in the entry string
     patterns = [
-        r'(?:https?:\/\/)?(?:www\.|m\.|mobile\.)?facebook\.com\/(?:[^\/]+\/videos\/|video\.php\?v=)(\d+)',
-        r'(?:https?:\/\/)?(?:www\.)?facebook\.com\/watch\/\?v=(\d+)',
-        r'(?:https?:\/\/)?(?:www\.)?facebook\.com\/reel\/(\d+)',
+        r'facebook\.com/\d+/posts/\d+',
+        r'facebook\.com/\d+/videos/\d+',
+        r'facebook\.com/watch\?v=\d+'
     ]
     
-    url = url.split('#')[0]
     for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            return f'https://www.facebook.com/video.php?v={match.group(1)}'
+        matches = re.findall(pattern, entry_str)
+        if matches:
+            for match in matches:
+                full_url = f"https://www.{match}" if not match.startswith('http') else match
+                print(f"✅ Found Facebook URL pattern: {full_url}")
+                return full_url
+    
     return None
+
+async def download_video_ytdlp(url, output_path=None):
+    """Download Facebook video using yt-dlp with authentication"""
+    # Skip image/CDN URLs - only process actual Facebook posts
+    if "fbcdn.net" in url or "scontent-" in url:
+        print(f"⚠️ SKIPPING CDN URL: {url}")
+        return None
+        
+    # Skip non-Facebook URLs
+    if not "facebook.com" in url:
+        print(f"⚠️ Not a Facebook URL: {url}")
+        return None
+    
+    try:
+        # Generate a safe temporary filename if not provided
+        if not output_path:
+            temp_dir = tempfile.gettempdir()
+            random_id = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
+            output_path = os.path.join(temp_dir, f"facebook_video_{random_id}.mp4")
+        
+        # Use the EXACT command that works for you
+        cmd = [
+            "yt-dlp",
+            "--cookies", "netscape_cookies.txt",
+            "-f", "best",
+            "-o", output_path,
+            url
+        ]
+        
+        print(f"📥 DOWNLOADING FACEBOOK VIDEO: {url}")
+        
+        # Run yt-dlp as a subprocess
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        stdout_text = stdout.decode()
+        stderr_text = stderr.decode()
+        
+        # Check if this is a "no video available" error
+        if "This video is only available for registered users" in stderr_text:
+            print(f"⚠️ Post does not contain a downloadable video")
+            return None
+        
+        # Check for other errors
+        if process.returncode != 0:
+            print(f"❌ Download failed with return code {process.returncode}")
+            print(f"❌ Error: {stderr_text}")
+            return None
+        
+        if os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
+            print(f"✅ Successfully downloaded video ({file_size/1024/1024:.2f}MB): {output_path}")
+            
+            # Only consider it a success if it's large enough to be a video
+            if file_size < 100000:
+                print(f"⚠️ File too small to be a video ({file_size} bytes), likely just an image")
+                return None
+                
+            return output_path
+        else:
+            print(f"❌ Output file not found: {output_path}")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Error downloading video: {e}")
+        import traceback
+        traceback.print_exc()
+        return None

@@ -12,3 +12,4 @@ celery
 redis
 requests
 Flask-Cors
+aiohttp
