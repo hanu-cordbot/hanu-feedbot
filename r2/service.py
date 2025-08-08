@@ -23,7 +23,7 @@ from typing import Dict
 import requests
 from flask import Flask, jsonify, request
 
-from r2_uploader import delete_object, get_metadata, upload_file
+from .uploader import delete_object, get_metadata, upload_file
 
 
 app = Flask(__name__)

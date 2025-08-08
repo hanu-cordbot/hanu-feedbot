@@ -6,8 +6,8 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-try:  # R2 uploads are optional; skip if module not available
-    from r2_uploader import upload_path_and_prune
+try:  # R2 uploads are optional; skip if package not available
+    from r2 import upload_path_and_prune
 except Exception:  # pragma: no cover - optional dependency
     upload_path_and_prune = None
 

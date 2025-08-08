@@ -15,7 +15,12 @@ import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-import r2_uploader
+from r2 import (
+    delete_oldest_if_over_quota,
+    get_metadata,
+    upload_file,
+    upload_path_and_prune,
+)
 
 
 @mock_aws
@@ -25,11 +30,11 @@ def test_upload_and_metadata_single_part():
     s3.create_bucket(Bucket=os.environ["R2_BUCKET"])
 
     data = b"a" * (1024 * 1024)  # 1 MiB -> single part
-    meta = r2_uploader.upload_file(io.BytesIO(data), "small.mp4", len(data))
+    meta = upload_file(io.BytesIO(data), "small.mp4", len(data))
 
     assert meta["key"] == "small.mp4"
     assert meta["size"] == len(data)
-    head = r2_uploader.get_metadata("small.mp4")
+    head = get_metadata("small.mp4")
     assert head["ContentLength"] == len(data)
 
 
@@ -43,7 +48,7 @@ def test_retention_manager():
     time.sleep(1)
     s3.put_object(Bucket=os.environ["R2_BUCKET"], Key="b.mp4", Body=b"b")
 
-    deleted = r2_uploader.delete_oldest_if_over_quota(1)
+    deleted = delete_oldest_if_over_quota(1)
     assert deleted == 1
     objs = s3.list_objects_v2(Bucket=os.environ["R2_BUCKET"]).get("Contents", [])
     assert len(objs) == 1
@@ -61,8 +66,8 @@ def test_upload_path_and_prune(tmp_path):
     b = tmp_path / "b.mp4"
     b.write_bytes(b"b")
 
-    r2_uploader.upload_path_and_prune(str(a), "a.mp4", max_total_bytes=10)
-    r2_uploader.upload_path_and_prune(str(b), "b.mp4", max_total_bytes=1)
+    upload_path_and_prune(str(a), "a.mp4", max_total_bytes=10)
+    upload_path_and_prune(str(b), "b.mp4", max_total_bytes=1)
 
     objs = s3.list_objects_v2(Bucket=os.environ["R2_BUCKET"]).get("Contents", [])
     assert len(objs) == 1

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import os
 
-from r2_uploader import delete_oldest_if_over_quota
+from .uploader import delete_oldest_if_over_quota
 
 
 def main() -> None:
