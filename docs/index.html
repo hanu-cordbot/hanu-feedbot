@@ -236,6 +236,20 @@
         metadata = data.metadata || {};
         groups = data.groups || {};
         mappings = data.mappings || {};
+
+        // Fetch system status to update service indicator
+        try {
+          const statusResp = await fetch(`${API_BASE}/api/status`);
+          if (statusResp.ok) {
+            const status = await statusResp.json();
+            document.getElementById('system-status').textContent =
+              status.rssService === 'ok' ? '🟢 Online' : '🔴 Offline';
+          } else {
+            document.getElementById('system-status').textContent = '⚠️ Unknown';
+          }
+        } catch (e) {
+          document.getElementById('system-status').textContent = '⚠️ Unknown';
+        }
         channels = data.channels || [];
         lastUpdate = data.last_update || null;
         
@@ -468,7 +482,6 @@
           label.removeAttribute('title');
         }
       }
-      document.getElementById('system-status').textContent = feeds.length > 0 ? '🟢 Online' : '🔴 Offline';
     }
 
     // Helper functions

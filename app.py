@@ -154,10 +154,24 @@ def api_login():
 
 @app.route('/api/status')
 def api_status():
-    """Endpoint to check token validity"""
+    """Endpoint to report basic system status"""
     if not verify_api_token():
         return jsonify({"error": "Authentication required"}), 401
-    return jsonify({"status": "ok"}), 200
+
+    rss_status = "ok"
+    try:
+        with open(FEEDS_FILE, 'r') as f:
+            first_feed = next((line.strip() for line in f if line.strip()), None)
+        if not first_feed:
+            rss_status = "missing"
+        else:
+            resp = requests.get(first_feed, timeout=5)
+            if not resp.ok:
+                rss_status = "down"
+    except Exception:
+        rss_status = "down"
+
+    return jsonify({"status": "ok", "rssService": rss_status}), 200
     
 @app.route('/api/reset-summary', methods=['POST'])
 def api_reset_summary():

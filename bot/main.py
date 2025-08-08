@@ -112,6 +112,23 @@ def save_seen_guids(guids):
     with open(SEEN_FILE, 'w') as f:
         json.dump(list(guids)[-500:], f, indent=2)  # Keep last 500 posts
 
+async def check_rss_service() -> bool:
+    """Quickly check if the first feed URL is reachable."""
+    try:
+        with open(os.path.join(BASE_DIR, 'feeds.txt'), 'r') as f:
+            feed_url = next((line.strip() for line in f if line.strip()), None)
+    except Exception:
+        feed_url = None
+
+    if not feed_url:
+        return False
+
+    try:
+        async with HTTP_SESSION.get(feed_url, timeout=10) as resp:
+            return resp.status < 500
+    except Exception:
+        return False
+
 async def build_full_body(entry: dict) -> str:
     """Build full formatted body for an entry using existing logic."""
     maybe_update(entry)
@@ -485,6 +502,16 @@ async def run_bot_job():
     @client.event
     async def on_ready():
         print(f"Logged in as {client.user} to perform job.")
+        rss_ok = await check_rss_service()
+        status_text = "feeds active" if rss_ok else "RSS service offline"
+        try:
+            await client.change_presence(activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name=status_text
+            ))
+        except Exception as e:
+            print(f"Presence update failed: {e}")
+
         await process_feeds_once(client)
         print("Job complete. Logging out.")
         await client.close()
