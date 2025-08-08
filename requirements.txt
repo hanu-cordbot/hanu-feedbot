@@ -10,6 +10,9 @@ Flask
 gunicorn
 celery
 redis
-requests
 Flask-Cors
 aiohttp
+boto3
+pytest
+moto
+
