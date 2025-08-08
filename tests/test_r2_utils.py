@@ -49,3 +49,22 @@ def test_retention_manager():
     assert len(objs) == 1
     assert objs[0]["Key"] == "b.mp4"
 
+
+@mock_aws
+def test_upload_path_and_prune(tmp_path):
+    os.environ["R2_BUCKET"] = "videos"
+    s3 = boto3.client("s3", region_name="us-east-1")
+    s3.create_bucket(Bucket=os.environ["R2_BUCKET"])
+
+    a = tmp_path / "a.mp4"
+    a.write_bytes(b"a")
+    b = tmp_path / "b.mp4"
+    b.write_bytes(b"b")
+
+    r2_uploader.upload_path_and_prune(str(a), "a.mp4", max_total_bytes=10)
+    r2_uploader.upload_path_and_prune(str(b), "b.mp4", max_total_bytes=1)
+
+    objs = s3.list_objects_v2(Bucket=os.environ["R2_BUCKET"]).get("Contents", [])
+    assert len(objs) == 1
+    assert objs[0]["Key"] == "b.mp4"
+

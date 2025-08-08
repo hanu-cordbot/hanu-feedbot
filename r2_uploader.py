@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import BinaryIO, Dict, List
+from typing import BinaryIO, Dict, List, Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -188,10 +188,34 @@ def delete_oldest_if_over_quota(max_total_bytes: int) -> int:
     return deleted
 
 
+def upload_path_and_prune(
+    path: str,
+    key: Optional[str] = None,
+    max_total_bytes: int = 5 * 1024 * 1024 * 1024,
+) -> Dict[str, str]:
+    """Upload the file at ``path`` and prune bucket if over quota.
+
+    ``key`` defaults to the basename of ``path``.  After a successful
+    upload ``delete_oldest_if_over_quota`` is invoked with ``max_total_bytes``
+    to ensure the bucket stays within the desired size limit.
+    """
+
+    if key is None:
+        key = os.path.basename(path)
+
+    with open(path, "rb") as f:
+        size = os.path.getsize(path)
+        meta = upload_file(f, key, size)
+
+    delete_oldest_if_over_quota(max_total_bytes)
+    return meta
+
+
 __all__ = [
     "upload_file",
     "get_metadata",
     "delete_object",
     "delete_oldest_if_over_quota",
+    "upload_path_and_prune",
 ]
 

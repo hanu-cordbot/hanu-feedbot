@@ -6,6 +6,11 @@ import asyncio
 import tempfile
 from pathlib import Path
 
+try:  # R2 uploads are optional; skip if module not available
+    from r2_uploader import upload_path_and_prune
+except Exception:  # pragma: no cover - optional dependency
+    upload_path_and_prune = None
+
 # Path to cookies file
 COOKIES_PATH = Path("netscape_cookies.txt")
 JSON_COOKIES_PATH = Path("cookies.txt")
@@ -164,12 +169,18 @@ async def download_video_ytdlp(url, output_path=None):
         if os.path.exists(output_path):
             file_size = os.path.getsize(output_path)
             print(f"✅ Successfully downloaded video ({file_size/1024/1024:.2f}MB): {output_path}")
-            
+
             # Only consider it a success if it's large enough to be a video
             if file_size < 100000:
                 print(f"⚠️ File too small to be a video ({file_size} bytes), likely just an image")
                 return None
-                
+            # Upload to R2 if configured
+            if upload_path_and_prune and os.environ.get("R2_BUCKET"):
+                try:
+                    upload_path_and_prune(output_path)
+                except Exception as exc:
+                    print(f"⚠️ Failed to upload to R2: {exc}")
+
             return output_path
         else:
             print(f"❌ Output file not found: {output_path}")
