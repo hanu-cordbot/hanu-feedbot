@@ -1,84 +1,221 @@
-name: Feed Bot Cron
+name: HANU Feed Bot
+
 permissions:
   contents: write
-on:
+
+"on":
+  # Run every hour at minute 0
   schedule:
-    - cron: '0 * * * *'  # Every hour
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 * * * *'
+  
+  # Allow manual trigger with options
+  workflow_dispatch:
+    inputs:
+      max_age_hours:
+        description: 'Maximum age of posts to process (hours)'
+        required: false
+        default: '36'
+        type: string
+      force_run:
+        description: 'Force run even if lock exists'
+        required: false
+        default: false
+        type: boolean
+      debug_mode:
+        description: 'Enable debug logging'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
-  run-bot:
+  run-feed-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     continue-on-error: false
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Use default token with write permissions to commit back
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: 'main'
           persist-credentials: true
-          clean: true
-          submodules: false  # disable submodules
-          sparse-checkout-cone-mode: true
-          fetch-depth: 0  # Fetch full history to allow pushing back state changes
-          fetch-tags: false
-          lfs: false
-
-      - name: Setup Python
+          fetch-depth: 0
+          
+      - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Validate environment
+      - name: Validate environment variables
         run: |
           python -c "
           import os
-          required = ['DISCORD_BOT_TOKEN', 'GEMINI_API_KEY', 'CHANNEL_ID']
+          required = [
+              'DISCORD_BOT_TOKEN', 
+              'GEMINI_API_KEY', 
+              'CHANNEL_ID',
+              'GLOBAL_FALLBACK_CHANNEL_ID'
+          ]
           missing = [k for k in required if not os.getenv(k)]
           if missing:
-              print(f'❌ Missing: {missing}')
+              print(f'❌ Missing required secrets: {missing}')
+              print('Please configure these secrets in your repository settings.')
               exit(1)
           print('✅ All required environment variables present')
+          print(f'📊 Channel ID: {os.getenv(\"CHANNEL_ID\")}')
+          print(f'🔄 Fallback Channel: {os.getenv(\"GLOBAL_FALLBACK_CHANNEL_ID\")}')
+          print(f'⏰ Max age: {os.getenv(\"MAX_AGE_HOURS\", \"36\")} hours')
           "
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          GLOBAL_FALLBACK_CHANNEL_ID: ${{ secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
+          MAX_AGE_HOURS: ${{ github.event.inputs.max_age_hours || secrets.MAX_AGE_HOURS || '36' }}
 
-      - name: Run bot
-        run: python cron_worker.py
-        env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+      - name: Remove stale lock if force run
+        if: ${{ github.event.inputs.force_run == 'true' }}
+        run: |
+          rm -f bot.lock
+          echo "🔓 Removed stale lock file (force run enabled)"
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+
+      - name: Run HANU Feed Bot
+        id: bot_run
+        run: |
+          echo "🤖 Starting HANU Feed Bot..."
+          echo "📅 Run time: $(date)"
+          echo "⚙️ Max age: ${{ github.event.inputs.max_age_hours || secrets.MAX_AGE_HOURS || '36' }} hours"
+          echo "🔧 Force run: ${{ github.event.inputs.force_run || 'false' }}"
+          echo "🐛 Debug mode: ${{ github.event.inputs.debug_mode || 'false' }}"
+          echo "==============================================="
+          
+          # Run the bot
+          python cron_worker.py
+          
+          echo "==============================================="
+          echo "✅ Bot execution completed"
+        env:
+          # Discord Configuration
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          GLOBAL_FALLBACK_CHANNEL_ID: ${{ secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
           SUMMARY_CHANNEL_ID: ${{ secrets.SUMMARY_CHANNEL_ID }}
-          MAX_AGE_HOURS: ${{ secrets.MAX_AGE_HOURS }}
-          FALLBACK_ENABLED: ${{ secrets.FALLBACK_ENABLED }}
+          
+          # Gemini AI Configuration
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          
+          # Cloudflare R2 Configuration
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_REGION: ${{ secrets.R2_REGION || 'auto' }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_PUBLIC_BASE: ${{ secrets.R2_PUBLIC_BASE }}
+          R2_MAX_BYTES: ${{ secrets.R2_MAX_BYTES || '5000000000' }}
+          
+          # Bot Configuration
+          MAX_AGE_HOURS: ${{ github.event.inputs.max_age_hours || secrets.MAX_AGE_HOURS || '36' }}
+          FALLBACK_ENABLED: ${{ secrets.FALLBACK_ENABLED || 'true' }}
+          JOB_ENDPOINT: '/job'
+          YT_DLP_COOKIES: 'cookies.txt'
+          ADMIN_PASS: ${{ secrets.ADMIN_PASS || 'github-actions' }}
+
+      - name: Check bot execution status
+        if: always()
+        run: |
+          if [ "${{ steps.bot_run.outcome }}" = "success" ]; then
+            echo "✅ Bot ran successfully"
+            
+            # Check state files and report statistics
+            if [ -f "seen.json" ]; then
+              SEEN_COUNT=$(jq length seen.json 2>/dev/null || echo "0")
+              echo "📊 Total seen entries: $SEEN_COUNT"
+            fi
+            
+            if [ -f "details_threads.json" ]; then
+              THREADS_COUNT=$(jq length details_threads.json 2>/dev/null || echo "0")
+              echo "📝 Active threads: $THREADS_COUNT"
+            fi
+            
+            echo "🎯 Bot execution completed successfully"
+          else
+            echo "❌ Bot execution failed"
+            echo "Check the logs above for error details"
+            exit 1
+          fi
 
       - name: Check for state changes
+        id: check_changes
         run: |
           echo "=== Git Status ==="
           git status --porcelain
-          echo "=== Git Diff ==="
-          git diff --name-only
-          if git diff --staged --quiet && git diff --quiet; then
+          
+          if git diff --quiet && git diff --staged --quiet; then
             echo "STATE_CHANGED=false" >> $GITHUB_ENV
+            echo "📝 No state changes detected"
           else
             echo "STATE_CHANGED=true" >> $GITHUB_ENV
+            echo "📝 State changes detected:"
+            git diff --name-only
           fi
 
-      - name: Commit state changes
+      - name: Commit and push state changes
         if: env.STATE_CHANGED == 'true'
         run: |
           git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action Bot"
-          git add seen.json feed_meta.json feed_map.json channels.json groups.json
-          git diff --staged --quiet || git commit -m "Update bot state [skip ci]"
-          git push
+          git config --local user.name "HANU Feed Bot"
+          
+          # Add all state files
+          git add seen.json details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json
+          
+          # Commit with timestamp
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
+          git commit -m "🤖 Update bot state - $TIMESTAMP [skip ci]" || echo "No changes to commit"
+          
+          # Push changes
+          git push origin main
+          echo "✅ State changes committed and pushed"
+
+      - name: Upload execution logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: bot-execution-logs-${{ github.run_number }}
+          path: |
+            seen.json
+            details_threads.json
+            avatar_cache.json
+            feed_meta.json
+            bot.lock
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Clean up lock file
+          rm -f bot.lock
+          echo "🧹 Cleanup completed"
+
+      - name: Report execution summary
+        if: always()
+        run: |
+          echo "==============================================="
+          echo "🎯 HANU Feed Bot Execution Summary"
+          echo "==============================================="
+          echo "📅 Execution time: $(date)"
+          echo "🔄 Workflow run: #${{ github.run_number }}"
+          echo "⚙️ Status: ${{ steps.bot_run.outcome }}"
+          echo "📝 State changed: ${{ env.STATE_CHANGED || 'false' }}"
+          echo "==============================================="
