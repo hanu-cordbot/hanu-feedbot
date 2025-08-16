@@ -14,7 +14,17 @@ import redis
 from redis import Redis
 from typing import cast, Optional
 from bot.formatter import build_prompt  # Import build_prompt function
-from celery_app import run_discord_bot_job, fetch_feed_meta  # also import fetch_feed_meta
+
+# Optional Celery imports - fallback to direct execution if not available
+try:
+    from celery_app import run_discord_bot_job, fetch_feed_meta
+    CELERY_AVAILABLE = True
+    print("✅ Celery imports available")
+except ImportError as e:
+    print(f"⚠️ Celery not available: {e}")
+    CELERY_AVAILABLE = False
+    run_discord_bot_job = None
+    fetch_feed_meta = None
 
 # Data directory for persistent storage (mount a volume here)
 DATA_DIR = os.environ.get('DATA_DIR', os.getcwd())
@@ -51,16 +61,27 @@ if not os.path.exists(FEEDS_FILE):
 
 # Load environment variables from .env file at the very beginning
 load_dotenv()
-# Redis client for real-time status and metrics
-REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
-redis_client: Redis = cast(Redis, redis.from_url(REDIS_URL))
+# Redis client for real-time status and metrics (optional)
+REDIS_URL = os.environ.get("REDIS_URL")
+redis_client: Optional[Redis] = None
+
+if REDIS_URL:
+    try:
+        redis_client = cast(Redis, redis.from_url(REDIS_URL))
+        # Test connection
+        redis_client.ping()
+        print("✅ Redis connected successfully")
+    except Exception as e:
+        print(f"⚠️ Redis connection failed: {e}")
+        redis_client = None
+else:
+    print("⚠️ Redis not configured - running without real-time metrics")
 
 # --- SECURITY UPDATE ---
 # Get the secret endpoint from an environment variable.
-# If it's not set, the application will not start.
-JOB_ENDPOINT = os.environ.get("JOB_ENDPOINT")
-if not JOB_ENDPOINT:
-    raise ValueError("FATAL: JOB_ENDPOINT environment variable not set. Please provide a secret URL path.")
+# Job endpoint configuration - with fallback for Railway deployment
+JOB_ENDPOINT = os.environ.get("JOB_ENDPOINT", "/cron-job-default")
+print(f"📋 Job endpoint configured: {JOB_ENDPOINT}")
 
 # Ensure the endpoint starts with a slash for the Flask route
 if not JOB_ENDPOINT.startswith('/'):
@@ -184,9 +205,24 @@ def api_run_job():
     if not verify_api_token():
         return jsonify({"error": "Authentication required"}), 401
     try:
-        # Enqueue asynchronous job
-        run_discord_bot_job.delay()  # type: ignore
-        return jsonify({"success": True, "message": "Run job enqueued"}), 200
+        # Use enhanced cron worker instead of Celery
+        if CELERY_AVAILABLE and run_discord_bot_job:
+            # Use Celery if available
+            run_discord_bot_job.delay()  # type: ignore
+            return jsonify({"success": True, "message": "Run job enqueued via Celery"}), 200
+        else:
+            # Run enhanced cron worker directly
+            import subprocess
+            import sys
+            result = subprocess.run([
+                sys.executable, "cron_worker_enhanced.py"
+            ], capture_output=True, text=True, timeout=600)
+            
+            if result.returncode == 0:
+                return jsonify({"success": True, "message": "Enhanced job completed successfully"}), 200
+            else:
+                return jsonify({"success": False, "error": f"Job failed: {result.stderr}"}), 500
+                
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
     
@@ -474,6 +510,42 @@ def api_delete_group():
     with open(GROUPS_FILE, 'w') as f:
         json.dump(groups, f)
     return jsonify({'success': True, 'message': 'Group deleted'}), 200
+
+# === DYNAMIC JOB ENDPOINT ROUTE ===
+def cron_job():
+    """Dynamic cron job endpoint - the actual job runner"""
+    try:
+        print(f"🔔 Cron job triggered via {JOB_ENDPOINT}")
+        
+        # Use enhanced cron worker instead of Celery
+        if CELERY_AVAILABLE and run_discord_bot_job:
+            # Use Celery if available
+            run_discord_bot_job.delay()  # type: ignore
+            return jsonify({"status": "success", "message": "Job enqueued via Celery"}), 200
+        else:
+            # Run enhanced cron worker directly
+            import subprocess
+            import sys
+            
+            print("🚀 Running enhanced cron worker...")
+            result = subprocess.run([
+                sys.executable, "cron_worker_enhanced.py"
+            ], capture_output=True, text=True, timeout=600)
+            
+            if result.returncode == 0:
+                print("✅ Enhanced cron job completed successfully")
+                return jsonify({"status": "success", "message": "Job completed successfully"}), 200
+            else:
+                print(f"❌ Enhanced cron job failed: {result.stderr}")
+                return jsonify({"status": "error", "message": f"Job failed: {result.stderr}"}), 500
+                
+    except Exception as e:
+        print(f"❌ Cron job exception: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# Register the dynamic route
+app.add_url_rule(JOB_ENDPOINT, 'cron_job', cron_job, methods=['POST'])
+print(f"✅ Registered cron job endpoint: {JOB_ENDPOINT}")
 
 # Direct runnable entrypoint
 if __name__ == "__main__":
