@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+"""
+Generate dashboard data for GitHub Pages deployment.
+Creates stats, feeds, and meta JSON files for the web dashboard.
+"""
+import os
+import json
+import time
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+import feedparser
+from collections import defaultdict
+
+def load_json_file(filepath, default=None):
+    """Load JSON file with fallback to default value"""
+    if default is None:
+        default = {}
+    
+    try:
+        if os.path.exists(filepath):
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error loading {filepath}: {e}")
+    
+    return default
+
+def save_json_file(filepath, data):
+    """Save data to JSON file"""
+    try:
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        print(f"✅ Saved {filepath}")
+    except Exception as e:
+        print(f"❌ Error saving {filepath}: {e}")
+
+def generate_stats():
+    """Generate comprehensive stats for the dashboard"""
+    print("📊 Generating stats...")
+    
+    # Load existing data
+    seen_data = load_json_file('seen.json', {})
+    feed_meta = load_json_file('feed_meta.json', {})
+    feed_map = load_json_file('feed_map.json', {})
+    channels = load_json_file('channels.json', [])
+    
+    # Load feeds list
+    feeds = []
+    if os.path.exists('feeds.txt'):
+        with open('feeds.txt', 'r') as f:
+            feeds = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+    
+    # Calculate stats
+    now = datetime.now(timezone.utc)
+    stats = {
+        'last_updated': now.isoformat(),
+        'total_feeds': len(feeds),
+        'total_channels': len(channels),
+        'total_seen_items': len(seen_data),
+        'feeds_with_metadata': len(feed_meta),
+        'feed_mappings': len(feed_map),
+        'recent_activity': [],
+        'feed_health': {},
+        'hourly_stats': defaultdict(int),
+        'daily_stats': defaultdict(int)
+    }
+    
+    # Analyze seen items for recent activity
+    recent_cutoff = now - timedelta(hours=24)
+    recent_items = 0
+    
+    # Handle both list and dict formats for seen_data
+    if isinstance(seen_data, list):
+        # Legacy format - just count items
+        stats['recent_items_24h'] = 0  # Can't determine timing from list format
+    else:
+        # New format with timestamps
+        for item_id, item_data in seen_data.items():
+            try:
+                if isinstance(item_data, dict) and 'timestamp' in item_data:
+                    timestamp = datetime.fromisoformat(item_data['timestamp'].replace('Z', '+00:00'))
+                    if timestamp > recent_cutoff:
+                        recent_items += 1
+                        
+                        # Add to hourly/daily stats
+                        hour_key = timestamp.strftime('%Y-%m-%d %H:00')
+                        day_key = timestamp.strftime('%Y-%m-%d')
+                        stats['hourly_stats'][hour_key] += 1
+                        stats['daily_stats'][day_key] += 1
+            except Exception as e:
+                continue
+        
+        stats['recent_items_24h'] = recent_items
+    
+    # Convert defaultdicts to regular dicts for JSON serialization
+    stats['hourly_stats'] = dict(stats['hourly_stats'])
+    stats['daily_stats'] = dict(stats['daily_stats'])
+    
+    # Analyze feed health
+    for feed_url in feeds:
+        try:
+            # Check if feed has metadata
+            has_meta = feed_url in feed_meta
+            
+            # Quick feed check (limit to avoid long execution)
+            feed_check = {
+                'url': feed_url,
+                'has_metadata': has_meta,
+                'last_check': now.isoformat(),
+                'status': 'unknown'
+            }
+            
+            if has_meta:
+                meta = feed_meta[feed_url]
+                feed_check['title'] = meta.get('title', 'Unknown')
+                feed_check['description'] = meta.get('description', '')
+                feed_check['entry_count'] = meta.get('entry_count', 0)
+                if meta.get('entry_count', 0) > 0:
+                    feed_check['status'] = 'healthy'
+                else:
+                    feed_check['status'] = 'no_entries'
+            
+            stats['feed_health'][feed_url] = feed_check
+            
+        except Exception as e:
+            stats['feed_health'][feed_url] = {
+                'url': feed_url,
+                'status': 'error',
+                'error': str(e),
+                'last_check': now.isoformat()
+            }
+    
+    return stats
+
+def generate_feeds_data():
+    """Generate feeds data for the dashboard"""
+    print("📡 Generating feeds data...")
+    
+    feed_meta = load_json_file('feed_meta.json', {})
+    feed_map = load_json_file('feed_map.json', {})
+    
+    feeds_data = {
+        'last_updated': datetime.now(timezone.utc).isoformat(),
+        'feeds': [],
+        'mappings': feed_map
+    }
+    
+    # Load feeds list
+    feeds = []
+    if os.path.exists('feeds.txt'):
+        with open('feeds.txt', 'r') as f:
+            feeds = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+    
+    for feed_url in feeds:
+        feed_info = {
+            'url': feed_url,
+            'title': 'Unknown Feed',
+            'description': '',
+            'entry_count': 0,
+            'last_updated': None,
+            'has_metadata': feed_url in feed_meta
+        }
+        
+        if feed_url in feed_meta:
+            meta = feed_meta[feed_url]
+            feed_info.update({
+                'title': meta.get('title', 'Unknown Feed'),
+                'description': meta.get('description', ''),
+                'entry_count': meta.get('entry_count', 0),
+                'last_updated': meta.get('last_updated')
+            })
+        
+        feeds_data['feeds'].append(feed_info)
+    
+    return feeds_data
+
+def generate_meta_data():
+    """Generate metadata for the dashboard"""
+    print("🔍 Generating meta data...")
+    
+    channels = load_json_file('channels.json', [])
+    groups = load_json_file('groups.json', {})
+    system_prompt = load_json_file('system_prompt.json', {})
+    
+    meta_data = {
+        'last_updated': datetime.now(timezone.utc).isoformat(),
+        'version': '1.0.0',
+        'channels': channels,
+        'groups': groups,
+        'system_prompt': system_prompt,
+        'configuration': {
+            'max_age_hours': os.getenv('MAX_AGE_HOURS', '36'),
+            'fallback_enabled': os.getenv('FALLBACK_ENABLED', 'true'),
+            'has_discord_token': bool(os.getenv('DISCORD_BOT_TOKEN')),
+            'has_gemini_key': bool(os.getenv('GEMINI_API_KEY')),
+            'has_webhook': bool(os.getenv('DISCORD_WEBHOOK_URL')),
+            'channel_id': os.getenv('CHANNEL_ID'),
+            'summary_channel_id': os.getenv('SUMMARY_CHANNEL_ID')
+        }
+    }
+    
+    return meta_data
+
+def main():
+    """Generate all dashboard data files"""
+    print("🚀 Generating dashboard data...")
+    print("=" * 50)
+    
+    # Ensure docs/data directory exists
+    os.makedirs('docs/data', exist_ok=True)
+    
+    try:
+        # Generate stats
+        stats = generate_stats()
+        save_json_file('docs/data/stats.json', {'stats': stats})
+        
+        # Generate feeds data
+        feeds_data = generate_feeds_data()
+        save_json_file('docs/data/feeds.json', feeds_data)
+        
+        # Generate meta data
+        meta_data = generate_meta_data()
+        save_json_file('docs/data/meta.json', meta_data)
+        
+        print("\n✅ Dashboard data generation completed!")
+        print(f"📊 Generated stats for {stats['total_feeds']} feeds")
+        print(f"📡 Processed {len(feeds_data['feeds'])} feed entries")
+        print(f"🔍 Configured {len(meta_data['channels'])} channels")
+        
+    except Exception as e:
+        print(f"❌ Error generating dashboard data: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+    
+    return 0
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

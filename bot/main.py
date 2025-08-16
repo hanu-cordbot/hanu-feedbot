@@ -28,8 +28,8 @@ print("Initializing configuration...")
 # Global cleanup list for temporary directories
 TEMP_DIRS_TO_CLEANUP = []
 
-# Create a shared aiohttp session to prevent unclosed connector warnings
-HTTP_SESSION = ClientSession(timeout=ClientTimeout(total=60))  # Increased timeout for large media
+# HTTP session will be created when needed
+HTTP_SESSION = None
 
 # Load DISCORD_BOT_TOKEN, warn if missing
 BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
@@ -92,10 +92,18 @@ from bot.facebook_downloader import download_video_ytdlp, normalize_url
 print("✅ Configuration loaded.")
 
 # --- HELPER FUNCTIONS ---
+def get_http_session():
+    """Get or create the HTTP session"""
+    global HTTP_SESSION
+    if HTTP_SESSION is None or HTTP_SESSION.closed:
+        HTTP_SESSION = ClientSession(timeout=ClientTimeout(total=60))
+    return HTTP_SESSION
+
 async def download_bytes(url: str) -> bytes:
     """Fetch raw bytes for a media URL."""
     # Use shared HTTP_SESSION with increased timeout for large media
-    async with HTTP_SESSION.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
+    session = get_http_session()
+    async with session.get(url, timeout=aiohttp.ClientTimeout(total=60)) as resp:
         resp.raise_for_status()
         return await resp.read()
 
@@ -506,7 +514,8 @@ async def run_bot_job():
             await client.close()
             print("🔌 Discord client closed after job.")
             # Close shared HTTP session
-            await HTTP_SESSION.close()
+            if HTTP_SESSION and not HTTP_SESSION.closed:
+                await HTTP_SESSION.close()
 
     await client.start(BOT_TOKEN)
 

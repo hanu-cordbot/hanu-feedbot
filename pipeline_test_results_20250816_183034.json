@@ -1,0 +1,288 @@
+{
+  "summary": {
+    "total_tests": 39,
+    "passed": 37,
+    "failed": 0,
+    "warnings": 2,
+    "success_rate": 94.87179487179486,
+    "total_duration": 11.81689739227295,
+    "errors": [],
+    "warning_messages": [],
+    "timestamp": "2025-08-16T11:30:34.373036+00:00"
+  },
+  "tests": [
+    {
+      "name": "Environment: DISCORD_BOT_TOKEN",
+      "status": "PASS",
+      "details": "Present",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "Environment: GEMINI_API_KEY",
+      "status": "PASS",
+      "details": "Present",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "Environment: CHANNEL_ID",
+      "status": "PASS",
+      "details": "Present",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "Environment: DISCORD_WEBHOOK_URL (optional)",
+      "status": "PASS",
+      "details": "Present: https://discord.com/api/webhooks/1390374041017257984/93oeFHs1clJIwwKEv5RM42TDt5xFP7XIb9iEUlFaftrwhtuG3rFj3fdTT6ZwVRv_-8m5",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "Environment: SUMMARY_CHANNEL_ID (optional)",
+      "status": "WARN",
+      "details": "Not set, using defaults",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "Environment: MAX_AGE_HOURS (optional)",
+      "status": "PASS",
+      "details": "Present: 36",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "Environment: FALLBACK_ENABLED (optional)",
+      "status": "WARN",
+      "details": "Not set, using defaults",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "File: feeds.txt",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "File: requirements.txt",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "File: cron_worker.py",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "File: bot/main.py",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.556139+00:00"
+    },
+    {
+      "name": "File: bot/parser.py",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "File: bot/formatter.py",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "File: bot/gemini_client.py",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "Data file: seen.json",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "Data file: feed_meta.json",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "Data file: feed_map.json",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "Data file: channels.json",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "Data file: groups.json",
+      "status": "PASS",
+      "details": "Exists",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557130+00:00"
+    },
+    {
+      "name": "RSS Feed Count",
+      "status": "PASS",
+      "details": "Found 43 feeds",
+      "duration": null,
+      "timestamp": "2025-08-16T11:30:22.557337+00:00"
+    },
+    {
+      "name": "RSS Feed 1",
+      "status": "PASS",
+      "details": "5 entries",
+      "duration": 0.8365025520324707,
+      "timestamp": "2025-08-16T11:30:23.393840+00:00"
+    },
+    {
+      "name": "RSS Feed 1 - Entry Processing",
+      "status": "PASS",
+      "details": "Processed sample entry",
+      "duration": 0.8365025520324707,
+      "timestamp": "2025-08-16T11:30:23.393840+00:00"
+    },
+    {
+      "name": "RSS Feed 2",
+      "status": "PASS",
+      "details": "5 entries",
+      "duration": 0.8222315311431885,
+      "timestamp": "2025-08-16T11:30:24.216071+00:00"
+    },
+    {
+      "name": "RSS Feed 2 - Entry Processing",
+      "status": "PASS",
+      "details": "Processed sample entry",
+      "duration": 0.8222315311431885,
+      "timestamp": "2025-08-16T11:30:24.216071+00:00"
+    },
+    {
+      "name": "RSS Feed 3",
+      "status": "PASS",
+      "details": "5 entries",
+      "duration": 0.8276638984680176,
+      "timestamp": "2025-08-16T11:30:25.043735+00:00"
+    },
+    {
+      "name": "RSS Feed 3 - Entry Processing",
+      "status": "PASS",
+      "details": "Processed sample entry",
+      "duration": 0.8276638984680176,
+      "timestamp": "2025-08-16T11:30:25.043735+00:00"
+    },
+    {
+      "name": "RSS Feed 4",
+      "status": "PASS",
+      "details": "5 entries",
+      "duration": 0.8250324726104736,
+      "timestamp": "2025-08-16T11:30:25.868767+00:00"
+    },
+    {
+      "name": "RSS Feed 4 - Entry Processing",
+      "status": "PASS",
+      "details": "Processed sample entry",
+      "duration": 0.8250324726104736,
+      "timestamp": "2025-08-16T11:30:25.868767+00:00"
+    },
+    {
+      "name": "RSS Feed 5",
+      "status": "PASS",
+      "details": "5 entries",
+      "duration": 0.8131389617919922,
+      "timestamp": "2025-08-16T11:30:26.681907+00:00"
+    },
+    {
+      "name": "RSS Feed 5 - Entry Processing",
+      "status": "PASS",
+      "details": "Processed sample entry",
+      "duration": 0.8131389617919922,
+      "timestamp": "2025-08-16T11:30:26.681907+00:00"
+    },
+    {
+      "name": "Gemini API",
+      "status": "PASS",
+      "details": "Response: 243 chars",
+      "duration": 4.365734338760376,
+      "timestamp": "2025-08-16T11:30:31.047641+00:00"
+    },
+    {
+      "name": "Discord Bot Auth",
+      "status": "PASS",
+      "details": "Bot: hanucordbot-dev",
+      "duration": 0.3685472011566162,
+      "timestamp": "2025-08-16T11:30:31.416188+00:00"
+    },
+    {
+      "name": "Discord Channel Access",
+      "status": "PASS",
+      "details": "Channel: testing",
+      "duration": 0.4520866870880127,
+      "timestamp": "2025-08-16T11:30:31.868275+00:00"
+    },
+    {
+      "name": "Railway /api/health",
+      "status": "PASS",
+      "details": "HTTP 200, valid JSON",
+      "duration": 0.7497913837432861,
+      "timestamp": "2025-08-16T11:30:32.618804+00:00"
+    },
+    {
+      "name": "Railway /api/public/feeds",
+      "status": "PASS",
+      "details": "HTTP 200, valid JSON",
+      "duration": 0.6435916423797607,
+      "timestamp": "2025-08-16T11:30:33.262395+00:00"
+    },
+    {
+      "name": "Railway /api/public/stats",
+      "status": "PASS",
+      "details": "HTTP 200, valid JSON",
+      "duration": 0.6589720249176025,
+      "timestamp": "2025-08-16T11:30:33.921367+00:00"
+    },
+    {
+      "name": "GitHub Pages /data/stats.json",
+      "status": "PASS",
+      "details": "HTTP 200, has data",
+      "duration": 0.15856456756591797,
+      "timestamp": "2025-08-16T11:30:34.080909+00:00"
+    },
+    {
+      "name": "GitHub Pages /data/feeds.json",
+      "status": "PASS",
+      "details": "HTTP 200, has data",
+      "duration": 0.14020085334777832,
+      "timestamp": "2025-08-16T11:30:34.221110+00:00"
+    },
+    {
+      "name": "GitHub Pages /data/meta.json",
+      "status": "PASS",
+      "details": "HTTP 200, has data",
+      "duration": 0.15192627906799316,
+      "timestamp": "2025-08-16T11:30:34.373036+00:00"
+    }
+  ]
+}

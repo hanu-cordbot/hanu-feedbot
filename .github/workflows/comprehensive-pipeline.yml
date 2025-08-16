@@ -1,0 +1,385 @@
+name: Comprehensive RSS Bot Pipeline Test & Deploy
+permissions:
+  contents: write
+  actions: write
+  checks: write
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Every 30 minutes for frequent monitoring
+  workflow_dispatch:  # Manual trigger
+    inputs:
+      run_full_test:
+        description: 'Run full pipeline test (including Discord posting)'
+        required: false
+        default: 'false'
+        type: boolean
+      force_data_update:
+        description: 'Force data regeneration'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  pipeline-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: false
+    outputs:
+      test-status: ${{ steps.test.outputs.status }}
+      needs-deployment: ${{ steps.check-changes.outputs.needs-deployment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: 'main'
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create required directories
+        run: |
+          mkdir -p docs/data
+          mkdir -p logs
+
+      - name: Run comprehensive pipeline test
+        id: test
+        run: |
+          echo "Running comprehensive pipeline test..."
+          if python run_full_pipeline_test.py; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "✅ Pipeline test passed"
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "❌ Pipeline test failed"
+            exit 1
+          fi
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          SUMMARY_CHANNEL_ID: ${{ secrets.SUMMARY_CHANNEL_ID }}
+          MAX_AGE_HOURS: ${{ secrets.MAX_AGE_HOURS }}
+          FALLBACK_ENABLED: ${{ secrets.FALLBACK_ENABLED }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-test-results
+          path: pipeline_test_results_*.json
+          retention-days: 30
+
+  run-bot:
+    needs: pipeline-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: needs.pipeline-test.outputs.test-status == 'success'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: 'main'
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate environment
+        run: |
+          python -c "
+          import os
+          required = ['DISCORD_BOT_TOKEN', 'GEMINI_API_KEY', 'CHANNEL_ID']
+          missing = [k for k in required if not os.getenv(k)]
+          if missing:
+              print(f'❌ Missing: {missing}')
+              exit(1)
+          print('✅ All required environment variables present')
+          "
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+
+      - name: Run bot with monitoring
+        run: |
+          echo "🚀 Starting bot execution..."
+          python cron_worker.py
+          echo "✅ Bot execution completed"
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          SUMMARY_CHANNEL_ID: ${{ secrets.SUMMARY_CHANNEL_ID }}
+          MAX_AGE_HOURS: ${{ secrets.MAX_AGE_HOURS }}
+          FALLBACK_ENABLED: ${{ secrets.FALLBACK_ENABLED }}
+
+      - name: Generate stats and dashboard data
+        run: |
+          echo "📊 Generating dashboard data..."
+          python generate_dashboard_data.py
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+
+      - name: Check for state changes
+        id: check-changes
+        run: |
+          echo "=== Git Status ==="
+          git status --porcelain
+          echo "=== Git Diff ==="
+          git diff --name-only
+          
+          # Check if any important files changed
+          if git diff --staged --quiet && git diff --quiet; then
+            echo "STATE_CHANGED=false" >> $GITHUB_ENV
+            echo "needs-deployment=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          else
+            echo "STATE_CHANGED=true" >> $GITHUB_ENV
+            echo "needs-deployment=true" >> $GITHUB_OUTPUT
+            echo "Changes detected"
+          fi
+
+      - name: Commit state changes
+        if: env.STATE_CHANGED == 'true'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action Bot"
+          
+          # Add all data files that might have changed
+          git add seen.json feed_meta.json feed_map.json channels.json groups.json docs/data/
+          
+          # Only commit if there are staged changes
+          if ! git diff --staged --quiet; then
+            git commit -m "🤖 Update bot state and dashboard data [skip ci]"
+            git push
+            echo "✅ State changes committed and pushed"
+          else
+            echo "ℹ️ No staged changes to commit"
+          fi
+
+  deploy-dashboard:
+    needs: [pipeline-test, run-bot]
+    runs-on: ubuntu-latest
+    if: needs.run-bot.outputs.needs-deployment == 'true' || github.event.inputs.force_data_update == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: 'main'
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Build dashboard
+        run: |
+          echo "🏗️ Building dashboard..."
+          # Copy docs to build directory
+          mkdir -p _site
+          cp -r docs/* _site/
+          
+          # Ensure data directory exists and has files
+          mkdir -p _site/data
+          
+          # Copy data files if they exist
+          for file in docs/data/*.json; do
+            if [ -f "$file" ]; then
+              cp "$file" _site/data/
+            fi
+          done
+          
+          # Create index.html if it doesn't exist
+          if [ ! -f "_site/index.html" ]; then
+            cp docs/dashboard.html _site/index.html
+          fi
+          
+          echo "✅ Dashboard built"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  health-check:
+    needs: [deploy-dashboard]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Wait for deployment
+        run: sleep 30
+
+      - name: Check Railway deployment
+        run: |
+          echo "🔍 Checking Railway deployment..."
+          response=$(curl -s -w "%{http_code}" https://hanu-feedbot-production.up.railway.app/api/health)
+          http_code=${response: -3}
+          if [ "$http_code" = "200" ]; then
+            echo "✅ Railway deployment healthy"
+          else
+            echo "❌ Railway deployment issue (HTTP $http_code)"
+            exit 1
+          fi
+
+      - name: Check GitHub Pages deployment
+        run: |
+          echo "🔍 Checking GitHub Pages deployment..."
+          response=$(curl -s -w "%{http_code}" https://hanu-cordbot.github.io/hanu-feedbot/data/stats.json)
+          http_code=${response: -3}
+          if [ "$http_code" = "200" ]; then
+            echo "✅ GitHub Pages deployment accessible"
+            # Check if data is not empty
+            content=$(curl -s https://hanu-cordbot.github.io/hanu-feedbot/data/stats.json)
+            if [ "$content" != "{\"stats\": {}}" ] && [ "$content" != "{}" ]; then
+              echo "✅ GitHub Pages has data"
+            else
+              echo "⚠️ GitHub Pages accessible but data is empty"
+            fi
+          else
+            echo "❌ GitHub Pages deployment issue (HTTP $http_code)"
+            exit 1
+          fi
+
+      - name: Test full API endpoints
+        run: |
+          echo "🔍 Testing API endpoints..."
+          
+          # Test Railway endpoints
+          endpoints=(
+            "https://hanu-feedbot-production.up.railway.app/api/health"
+            "https://hanu-feedbot-production.up.railway.app/api/feeds"
+            "https://hanu-feedbot-production.up.railway.app/api/stats"
+          )
+          
+          for endpoint in "${endpoints[@]}"; do
+            echo "Testing $endpoint..."
+            response=$(curl -s -w "%{http_code}" "$endpoint")
+            http_code=${response: -3}
+            if [ "$http_code" = "200" ]; then
+              echo "✅ $endpoint OK"
+            else
+              echo "⚠️ $endpoint returned HTTP $http_code"
+            fi
+          done
+          
+          # Test GitHub Pages endpoints
+          gh_endpoints=(
+            "https://hanu-cordbot.github.io/hanu-feedbot/data/stats.json"
+            "https://hanu-cordbot.github.io/hanu-feedbot/data/feeds.json"
+            "https://hanu-cordbot.github.io/hanu-feedbot/data/meta.json"
+          )
+          
+          for endpoint in "${gh_endpoints[@]}"; do
+            echo "Testing $endpoint..."
+            response=$(curl -s -w "%{http_code}" "$endpoint")
+            http_code=${response: -3}
+            if [ "$http_code" = "200" ]; then
+              echo "✅ $endpoint OK"
+            else
+              echo "⚠️ $endpoint returned HTTP $http_code"
+            fi
+          done
+
+  notification:
+    needs: [pipeline-test, run-bot, deploy-dashboard, health-check]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Send status notification
+        if: env.DISCORD_WEBHOOK_URL != ''
+        run: |
+          # Determine overall status
+          if [ "${{ needs.pipeline-test.result }}" = "success" ] && \
+             [ "${{ needs.run-bot.result }}" = "success" ] && \
+             [ "${{ needs.deploy-dashboard.result }}" = "success" ] && \
+             [ "${{ needs.health-check.result }}" = "success" ]; then
+            status="✅ SUCCESS"
+            color="3066993"
+          else
+            status="❌ FAILURE"
+            color="15158332"
+          fi
+          
+          # Create Discord webhook payload
+          payload=$(cat << EOF
+          {
+            "embeds": [
+              {
+                "title": "RSS Bot Pipeline Status",
+                "description": "$status - Full pipeline execution completed",
+                "color": $color,
+                "fields": [
+                  {
+                    "name": "Pipeline Test",
+                    "value": "${{ needs.pipeline-test.result }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Bot Execution",
+                    "value": "${{ needs.run-bot.result }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Dashboard Deploy",
+                    "value": "${{ needs.deploy-dashboard.result }}",
+                    "inline": true
+                  },
+                  {
+                    "name": "Health Check",
+                    "value": "${{ needs.health-check.result }}",
+                    "inline": true
+                  }
+                ],
+                "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
+              }
+            ]
+          }
+          EOF
+          )
+          
+          # Send to Discord
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}" || echo "Failed to send Discord notification"
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
