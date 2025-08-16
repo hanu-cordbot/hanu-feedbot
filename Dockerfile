@@ -1,38 +1,27 @@
-# === FILE: Dockerfile ===
+# === ENHANCED DOCKERFILE FOR RAILWAY SERVERLESS ===
 
-# Start from the pre-built image that already includes ffmpeg.
-FROM linuxserver/ffmpeg
+# Use Python slim image for better Railway compatibility
+FROM python:3.11-slim
 
 # Set the working directory inside the container
 WORKDIR /app
 
-# Install Python and other necessary system tools.
+# Install system dependencies including ffmpeg
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-pip \
-    python3-venv \
-    redis-tools \
+    ffmpeg \
+    curl \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and activate a virtual environment to avoid OS conflicts.
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Copy and install Python dependencies into the virtual environment.
+# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of your application code into the container.
+# Copy the rest of your application code
 COPY . .
 
-# Make your startup script executable.
-RUN chmod +x ./run.sh
+# Expose the port Railway expects
+EXPOSE 8080
 
-# --- THE FINAL FIX ---
-# The linuxserver/ffmpeg image defaults to running the 'ffmpeg' command.
-# We override this entrypoint to ensure our startup script is run with a bash shell.
-ENTRYPOINT ["/bin/bash", "-c"]
-
-# This is the command that will now be executed correctly by the bash shell.
-CMD ["./run.sh"]
+# Use Procfile command for Railway compatibility
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--timeout", "300", "--workers", "1"]
