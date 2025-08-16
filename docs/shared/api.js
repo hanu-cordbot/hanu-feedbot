@@ -5,6 +5,33 @@ class HanuAPI {
   constructor() {
     // Use configured API_BASE if available (dashboard) or same origin
     this.baseUrl = window.DEFAULT_AUTH_BASE || window.location.origin;
+    this.railwayAPI = window.CONFIG?.API_BASE_URL || 'https://hanu-feedbot-production.up.railway.app';
+    this.localDataEnabled = window.CONFIG?.DATA_SYNC?.enabled || false;
+    this.localDataPath = window.CONFIG?.DATA_SYNC?.localDataPath || './data/';
+  }
+
+  // Smart data loading: try local first, then Railway API
+  async loadDataSmart(endpoint, localFile = null) {
+    // If we're on GitHub Pages and have local data enabled
+    if (this.localDataEnabled && localFile) {
+      try {
+        console.log(`📁 Trying local data: ${this.localDataPath}${localFile}`);
+        const localUrl = `${this.localDataPath}${localFile}`;
+        const response = await fetch(localUrl);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ Loaded local data from ${localFile}`);
+          return data;
+        }
+      } catch (error) {
+        console.warn(`⚠️ Local data failed for ${localFile}:`, error);
+      }
+    }
+
+    // Fallback to Railway API
+    console.log(`🚂 Falling back to Railway API: ${endpoint}`);
+    return this.request(`${this.railwayAPI}${endpoint}`);
   }
 
   // Get authentication headers
@@ -162,7 +189,13 @@ class HanuAPI {
   // ===== FEED MANAGEMENT =====
 
   async getFeeds() {
-    return this.get('/api/feeds');
+    // Use smart loading for feeds data
+    return this.loadDataSmart('/api/public/feeds', 'feeds.json');
+  }
+
+  async getStats() {
+    // Use smart loading for stats data  
+    return this.loadDataSmart('/api/stats', 'stats.json');
   }
 
   async addFeed(feedUrl) {

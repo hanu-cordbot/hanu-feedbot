@@ -204,6 +204,96 @@ def api_reset_summary():
     # Stub: reset any daily summary state if applicable
     return jsonify({"success": True, "message": "Daily summary reset"}), 200
 
+# === PUBLIC API ENDPOINTS (for GitHub Pages) ===
+
+@app.route('/api/public/feeds')
+def api_public_feeds():
+    """Public endpoint for GitHub Pages to fetch feed data"""
+    try:
+        # Read feeds data if available
+        feeds_data = []
+        try:
+            feeds_file = os.path.join(DATA_DIR, 'feeds.txt')
+            if os.path.exists(feeds_file):
+                with open(feeds_file, 'r') as f:
+                    feeds_data = [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            print(f"Error reading feeds: {e}")
+        
+        return jsonify({
+            "feeds": feeds_data,
+            "count": len(feeds_data),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/public/stats')
+def api_public_stats():
+    """Public endpoint for basic stats"""
+    try:
+        # Basic stats that are safe to expose publicly
+        stats = {
+            "service": "hanu-feedbot-enhanced", 
+            "version": "2.0.0",
+            "status": "operational",
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        
+        # Add basic feed count if available
+        try:
+            feeds_file = os.path.join(DATA_DIR, 'feeds.txt')
+            if os.path.exists(feeds_file):
+                with open(feeds_file, 'r') as f:
+                    feed_count = len([line for line in f if line.strip()])
+                stats["feed_count"] = str(feed_count)  # Convert to string
+        except Exception:
+            pass
+            
+        return jsonify(stats)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/trigger-pages-update', methods=['POST'])
+def api_trigger_pages_update():
+    """Trigger GitHub Pages dashboard update via GitHub API"""
+    if not verify_api_token():
+        return jsonify({"error": "Authentication required"}), 401
+    
+    try:
+        # Trigger GitHub Actions workflow via repository dispatch
+        github_token = os.environ.get('GITHUB_TOKEN')
+        if not github_token:
+            return jsonify({"error": "GitHub token not configured"}), 500
+            
+        import requests
+        
+        headers = {
+            'Authorization': f'token {github_token}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
+        
+        dispatch_data = {
+            'event_type': 'update-dashboard',
+            'client_payload': {
+                'source': 'railway-api',
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
+        }
+        
+        # Replace with your actual GitHub repo
+        repo_url = 'https://api.github.com/repos/hanu-cordbot/hanu-feedbot/dispatches'
+        
+        response = requests.post(repo_url, json=dispatch_data, headers=headers)
+        
+        if response.status_code == 204:
+            return jsonify({"success": True, "message": "GitHub Pages update triggered"}), 200
+        else:
+            return jsonify({"error": f"GitHub API error: {response.status_code}"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/cache', methods=['DELETE'])
 def api_clear_cache():
     if not verify_api_token():
