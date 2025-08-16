@@ -81,10 +81,10 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     """
     # Debug output
     print(f"\n{'='*40}")
-    print(f"🔍 PROCESSING ENTRY: {entry.get('title', 'No title')}")
-    print(f"🔗 Link: {entry.get('link', 'No link')}")
-    print(f"📅 Date: {post_time}")
-    print(f"🔢 Entry ID: {entry.get('id', 'No ID')}")
+    print(f"? PROCESSING ENTRY: {entry.get('title', 'No title')}")
+    print(f"? Link: {entry.get('link', 'No link')}")
+    print(f"? Date: {post_time}")
+    print(f"? Entry ID: {entry.get('id', 'No ID')}")
     print(f"{'='*40}\n")
 
     # Determine webhook channel, forum flag, and initial thread_id
@@ -123,7 +123,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     # --- Media Processing Logic ---
     # First check for our known target post ID anywhere in the entry
     if str(entry).find("743124275142078") >= 0 or str(entry).find("4010190512624581") >= 0:
-        print(f"❗❗❗ FOUND TARGET POST ID in entry text!")
+        print(f"??? FOUND TARGET POST ID in entry text!")
         facebook_url = "https://www.facebook.com/720895507364955/posts/743124275142078"
     else:
         # Try to find any Facebook video URL in the entry
@@ -132,7 +132,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     # Try to download video if URL found
     video_processed = False
     if facebook_url:
-        print(f"📹 Found Facebook URL: {facebook_url}")
+        print(f"? Found Facebook URL: {facebook_url}")
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_filename = os.path.join(temp_dir, f"facebook_video_{random.randint(1000, 9999)}.mp4")
@@ -140,13 +140,13 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
                 
                 if video_path and os.path.exists(video_path):
                     file_size = os.path.getsize(video_path)
-                    print(f"✅ Video downloaded successfully: {file_size/1024/1024:.2f}MB")
+                    print(f"[OK] Video downloaded successfully: {file_size/1024/1024:.2f}MB")
                     
                     if file_size < DISCORD_LIMIT:
                         files_to_upload.append(discord.File(video_path, filename="facebook_video.mp4"))
                         video_processed = True
                     else:
-                        print(f"⚠️ Video too large for Discord ({file_size/1024/1024:.2f}MB)")
+                        print(f"[WARNING] Video too large for Discord ({file_size/1024/1024:.2f}MB)")
                         # Handle large files with Catbox
                         try:
                             with open(video_path, 'rb') as f:
@@ -156,13 +156,13 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
                                 catbox_video_links.append(catbox_url)
                                 video_processed = True
                             else:
-                                print("❌ Failed to upload large video to Catbox")
+                                print("[ERROR] Failed to upload large video to Catbox")
                         except Exception as e:
-                            print(f"❌ Error uploading to Catbox: {e}")
+                            print(f"[ERROR] Error uploading to Catbox: {e}")
                 else:
-                    print("⚠️ No video found in post or download failed")
+                    print("[WARNING] No video found in post or download failed")
         except Exception as e:
-            print(f"❌ Error processing Facebook video: {e}")
+            print(f"[ERROR] Error processing Facebook video: {e}")
             import traceback
             traceback.print_exc()
 
@@ -175,7 +175,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
                 
             # Skip URLs that are clearly Facebook CDN images
             if "fbcdn.net" in url or "scontent-" in url:
-                print(f"   🖼️ Processing image: {url}")
+                print(f"   ?? Processing image: {url}")
                 try:
                     # Allow longer timeout for large media
                     resp = requests.get(url, timeout=60, headers={'User-Agent': 'DiscordBot/1.0'})
@@ -375,7 +375,7 @@ async def create_daily_summary_message(channel, vietnamese_date):
             
         return message
     except discord.Forbidden:
-        print(f"🚨 Lacking permissions to send messages or add reactions in channel {channel.id}.")
+        print(f"[CRITICAL] Lacking permissions to send messages or add reactions in channel {channel.id}.")
         return None
 
 async def update_daily_summary_message(summary_message, entry, posted_message):
@@ -438,7 +438,7 @@ def upload_to_catbox(video_data: bytes) -> str | None:
     
     for attempt in range(1, max_retries + 1):
         try:
-            print(f"   ⬆️ Uploading to Catbox.moe... (attempt {attempt}/{max_retries})")
+            print(f"   ?? Uploading to Catbox.moe... (attempt {attempt}/{max_retries})")
             r = requests.post(
                 'https://catbox.moe/user/api.php',
                 files={'fileToUpload': ('video.mp4', video_data)},
@@ -450,17 +450,17 @@ def upload_to_catbox(video_data: bytes) -> str | None:
             if r.text.startswith("https://"):
                 return r.text
             else:
-                print(f"   ❌ Catbox API returned an error: {r.text}")
+                print(f"   [ERROR] Catbox API returned an error: {r.text}")
                 return None
         except requests.RequestException as e:
-            print(f"   ❌ Catbox upload failed (attempt {attempt}/{max_retries}): {e}")
+            print(f"   [ERROR] Catbox upload failed (attempt {attempt}/{max_retries}): {e}")
             
             if attempt < max_retries:
                 wait = backoff_factor * (2 ** (attempt - 1))
-                print(f"   ⏳ Retrying in {wait} seconds...")
+                print(f"   ? Retrying in {wait} seconds...")
                 time.sleep(wait)
             else:
-                print("   ❌ All Catbox upload attempts failed.")
+                print("   [ERROR] All Catbox upload attempts failed.")
                 return None
 
 # Async wrapper to keep event loop responsive
@@ -475,10 +475,10 @@ async def process_special_posts(client, config):
     if not special_posts:
         return
         
-    print(f"🌟 Found {len(special_posts)} special posts to process")
+    print(f"? Found {len(special_posts)} special posts to process")
     
     for post in special_posts:
-        print(f"🌟 Processing special post: {post['title']}")
+        print(f"? Processing special post: {post['title']}")
         
         try:
             # Find target channel
@@ -486,7 +486,7 @@ async def process_special_posts(client, config):
             channel = client.get_channel(channel_id)
             
             if not channel:
-                print(f"❌ Channel {channel_id} not found")
+                print(f"[ERROR] Channel {channel_id} not found")
                 continue
                 
             # Download the video
@@ -495,11 +495,11 @@ async def process_special_posts(client, config):
                 video_path = await download_video_ytdlp(post["url"], output_path=temp_filename)
                 
                 if not video_path or not os.path.exists(video_path):
-                    print(f"❌ Failed to download video for special post")
+                    print(f"[ERROR] Failed to download video for special post")
                     continue
                     
                 file_size = os.path.getsize(video_path)
-                print(f"✅ Special post video downloaded: {file_size/1024/1024:.2f}MB")
+                print(f"[OK] Special post video downloaded: {file_size/1024/1024:.2f}MB")
                 
                 # Create message with video attachment
                 if file_size < DISCORD_LIMIT:
@@ -507,7 +507,7 @@ async def process_special_posts(client, config):
                         f"🌟 **{post['title']}**\n{post['url']}", 
                         file=discord.File(video_path, filename="facebook_video.mp4")
                     )
-                    print(f"✅ Special post sent to Discord")
+                    print(f"[OK] Special post sent to Discord")
                 else:
                     # For large videos, upload to Catbox
                     with open(video_path, 'rb') as f:
@@ -516,9 +516,9 @@ async def process_special_posts(client, config):
                     
                     if catbox_url:
                         message = await channel.send(f"🌟 **{post['title']}**\n{post['url']}\n{catbox_url}")
-                        print(f"✅ Special post sent to Discord via Catbox")
+                        print(f"[OK] Special post sent to Discord via Catbox")
                     else:
-                        print(f"❌ Failed to upload large video to Catbox")
+                        print(f"[ERROR] Failed to upload large video to Catbox")
                         continue
                 
                 # Mark as processed
@@ -532,7 +532,7 @@ async def process_special_posts(client, config):
                         pass
                         
         except Exception as e:
-            print(f"❌ Error processing special post: {e}")
+            print(f"[ERROR] Error processing special post: {e}")
             import traceback
             traceback.print_exc()
 

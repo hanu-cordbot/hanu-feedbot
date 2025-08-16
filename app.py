@@ -1,6 +1,10 @@
 # === FILE: app.py ===
 
 import os
+import subprocess
+import sys
+import signal
+import time
 from datetime import datetime, timezone
 from flask import Flask, jsonify, abort, render_template, request, redirect, url_for, Response, session, flash, send_from_directory
 from dotenv import load_dotenv
@@ -158,6 +162,16 @@ def api_status():
     if not verify_api_token():
         return jsonify({"error": "Authentication required"}), 401
     return jsonify({"status": "ok"}), 200
+
+@app.route('/api/health')
+def api_health():
+    """Health check endpoint - no auth required"""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "job_endpoint": JOB_ENDPOINT,
+        "environment": "railway" if os.environ.get("RAILWAY_ENVIRONMENT") else "local"
+    }), 200
     
 @app.route('/api/reset-summary', methods=['POST'])
 def api_reset_summary():
@@ -189,6 +203,91 @@ def api_run_job():
         return jsonify({"success": True, "message": "Run job enqueued"}), 200
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+# Railway cron job endpoint (using secret JOB_ENDPOINT path)
+@app.route(JOB_ENDPOINT, methods=['POST', 'GET'])
+def trigger_bot_job():
+    """Railway cron endpoint to trigger bot execution"""
+    start_time = time.time()
+    print(f"Job endpoint {JOB_ENDPOINT} triggered at {datetime.now()}")
+    
+    try:
+        # For Railway deployment, run the job directly without Celery
+        print("Starting bot job subprocess...")
+        
+        # Run the cron worker as a subprocess with real-time output
+        process = subprocess.Popen([
+            sys.executable, "cron_worker.py"
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        
+        # Set a shorter timeout for debugging (10 minutes)
+        timeout = 600  # 10 minutes instead of 1 hour
+        
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+            returncode = process.returncode
+            
+            duration = time.time() - start_time
+            print(f"Job completed in {duration:.2f} seconds with exit code {returncode}")
+            
+            if returncode == 0:
+                print("Bot job completed successfully")
+                response_data = {
+                    "success": True, 
+                    "message": "Bot job completed successfully",
+                    "duration": f"{duration:.2f}s",
+                    "stdout": stdout[-2000:] if stdout else "",  # Last 2000 chars
+                    "stderr": stderr[-1000:] if stderr else ""   # Last 1000 chars
+                }
+                
+                # Signal Railway we're done - exit after response
+                def shutdown_after_response():
+                    print("Scheduling shutdown after response...")
+                    time.sleep(1)  # Give time for response to be sent
+                    print("Exiting process...")
+                    os._exit(0)  # Force exit
+                
+                # Schedule shutdown in background
+                import threading
+                threading.Thread(target=shutdown_after_response, daemon=True).start()
+                
+                return jsonify(response_data), 200
+            else:
+                print(f"Bot job failed with exit code {returncode}")
+                return jsonify({
+                    "success": False,
+                    "error": f"Bot job failed with exit code {returncode}",
+                    "duration": f"{duration:.2f}s",
+                    "stdout": stdout[-2000:] if stdout else "",
+                    "stderr": stderr[-1000:] if stderr else ""
+                }), 500
+                
+        except subprocess.TimeoutExpired:
+            print(f"Bot job timed out after {timeout} seconds, terminating...")
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                print("Force killing process...")
+                process.kill()
+                
+            return jsonify({
+                "success": False,
+                "error": f"Bot job timed out after {timeout} seconds",
+                "duration": f"{time.time() - start_time:.2f}s"
+            }), 500
+            
+    except Exception as e:
+        duration = time.time() - start_time
+        print(f"Exception in job endpoint: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            "success": False,
+            "error": f"Failed to start bot job: {str(e)}",
+            "duration": f"{duration:.2f}s"
+        }), 500
     
 @app.route('/api/channels/fetch-name', methods=['POST'])
 def api_fetch_channel_name():

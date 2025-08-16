@@ -40,4 +40,6 @@ https://fetchrss.com/feed/aGpHnlNw71YCaGpHq4U_hgrz.rss
 https://fetchrss.com/feed/aGpHwYnhTCHiaGpHzBt5LfkT.rss
 https://fetchrss.com/feed/aGpIB98iYZkiaGpIEXO_OKjz.rss
 https://fetchrss.com/feed/aGpILhAhnvNyaGpIQEjDu2zz.rss
-https://fetchrss.com/feed/aGpIYAsmKbgjaGpIas-e60YU.rss
+https://fetchrss.com/feed/aGpIYAsmKbgjaKAXH-sQCkti.rss
+https://fetchrss.com/feed/aKAX3Q_1UbOTaKAX6ewHsDai.rss
+https://fetchrss.com/feed/aKAYDesQCktjaKAYGOsQCktk.rss

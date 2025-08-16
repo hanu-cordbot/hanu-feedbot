@@ -13,6 +13,8 @@ redis
 Flask-Cors
 aiohttp
 boto3
+rich
+boto3
 pytest
 moto
 

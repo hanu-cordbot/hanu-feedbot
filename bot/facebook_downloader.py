@@ -52,7 +52,7 @@ def check_special_posts():
             posts_to_process.append(post)
     
     if posts_to_process:
-        print(f"🌟 Found {len(posts_to_process)} special posts to process")
+        print(f"? Found {len(posts_to_process)} special posts to process")
     
     return posts_to_process
 
@@ -75,26 +75,26 @@ def mark_special_post_seen(post_id):
 def extract_facebook_post_url(entry):
     """Extract Facebook post URL from entry using multiple strategies"""
     # Debug output
-    print(f"🔍 Processing entry: {entry.get('title', '')}")
+    print(f"? Processing entry: {entry.get('title', '')}")
     
     # Check for our target post ID in any field
     for key in ['link', 'id', 'title', 'summary']:
         if key in entry:
             value = entry.get(key)
             if isinstance(value, str) and "743124275142078" in value:
-                print(f"🎯 FOUND TARGET POST ID IN FIELD '{key}'!")
+                print(f"[TARGET] FOUND TARGET POST ID IN FIELD '{key}'!")
                 return "https://www.facebook.com/720895507364955/posts/743124275142078"
     
     # Convert entry to string and check if our target ID exists ANYWHERE
     entry_str = str(entry)
     if "743124275142078" in entry_str:
-        print(f"🎯 FOUND TARGET VIDEO POST! Entry title: {entry.get('title', 'Unknown')}")
+        print(f"[TARGET] FOUND TARGET VIDEO POST! Entry title: {entry.get('title', 'Unknown')}")
         return "https://www.facebook.com/720895507364955/posts/743124275142078"
     
     # Regular URL extraction logic
     link = entry.get('link', '')
     if link and "facebook.com" in link and ("/posts/" in link or "/videos/" in link or "/watch/" in link):
-        print(f"✅ Found Facebook post in main link: {link}")
+        print(f"[OK] Found Facebook post in main link: {link}")
         return link
     
     # Look for FB post patterns in the entry string
@@ -109,7 +109,7 @@ def extract_facebook_post_url(entry):
         if matches:
             for match in matches:
                 full_url = f"https://www.{match}" if not match.startswith('http') else match
-                print(f"✅ Found Facebook URL pattern: {full_url}")
+                print(f"[OK] Found Facebook URL pattern: {full_url}")
                 return full_url
     
     return None
@@ -118,12 +118,12 @@ async def download_video_ytdlp(url, output_path=None):
     """Download Facebook video using yt-dlp with authentication"""
     # Skip image/CDN URLs - only process actual Facebook posts
     if "fbcdn.net" in url or "scontent-" in url:
-        print(f"⚠️ SKIPPING CDN URL: {url}")
+        print(f"[WARNING] SKIPPING CDN URL: {url}")
         return None
         
     # Skip non-Facebook URLs
     if not "facebook.com" in url:
-        print(f"⚠️ Not a Facebook URL: {url}")
+        print(f"[WARNING] Not a Facebook URL: {url}")
         return None
     
     try:
@@ -142,7 +142,7 @@ async def download_video_ytdlp(url, output_path=None):
             url
         ]
         
-        print(f"📥 DOWNLOADING FACEBOOK VIDEO: {url}")
+        print(f"[DOWNLOAD] DOWNLOADING FACEBOOK VIDEO: {url}")
         
         # Run yt-dlp as a subprocess
         process = await asyncio.create_subprocess_exec(
@@ -157,37 +157,37 @@ async def download_video_ytdlp(url, output_path=None):
         
         # Check if this is a "no video available" error
         if "This video is only available for registered users" in stderr_text:
-            print(f"⚠️ Post does not contain a downloadable video")
+            print(f"[WARNING] Post does not contain a downloadable video")
             return None
         
         # Check for other errors
         if process.returncode != 0:
-            print(f"❌ Download failed with return code {process.returncode}")
-            print(f"❌ Error: {stderr_text}")
+            print(f"[ERROR] Download failed with return code {process.returncode}")
+            print(f"[ERROR] Error: {stderr_text}")
             return None
         
         if os.path.exists(output_path):
             file_size = os.path.getsize(output_path)
-            print(f"✅ Successfully downloaded video ({file_size/1024/1024:.2f}MB): {output_path}")
+            print(f"[OK] Successfully downloaded video ({file_size/1024/1024:.2f}MB): {output_path}")
 
             # Only consider it a success if it's large enough to be a video
             if file_size < 100000:
-                print(f"⚠️ File too small to be a video ({file_size} bytes), likely just an image")
+                print(f"[WARNING] File too small to be a video ({file_size} bytes), likely just an image")
                 return None
             # Upload to R2 if configured
             if upload_path_and_prune and os.environ.get("R2_BUCKET"):
                 try:
                     upload_path_and_prune(output_path)
                 except Exception as exc:
-                    print(f"⚠️ Failed to upload to R2: {exc}")
+                    print(f"[WARNING] Failed to upload to R2: {exc}")
 
             return output_path
         else:
-            print(f"❌ Output file not found: {output_path}")
+            print(f"[ERROR] Output file not found: {output_path}")
             return None
             
     except Exception as e:
-        print(f"❌ Error downloading video: {e}")
+        print(f"[ERROR] Error downloading video: {e}")
         import traceback
         traceback.print_exc()
         return None

@@ -16,7 +16,7 @@ TEMP_DIRS_TO_CLEANUP = []
 
 # Set up signal handlers for graceful shutdown
 def signal_handler(signum, frame):
-    print(f"Received signal {signum}, shutting down...")
+    print(f"🛑 Received signal {signum}, shutting down...")
     cleanup_temp_files()
     release_lock(None)
     sys.exit(1)
@@ -31,17 +31,17 @@ def acquire_lock():
     if LOCK_FILE.exists():
         age = time.time() - LOCK_FILE.stat().st_mtime
         if age > STALE_THRESHOLD:
-            print(f"Stale lock detected (age {int(age)}s), removing.")
+            print(f"⚠️ Stale lock detected (age {int(age)}s), removing.")
             LOCK_FILE.unlink(missing_ok=True)
         else:
-            print(f"Another bot instance is already running (lock age: {int(age)}s)")
+            print(f"❌ Another bot instance is already running (lock age: {int(age)}s)")
             sys.exit(1)
     try:
         lock_fd = os.open(LOCK_FILE, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-        print(f"Lock acquired: {LOCK_FILE}")
+        print(f"🔒 Lock acquired: {LOCK_FILE}")
         return lock_fd
     except OSError:
-        print("Could not acquire lock; another instance may be running")
+        print("❌ Could not acquire lock; another instance may be running")
         sys.exit(1)
 
 
@@ -51,9 +51,9 @@ def release_lock(lock_fd):
         if lock_fd is not None:
             os.close(lock_fd)
         LOCK_FILE.unlink(missing_ok=True)
-        print(f"Lock released: {LOCK_FILE}")
+        print(f"🔓 Lock released: {LOCK_FILE}")
     except Exception as e:
-        print(f"Error releasing lock: {e}")
+        print(f"⚠️ Error releasing lock: {e}")
 
 
 def cleanup_temp_files():
@@ -61,7 +61,7 @@ def cleanup_temp_files():
     if not TEMP_FILES_TO_CLEANUP and not TEMP_DIRS_TO_CLEANUP:
         return
         
-    print(f"Cleaning up {len(TEMP_FILES_TO_CLEANUP)} files and {len(TEMP_DIRS_TO_CLEANUP)} directories...")
+    print(f"🧹 Cleaning up {len(TEMP_FILES_TO_CLEANUP)} files and {len(TEMP_DIRS_TO_CLEANUP)} directories...")
     
     # Wait a bit to ensure Discord is done with the files
     time.sleep(2)
@@ -71,9 +71,9 @@ def cleanup_temp_files():
         try:
             if os.path.exists(file_path):
                 os.unlink(file_path)
-                print(f"Removed temp file: {file_path}")
+                print(f"✅ Removed temp file: {file_path}")
         except Exception as e:
-            print(f"Could not remove temp file {file_path}: {e}")
+            print(f"⚠️ Could not remove temp file {file_path}: {e}")
     
     # Try to clean up directories
     for dir_path in TEMP_DIRS_TO_CLEANUP:
@@ -93,9 +93,9 @@ def cleanup_temp_files():
                             pass
                 # Then try to remove the directory itself
                 os.rmdir(dir_path)
-                print(f"Removed temp directory: {dir_path}")
+                print(f"✅ Removed temp directory: {dir_path}")
         except Exception as e:
-            print(f"Could not remove temp directory {dir_path}: {e}")
+            print(f"⚠️ Could not remove temp directory {dir_path}: {e}")
 
 
 async def main():
@@ -104,7 +104,7 @@ async def main():
     lock_fd = acquire_lock()
     
     try:
-        print(f"Starting standalone bot job at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"🤖 Starting standalone bot job at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Patch the tempfile.TemporaryDirectory class to avoid auto-cleanup
         original_exit = tempfile.TemporaryDirectory.__exit__
@@ -122,7 +122,7 @@ async def main():
         # Set up a timeout for the entire job (8 minutes)
         async def timeout_handler():
             await asyncio.sleep(480)  # 8 minutes
-            print("Job timeout reached, forcing exit...")
+            print("⏰ Job timeout reached, forcing exit...")
             os._exit(1)
         
         # Create timeout task
@@ -131,7 +131,7 @@ async def main():
         try:
             # Now run the bot
             from bot.main import run_bot_job
-            print("Importing bot modules...")
+            print("🔄 Importing bot modules...")
             
             # Run the bot job with timeout
             bot_task = asyncio.create_task(run_bot_job())
@@ -154,28 +154,28 @@ async def main():
             if bot_task in done:
                 await bot_task  # This will raise any exception that occurred
                 duration = time.time() - start_time
-                print(f"Bot job completed successfully in {duration:.2f} seconds")
+                print(f"✅ Bot job completed successfully in {duration:.2f} seconds")
             else:
-                print("Bot job was cancelled due to timeout")
+                print("❌ Bot job was cancelled due to timeout")
                 return 1
             
         except Exception as e:
             duration = time.time() - start_time
-            print(f"Bot job failed after {duration:.2f} seconds: {e}")
+            print(f"❌ Bot job failed after {duration:.2f} seconds: {e}")
             traceback.print_exc()
             return 1
         
         # Add a delay to ensure uploads complete
-        print("Waiting for pending uploads to complete...")
+        print("⏳ Waiting for pending uploads to complete...")
         await asyncio.sleep(5)  # Reduced from 10 to 5 seconds
         
         duration = time.time() - start_time
-        print(f"Job finished successfully in {duration:.2f} seconds")
+        print(f"🏁 Job finished successfully in {duration:.2f} seconds")
         return 0
         
     except Exception as e:
         duration = time.time() - start_time
-        print(f"Fatal error after {duration:.2f} seconds: {e}")
+        print(f"💥 Fatal error after {duration:.2f} seconds: {e}")
         traceback.print_exc()
         return 1
     finally:
@@ -186,15 +186,43 @@ async def main():
 
 
 if __name__ == "__main__":
-    print("Starting cron worker...")
+    print("🎬 Cron worker starting...")
     try:
         exit_code = asyncio.run(main())
-        print(f"Cron worker finished with exit code {exit_code}")
+        print(f"🏁 Cron worker finished with exit code {exit_code}")
         sys.exit(exit_code)
     except KeyboardInterrupt:
-        print("Cron worker interrupted by user")
+        print("🛑 Cron worker interrupted by user")
         sys.exit(130)
     except Exception as e:
-        print(f"Cron worker crashed: {e}")
+        print(f"💥 Cron worker crashed: {e}")
         traceback.print_exc()
         sys.exit(1)
+        
+        # Now run the bot
+        from bot.main import run_bot_job
+        print("🤖 Starting standalone bot job...")
+        await run_bot_job()
+        print("✅ Bot job completed successfully")
+        
+        # Add a delay to ensure uploads complete
+        print("⏳ Waiting for pending uploads to complete...")
+        await asyncio.sleep(10)
+        
+        # Exit cleanly on success
+        return 0
+    except Exception as e:
+        print(f"❌ Bot job failed: {e}")
+        traceback.print_exc()
+        return 1
+    finally:
+        # Clean up temp files
+        cleanup_temp_files()
+        # Release lock
+        release_lock(lock_fd)
+
+
+if __name__ == "__main__":
+    exit_code = asyncio.run(main())
+    print(f"🏁 Bot job finished with exit code {exit_code}")
+    sys.exit(exit_code)

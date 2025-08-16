@@ -44,14 +44,14 @@ def call_gemini(blocks: List[Dict], tries: int = 3) -> str:
             
             # Check if it's a rate limit error
             if "rate limit" in error_str or "quota" in error_str or "429" in error_str:
-                print(f"⚠️ Rate limit hit on {PRIMARY_MODEL}, falling back to {FALLBACK_MODEL}")
+                print(f"[WARNING] Rate limit hit on {PRIMARY_MODEL}, falling back to {FALLBACK_MODEL}")
                 
                 # Try with fallback model
                 try:
                     fallback_rsp = FALLBACK.generate_content(parts)
                     return fallback_rsp.text.strip()
                 except Exception as fallback_exc:
-                    print(f"❌ Fallback model also failed: {fallback_exc}")
+                    print(f"[ERROR] Fallback model also failed: {fallback_exc}")
             
             print(f"[Gemini error] {exc} (attempt {i + 1}/{tries})")
             
