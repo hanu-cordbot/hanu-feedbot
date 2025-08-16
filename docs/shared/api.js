@@ -1,10 +1,17 @@
-// API wrapper for HANU Dashboard - Complete Implementation
+// API wrapper for HANU Dashboard - Production Configuration
 import HanuAuth from './auth.js';
 
 class HanuAPI {
   constructor() {
-    // Use configured API_BASE if available (dashboard) or same origin
-    this.baseUrl = window.DEFAULT_AUTH_BASE || window.location.origin;
+    // Production Railway API endpoint - UPDATE THIS WITH YOUR RAILWAY URL
+    this.baseUrl = window.API_BASE_URL || 'https://your-railway-app.railway.app';
+    
+    // Development fallback
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      this.baseUrl = 'http://localhost:5000';
+    }
+    
+    console.log(`🔗 API Base URL: ${this.baseUrl}`);
   }
 
   // Get authentication headers
