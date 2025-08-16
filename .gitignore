@@ -1,5 +1,20 @@
-# Environment variables and secrets
+# Environment variables and secrets - CRITICAL SECURITY
 .env
+*.env
+*.env.*
+cookies.txt
+netscape_cookies.txt
+
+# Bot data files - contain sensitive runtime data
+bot.lock
+seen.json
+avatar_cache.json
+channels.json
+feed_map.json
+feed_meta.json
+groups.json
+system_prompt.json
+details_threads.json
 
 # Virtual environments
 .venv/
