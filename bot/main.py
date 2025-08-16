@@ -388,6 +388,34 @@ async def process_media(entry, channel):
         if temp_dir not in TEMP_DIRS_TO_CLEANUP:
             TEMP_DIRS_TO_CLEANUP.append(temp_dir)
 
+async def process_entry_in_thread(entry, thread, summary):
+    """Process a single entry in a text channel thread"""
+    # Generate and send body content
+    body = await build_full_body(entry)
+    last_msg = None
+    for idx in range(0, len(body), 2000):
+        chunk = body[idx:idx+2000]
+        last_msg = await thread.send(chunk)
+    
+    # Update per-channel summary if we have a posted message
+    if last_msg:
+        await update_daily_summary_message(summary, entry, last_msg)
+
+async def process_entry_in_forum(entry, forum_channel):
+    """Process a single entry in a forum channel by creating a new thread"""
+    title = entry.get('title', 'No Title')[:100]  # Forum thread titles are limited
+    
+    # Create thread in forum
+    thread = await forum_channel.create_thread(name=title)
+    
+    # Post content to the thread
+    body = await build_full_body(entry)
+    for idx in range(0, len(body), 2000):
+        chunk = body[idx:idx+2000]
+        await thread.send(chunk)
+    
+    print(f"✅ Created forum thread: {title}")
+
 async def process_feeds_once(client: discord.Client):
     """Scans feeds and processes new entries per-channel summary."""
     seen = load_seen_guids()
@@ -412,7 +440,7 @@ async def process_feeds_once(client: discord.Client):
         cid = user_map.get(e['feed']) or GLOBAL_FALLBACK_CHANNEL_ID
         if not cid or e['guid'] in seen: 
             continue
-        age = (now - e.get('published', now)).total_hours()
+        age = (now - e.get('published', now)).total_seconds() / 3600  # Convert to hours
         if age > MAX_AGE_HOURS: 
             continue
         new_posts.append(e)
@@ -432,49 +460,47 @@ async def process_feeds_once(client: discord.Client):
     # Process each channel
     for ch_id, entries in channel_groups.items():
         ch = client.get_channel(ch_id)
-        if not isinstance(ch, discord.TextChannel):
-            print(f"Skipping non-text channel {ch_id}")
-            continue
-
-        # 1) Summary header
-        vietnamese_date = format_vietnamese_date(now)
-        summary = await get_daily_summary_message(ch, today)
-        if not summary:
-            summary = await create_daily_summary_message(ch, vietnamese_date)
+        
+        # Support both TextChannel and ForumChannel
+        if isinstance(ch, discord.TextChannel):
+            # Regular text channel processing
+            vietnamese_date = format_vietnamese_date(now)
+            summary = await get_daily_summary_message(ch, today)
             if not summary:
-                continue
+                summary = await create_daily_summary_message(ch, vietnamese_date)
+                if not summary:
+                    continue
 
-        # 2) Single Details thread under summary
-        thr = await get_or_create_channel_details_thread(client, ch, summary, details_map)
+            # Single Details thread under summary
+            thr = await get_or_create_channel_details_thread(client, ch, summary, details_map)
 
-        # 3) Post full entries in that thread and update per-channel summary
-        for e in entries:
-            # Debug info
-            print(f"\n{'='*40}")
-            print(f"🔍 PROCESSING ENTRY: {e.get('title', 'No title')}")
-            print(f"🔗 Link: {e.get('link', 'No link')}")
-            print(f"{'='*40}\n")
-            
-            # Generate and send body content
-            body = await build_full_body(e)
-            last_msg = None
-            for idx in range(0, len(body), 2000):
-                chunk = body[idx:idx+2000]
-                last_msg = await thr.send(chunk)
-            posted_message = last_msg
-            
-            # Append summary to daily summary message
-            await update_daily_summary_message(summary, e, posted_message)
-            
-            # Process media (Facebook videos, images, etc.)
-            await process_media(e, ch)
-            
-            # Mark as seen and save
-            seen.add(e['guid'])
-            save_seen_guids(seen)
-            
-            # Rate limit to avoid Discord issues
-            await asyncio.sleep(1)
+            # Post full entries in that thread and update per-channel summary
+            for e in entries:
+                await process_entry_in_thread(e, thr, summary)
+                
+                # Process media (Facebook videos, images, etc.)
+                await process_media(e, ch)
+                
+                # Mark as seen and save
+                seen.add(e['guid'])
+                save_seen_guids(seen)
+                
+                # Rate limit to avoid Discord issues
+                await asyncio.sleep(1)
+                
+        elif isinstance(ch, discord.ForumChannel):
+            # Forum channel - create separate thread for each entry
+            print(f"Processing {len(entries)} entries for forum channel: {ch.name}")
+            for e in entries:
+                await process_entry_in_forum(e, ch)
+                # Mark as seen and save
+                seen.add(e['guid'])
+                save_seen_guids(seen)
+                # Rate limit to avoid Discord issues
+                await asyncio.sleep(1)
+        else:
+            print(f"Skipping unsupported channel type {type(ch)} for channel {ch_id}")
+            continue
 
     # Persist thread map
     with open(DETAILS_MAP_FILE, 'w') as f:
