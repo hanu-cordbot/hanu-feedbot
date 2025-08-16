@@ -215,9 +215,9 @@ def trigger_bot_job():
         # For Railway deployment, run the job directly without Celery
         print("Starting bot job subprocess...")
         
-        # Run the cron worker as a subprocess with real-time output
+        # Run the enhanced cron worker as a subprocess with real-time output
         process = subprocess.Popen([
-            sys.executable, "cron_worker.py"
+            sys.executable, "cron_worker_enhanced.py"
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
         
         # Set a shorter timeout for debugging (10 minutes)

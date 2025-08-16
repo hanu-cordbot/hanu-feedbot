@@ -37,6 +37,9 @@ FACEBOOK_REACTIONS = ["👍", "❤️", "😆", "😲", "😢", "😡"]
 DISCORD_LIMIT = 8 * 1024 * 1024  # 8MB Discord file limit
 CATBOX_LIMIT = 200 * 1024 * 1024  # 200MB Catbox limit
 
+# Webhook cache for channels
+WEBHOOK_CACHE = {}
+
 def _chunker(seq, size):
     """Yield successive n-sized chunks from a sequence."""
     for i in range(0, len(seq), size):
@@ -65,14 +68,31 @@ def _split_message(content, limit=2000):
 
 # Helper to get or create a webhook in a TextChannel
 async def get_or_create_webhook_url(channel: Any) -> str:
-    """Get or create a webhook URL for the given channel."""
-    existing = await channel.webhooks()  # type: ignore
-    for hook in existing:
-        if hook.name == 'hanu-feedbot':
-            return f"https://discord.com/api/webhooks/{hook.id}/{hook.token}"
+    """Get or create a webhook URL for the given channel with caching."""
+    # Check cache first
+    if hasattr(channel, 'id') and channel.id in WEBHOOK_CACHE:
+        return WEBHOOK_CACHE[channel.id]
     
-    new_hook = await channel.create_webhook(name='hanu-feedbot')  # type: ignore
-    return f"https://discord.com/api/webhooks/{new_hook.id}/{new_hook.token}"
+    try:
+        existing = await channel.webhooks()  # type: ignore
+        for hook in existing:
+            if hook.name == 'hanu-feedbot':
+                url = f"https://discord.com/api/webhooks/{hook.id}/{hook.token}"
+                # Cache the result
+                if hasattr(channel, 'id'):
+                    WEBHOOK_CACHE[channel.id] = url
+                return url
+        
+        new_hook = await channel.create_webhook(name='hanu-feedbot')  # type: ignore
+        url = f"https://discord.com/api/webhooks/{new_hook.id}/{new_hook.token}"
+        # Cache the result
+        if hasattr(channel, 'id'):
+            WEBHOOK_CACHE[channel.id] = url
+        return url
+    except Exception as e:
+        print(f"[WARNING] Failed to get/create webhook for channel: {e}")
+        # Fallback to global webhook
+        return WH_URL or ""
 
 async def push(client: discord.Client, target: discord.TextChannel | discord.ForumChannel | discord.Thread, entry: dict, body: str, tldr: str, post_time: str):
     """
