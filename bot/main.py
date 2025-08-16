@@ -25,6 +25,9 @@ load_dotenv()
 # --- GLOBAL CONFIGURATION ---
 print("Initializing configuration...")
 
+# Global cleanup list for temporary directories
+TEMP_DIRS_TO_CLEANUP = []
+
 # Create a shared aiohttp session to prevent unclosed connector warnings
 HTTP_SESSION = ClientSession(timeout=ClientTimeout(total=60))  # Increased timeout for large media
 
@@ -485,12 +488,25 @@ async def run_bot_job():
     @client.event
     async def on_ready():
         print(f"Logged in as {client.user} to perform job.")
-        await process_feeds_once(client)
-        print("Job complete. Logging out.")
-        await client.close()
-        print("🔌 Discord client closed after job.")
-        # Close shared HTTP session
-        await HTTP_SESSION.close()
+        try:
+            await process_feeds_once(client)
+            print("Job complete. Logging out.")
+        finally:
+            # Cleanup temporary directories
+            import shutil
+            for temp_dir in TEMP_DIRS_TO_CLEANUP:
+                try:
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir)
+                        print(f"🧹 Cleaned up temp directory: {temp_dir}")
+                except Exception as e:
+                    print(f"⚠️ Failed to cleanup {temp_dir}: {e}")
+            TEMP_DIRS_TO_CLEANUP.clear()
+            
+            await client.close()
+            print("🔌 Discord client closed after job.")
+            # Close shared HTTP session
+            await HTTP_SESSION.close()
 
     await client.start(BOT_TOKEN)
 
