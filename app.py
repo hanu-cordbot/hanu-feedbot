@@ -158,6 +158,23 @@ CORS(app, origins=[
     "https://hanu-api-proxy.snacky496.workers.dev"
 ])
 
+# === ESSENTIAL API ENDPOINTS ===
+
+@app.route('/api/health')
+def health():
+    """Health check endpoint for Railway and monitoring"""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "service": "hanu-feedbot-enhanced",
+        "version": "2.0.0",
+        "endpoints": {
+            "job": JOB_ENDPOINT,
+            "dashboard": "/",
+            "api": "/api/"
+        }
+    })
+
 # Authentication bridge for JWT-like tokens
 @app.route("/api/auth/login", methods=["POST"])
 def api_login():
