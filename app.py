@@ -409,51 +409,7 @@ def api_login_required(f):
     return decorated
 
 # JSON API endpoints for Phase 3
-@app.route("/api/public/feeds")
-def api_public_feeds():
-    """JSON API for public feed data - matches dashboard expectations"""
-    # Load feeds and metadata
-    with open(FEEDS_FILE, "r") as f:
-        feeds = [line.strip() for line in f if line.strip()]
-    try:
-        meta = json.load(open(FEED_META_FILE))
-    except Exception:
-        meta = {}
-    try:
-        feed_map = json.load(open(FEED_MAP_FILE))
-    except Exception:
-        feed_map = {}
-    try:
-        groups = json.load(open(GROUPS_FILE))
-    except Exception:
-        groups = {}
-    channels = json.load(open(CHANNELS_FILE)) if os.path.exists(CHANNELS_FILE) else []
-    # Build feed items list
-    feed_items = []
-    for url in feeds:
-        m = meta.get(url, {})
-        title = m.get("title") or url
-        last_post = None
-        if m.get("last_post"):
-            try:
-                last_post = datetime.fromisoformat(m.get("last_post")).isoformat()
-            except Exception:
-                last_post = None
-        feed_items.append({"url": url, "title": title, "last_post": last_post})
-    # Include API timestamp for front-end last-update display (based on feed_meta cache file)
-    try:
-        mtime = os.path.getmtime(FEED_META_FILE)
-        last_update = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
-    except Exception:
-        last_update = None
-    return jsonify({
-        "feeds": feed_items,
-        "metadata": meta,
-        "groups": groups,
-        "mappings": feed_map,
-        "channels": channels,
-        "last_update": last_update
-    })
+# Note: api_public_feeds is defined earlier in the file
 
 @app.route("/api/feeds")
 @api_login_required
