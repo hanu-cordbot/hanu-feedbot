@@ -1,31 +1,91 @@
-name: Update Feed Metadata
+name: Update Feed Metadata & Deploy Dashboard
 on:
   schedule:
-    - cron: '0 * * * *'  # Every hour
+    - cron: '5 * * * *'  # Every hour at 5 minutes past (after Railway cron job)
   workflow_dispatch:  # Manual trigger
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
 jobs:
-  update-feed-meta:
+  update-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+          
       - name: Install dependencies
         run: pip install -r requirements.txt
-      - name: Fetch feed metadata
+        
+      - name: Fetch Railway API data for dashboard
+        run: |
+          # Create data directory if it doesn't exist
+          mkdir -p docs/data
+          
+          # Fetch feeds data from Railway API (try with timeout)
+          curl -f -m 30 "https://hanu-feedbot-production.up.railway.app/api/public/feeds" \
+            -o docs/data/feeds.json || echo '{"feeds": [], "error": "API timeout"}' > docs/data/feeds.json
+          
+          # Fetch stats data (if available)
+          curl -f -m 30 "https://hanu-feedbot-production.up.railway.app/api/public/stats" \
+            -o docs/data/stats.json || echo '{"stats": {}, "error": "API timeout"}' > docs/data/stats.json
+          
+          # Update timestamp
+          echo '{"lastUpdated": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "source": "github-actions"}' > docs/data/meta.json
+          
+      - name: Fetch feed metadata (existing functionality)
         run: |
           python - <<'EOF'
-          from celery_app import fetch_feed_meta
-          fetch_feed_meta()
+          try:
+              from celery_app import fetch_feed_meta
+              fetch_feed_meta()
+              print("✅ Feed metadata updated successfully")
+          except Exception as e:
+              print(f"⚠️ Feed metadata update failed: {e}")
           EOF
-      - name: Commit updated metadata
+          
+      - name: Update dashboard config timestamp
+        run: |
+          # Update the config.js with current timestamp
+          if [ -f "docs/config.js" ]; then
+            sed -i 's/"lastDataUpdate":.*/"lastDataUpdate": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'",/' docs/config.js || true
+          fi
+          
+      - name: Commit updated data
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action Bot"
-          git add feed_meta.json
-          git diff --quiet || git commit -m "Update feed metadata [skip ci]"
-          git push
+          
+          # Add all updated files
+          git add feed_meta.json docs/data/ docs/config.js 2>/dev/null || true
+          
+          # Check if there are changes to commit
+          if ! git diff --staged --quiet; then
+            echo "📊 Data changes detected, committing..."
+            git commit -m "🤖 Auto-update: feed metadata and dashboard data $(date -u +"%Y-%m-%d %H:%M UTC")"
+            git push
+          else
+            echo "ℹ️ No data changes detected"
+          fi
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs'
+          
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
