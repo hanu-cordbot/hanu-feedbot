@@ -1,6 +1,6 @@
 // Configuration for GitHub Pages Dashboard
 window.CONFIG = {
-  // Your Railway API URL - UPDATE THIS after deployment
+  // Your Railway API URL - UPDATED WITH ACTUAL DEPLOYMENT
   API_BASE_URL: 'https://hanu-feedbot-production.up.railway.app',
   
   // Dashboard settings
