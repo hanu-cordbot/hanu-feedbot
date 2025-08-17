@@ -162,6 +162,7 @@ jobs:
         TEST_MODE: 'true'
         TEST_ENTRIES_COUNT: ${{ github.event.inputs.test_entries_count }}
         FORCE_TEST_RUN: ${{ github.event.inputs.force_test_run }}
+        FORCE_IGNORE_AGE: 'true'  # Bypass age filtering for testing
 
     - name: Analyze test results
       run: |
