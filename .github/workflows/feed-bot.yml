@@ -64,14 +64,13 @@ jobs:
               'GLOBAL_FALLBACK_CHANNEL_ID'
           ]
           missing = [k for k in required if not os.getenv(k)]
-          if missing:
-              print(f'❌ Missing required secrets: {missing}')
-              print('Please configure these secrets in your repository settings.')
-              exit(1)
-          print('✅ All required environment variables present')
-          print(f'📊 Channel ID: {os.getenv(\"CHANNEL_ID\")}')
-          print(f'🔄 Fallback Channel: {os.getenv(\"GLOBAL_FALLBACK_CHANNEL_ID\")}')
-          print(f'⏰ Max age: {os.getenv(\"MAX_AGE_HOURS\", \"36\")} hours')
+      if missing:
+        print(f'❌ Missing required secrets: {missing}')
+        print('Please configure these secrets in your repository settings.')
+        exit(1)
+      # Confirm presence only; do NOT print secret values
+      print('✅ All required environment variables present (values hidden)')
+      print(f'⏰ Max age: {os.getenv("MAX_AGE_HOURS", "36")} hours')
           "
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
@@ -92,8 +91,6 @@ jobs:
           echo "🤖 Starting HANU Feed Bot..."
           echo "📅 Run time: $(date)"
           echo "⚙️ Max age: ${{ github.event.inputs.max_age_hours || secrets.MAX_AGE_HOURS || '36' }} hours"
-          echo "🔧 Force run: ${{ github.event.inputs.force_run || 'false' }}"
-          echo "🐛 Debug mode: ${{ github.event.inputs.debug_mode || 'false' }}"
           echo "==============================================="
           
           # Run the bot (ensure env vars are provided via repository secrets)
