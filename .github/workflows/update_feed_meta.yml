@@ -51,10 +51,13 @@ jobs:
           echo "🔍 Final health check before job trigger..."
           curl -f -m 30 "https://hanu-feedbot-production.up.railway.app/api/health" || echo "⚠️ Service may still be starting..."
           
-          # Trigger the actual feed processing job
+          # Trigger the actual feed processing job via configurable endpoint (store the endpoint or token as a secret)
           echo "🤖 Triggering feed processing job..."
-          curl -X POST -f -m 300 "https://hanu-feedbot-production.up.railway.app/cxNDM5NQ.GQ9dEK.6ocOcpLi374041017257dAht_xZ_iU5TUZeQECkohPZ256eyOU" \
-            || echo "⚠️ Job trigger may have timed out (this is normal for long-running jobs)"
+          if [ -n "${{ secrets.RAILWAY_JOB_ENDPOINT }}" ]; then
+            curl -X POST -f -m 300 "${{ secrets.RAILWAY_JOB_ENDPOINT }}" || echo "⚠️ Job trigger may have timed out or failed"
+          else
+            echo "⚠️ RAILWAY_JOB_ENDPOINT secret not configured; skipping remote trigger"
+          fi
           
           # Wait for job to complete (feed processing can take several minutes)
           echo "⏳ Waiting for job to complete..."
