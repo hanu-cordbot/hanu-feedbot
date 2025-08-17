@@ -38,6 +38,24 @@ def _maybe_fetch_feeds_from_r2():
 _maybe_fetch_feeds_from_r2()
 SEEN_DB   = BASE_DIR / "seen.json"          # This will now be /data/seen.json on Railway
 
+# Optional R2/S3 bucket for persisting runtime state (seen.json)
+SEEN_R2_BUCKET = os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET')
+
+def r2_client():
+    """Return a boto3 S3-compatible client if R2 envs are set, else None."""
+    bucket = SEEN_R2_BUCKET
+    access_key = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')
+    secret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')
+    endpoint = os.getenv('R2_ENDPOINT')
+    if not bucket or not access_key or not secret:
+        return None
+    try:
+        import boto3
+        s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret, endpoint_url=endpoint)
+        return s3
+    except Exception:
+        return None
+
 # ── Discord text limits & reactions ──────────────────────────────────────
 MAX_BODY = 2_000                            # hard limit per message
 EMOJIS   = ["👍", "❤️", "😆", "😲", "😢", "😡"]
