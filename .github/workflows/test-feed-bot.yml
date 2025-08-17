@@ -50,6 +50,14 @@ jobs:
 
     - name: Validate test environment
       run: |
+        echo "✅ Test environment ready"
+        echo "🎯 Test entries: ${{ github.event.inputs.test_entries_count }}"
+        if [ -n "${{ github.event.inputs.target_channel }}" ]; then
+          echo "📍 Target channel: ${{ github.event.inputs.target_channel }}"
+        else
+          echo "📍 Target channel: default"
+        fi
+        
         python -c "
         import os
         required = ['DISCORD_BOT_TOKEN', 'GEMINI_API_KEY']
@@ -57,9 +65,7 @@ jobs:
         if missing:
             print(f'❌ Missing required secrets: {missing}')
             exit(1)
-        print('✅ Test environment ready')
-        print(f'🎯 Test entries: ${{ github.event.inputs.test_entries_count }}')
-        print(f'📍 Target channel: ${{ github.event.inputs.target_channel && github.event.inputs.target_channel || \"default\" }}')
+        print('✅ Python environment validated')
         "
       env:
         DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
@@ -123,8 +129,8 @@ jobs:
       env:
         # Discord Configuration
         DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-        CHANNEL_ID: ${{ github.event.inputs.target_channel != '' && github.event.inputs.target_channel || secrets.CHANNEL_ID }}
-        GLOBAL_FALLBACK_CHANNEL_ID: ${{ github.event.inputs.target_channel != '' && github.event.inputs.target_channel || secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
+        CHANNEL_ID: ${{ github.event.inputs.target_channel || secrets.CHANNEL_ID }}
+        GLOBAL_FALLBACK_CHANNEL_ID: ${{ github.event.inputs.target_channel || secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
         
         # Gemini AI Configuration
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -192,6 +198,10 @@ jobs:
         echo "📅 Test execution: $(date)"
         echo "🔄 Workflow run: #${{ github.run_number }}"
         echo "🎯 Requested entries: ${{ github.event.inputs.test_entries_count }}"
-        echo "📍 Target channel: ${{ github.event.inputs.target_channel != '' && github.event.inputs.target_channel || 'default' }}"
+        if [ -n "${{ github.event.inputs.target_channel }}" ]; then
+          echo "📍 Target channel: ${{ github.event.inputs.target_channel }}"
+        else
+          echo "📍 Target channel: default"
+        fi
         echo "✅ Test completed - Check Discord for results"
         echo "==============================================="
