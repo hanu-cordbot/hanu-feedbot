@@ -85,8 +85,6 @@ jobs:
         run: |
           rm -f bot.lock
           echo "🔓 Removed stale lock file (force run enabled)"
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
 
       - name: Run HANU Feed Bot
         id: bot_run
@@ -98,7 +96,7 @@ jobs:
           echo "🐛 Debug mode: ${{ github.event.inputs.debug_mode || 'false' }}"
           echo "==============================================="
           
-          # Run the bot
+          # Run the bot (ensure env vars are provided via repository secrets)
           python cron_worker.py
           
           echo "==============================================="
