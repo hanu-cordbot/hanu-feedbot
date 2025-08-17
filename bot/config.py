@@ -10,7 +10,32 @@ if Path("/data").exists():
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 
-FEED_LIST = Path(__file__).resolve().parent.parent / "feeds.txt" # Feeds should still be read from the repo
+FEED_LIST = Path(__file__).resolve().parent.parent / "feeds.txt" # Default: read feeds from local file
+
+# Optional: if FEEDS_R2_BUCKET is configured, attempt to download feeds.txt from R2 at startup
+def _maybe_fetch_feeds_from_r2():
+    import os
+    from pathlib import Path
+    bucket = os.getenv('FEEDS_R2_BUCKET')
+    access_key = os.getenv('R2_ACCESS_KEY_ID')
+    secret = os.getenv('R2_SECRET_ACCESS_KEY')
+    endpoint = os.getenv('R2_ENDPOINT')
+    if not bucket or not access_key or not secret:
+        return
+    try:
+        # Lazy-import boto3 to avoid requiring it unless configured
+        import boto3
+        s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret, endpoint_url=endpoint)
+        target = FEED_LIST
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with open(target, 'wb') as f:
+            s3.download_fileobj(bucket, 'feeds.txt', f)
+    except Exception:
+        # If anything goes wrong, silently fall back to local feeds.txt
+        return
+
+# Try to fetch feeds from R2 on import
+_maybe_fetch_feeds_from_r2()
 SEEN_DB   = BASE_DIR / "seen.json"          # This will now be /data/seen.json on Railway
 
 # ── Discord text limits & reactions ──────────────────────────────────────
