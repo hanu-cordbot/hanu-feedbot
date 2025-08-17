@@ -1,8 +1,9 @@
 # Goal: Feeds storage
+Status: todo
 
 Purpose: Move feeds list into a private store and ensure runtime can securely fetch it.
 
-Checklist:
+# Checklist:
 - [ ] 3.1 Choose storage: R2 (recommended) or encrypted file
 - [ ] 3.2 Upload `feeds.txt` to R2 and set secrets
 - [ ] 3.3 Verify `bot/config.py` loads feeds from R2 fallback to local

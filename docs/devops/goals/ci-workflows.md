@@ -1,8 +1,9 @@
 # Goal: CI & Workflows
+Status: todo
 
 Purpose: Provide secure, auditable, and reliable automation pipelines for hourly runs, deployments, and state commits.
 
-Checklist:
+# Checklist:
 - [ ] 2.1 Create `ci/clean-workflows` branch
 - [ ] 2.2 Remove hard-coded secrets from workflows
 - [ ] 2.3 Add validation step for required secrets
