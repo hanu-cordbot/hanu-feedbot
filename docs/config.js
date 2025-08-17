@@ -16,7 +16,7 @@ window.CONFIG = {
   },
   
   // Last data update timestamp (updated by GitHub Actions)
-  "lastDataUpdate": "2025-08-17T22:17:51Z",
+  "lastDataUpdate": "2025-08-17T23:17:59Z",
   
   // Features enabled
   FEATURES: {
