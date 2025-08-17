@@ -1,7 +1,7 @@
 name: Update Feed Metadata & Deploy Dashboard
 on:
   schedule:
-    - cron: '5 * * * *'  # Every hour at 5 minutes past (after Railway cron job)
+    - cron: '0 * * * *'  # Every hour at the top of the hour
   workflow_dispatch:  # Manual trigger
 
 permissions:
@@ -20,28 +20,62 @@ jobs:
         uses: actions/checkout@v4
         
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           
       - name: Install dependencies
         run: pip install -r requirements.txt
         
+      - name: Trigger Railway Feed Processing
+        run: |
+          echo "🚂 Triggering Railway feed processing job..."
+          
+          # First wake up Railway with health check (with extended retries and wait times)
+          for i in {1..5}; do
+            echo "Attempt $i: Waking up Railway service..."
+            if curl -f -m 60 "https://hanu-feedbot-production.up.railway.app/api/health"; then
+              echo "✅ Railway service is awake"
+              break
+            else
+              echo "⚠️ Attempt $i failed, waiting 30 seconds..."
+              sleep 30
+            fi
+          done
+          
+          # Wait more for full startup (Railway from cold start can take 60+ seconds)
+          echo "⏳ Waiting for Railway service to fully initialize (cold start can take 1-2 minutes)..."
+          sleep 60
+          
+          # Double-check service is responsive before triggering job
+          echo "🔍 Final health check before job trigger..."
+          curl -f -m 30 "https://hanu-feedbot-production.up.railway.app/api/health" || echo "⚠️ Service may still be starting..."
+          
+          # Trigger the actual feed processing job
+          echo "🤖 Triggering feed processing job..."
+          curl -X POST -f -m 300 "https://hanu-feedbot-production.up.railway.app/cxNDM5NQ.GQ9dEK.6ocOcpLi374041017257dAht_xZ_iU5TUZeQECkohPZ256eyOU" \
+            || echo "⚠️ Job trigger may have timed out (this is normal for long-running jobs)"
+          
+          # Wait for job to complete (feed processing can take several minutes)
+          echo "⏳ Waiting for job to complete..."
+          sleep 120
+          
       - name: Fetch Railway API data for dashboard
         run: |
           # Create data directory if it doesn't exist
           mkdir -p docs/data
           
-          # Fetch feeds data from Railway API (try with timeout)
-          curl -f -m 30 "https://hanu-feedbot-production.up.railway.app/api/public/feeds" \
-            -o docs/data/feeds.json || echo '{"feeds": [], "error": "API timeout"}' > docs/data/feeds.json
+          # Fetch feeds data from Railway API (with extended timeout since service just processed feeds)
+          echo "📊 Fetching updated feed data from Railway..."
+          curl -f -m 60 "https://hanu-feedbot-production.up.railway.app/api/public/feeds" \
+            -o docs/data/feeds.json || echo '{"feeds": [], "error": "API timeout or service sleeping"}' > docs/data/feeds.json
           
           # Fetch stats data (if available)
           curl -f -m 30 "https://hanu-feedbot-production.up.railway.app/api/public/stats" \
-            -o docs/data/stats.json || echo '{"stats": {}, "error": "API timeout"}' > docs/data/stats.json
+            -o docs/data/stats.json || echo '{"stats": {}, "error": "API timeout or service sleeping"}' > docs/data/stats.json
           
           # Update timestamp
-          echo '{"lastUpdated": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "source": "github-actions"}' > docs/data/meta.json
+          echo '{"lastUpdated": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'", "source": "github-actions", "railwayTriggered": true}' > docs/data/meta.json
           
       - name: Fetch feed metadata (existing functionality)
         run: |
