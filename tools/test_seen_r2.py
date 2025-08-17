@@ -22,10 +22,21 @@ from io import BytesIO
 
 try:
     import boto3
-    from bot.config import r2_client
 except Exception as e:
-    print("❌ Missing dependencies or bot.config: ", e)
+    print("❌ Missing dependency boto3:", e)
     sys.exit(2)
+
+# Create an S3/R2 client directly from environment variables instead of importing bot.config
+def make_r2_client():
+    access_key = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')
+    secret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')
+    endpoint = os.getenv('R2_ENDPOINT')
+    if not access_key or not secret or not endpoint:
+        return None
+    try:
+        return boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret, endpoint_url=endpoint)
+    except Exception:
+        return None
 
 BUCKET = os.getenv('SEEN_R2_BUCKET')
 KEY = 'seen.json'
@@ -35,7 +46,7 @@ if not BUCKET:
     print('❌ SEEN_R2_BUCKET not set')
     sys.exit(2)
 
-client = r2_client()
+client = make_r2_client()
 if not client:
     print('❌ Could not create R2 client - check credentials')
     sys.exit(2)
