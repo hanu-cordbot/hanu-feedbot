@@ -1,0 +1,55 @@
+# Sample RSS Feeds for Testing HANU Feedbot
+# ==========================================
+# 
+# This file contains safe, reliable RSS feeds for testing purposes.
+# These feeds are publicly available and suitable for testing without
+# concerns about posting inappropriate content.
+#
+# IMPORTANT: Replace these with your actual RSS feeds for production use!
+
+# Technology News (Reliable and frequently updated)
+https://feeds.feedburner.com/TechCrunch
+https://www.wired.com/feed/rss
+https://rss.cnn.com/rss/cnn_tech.rss
+
+# General News (Good for testing content variety)
+https://feeds.bbci.co.uk/news/rss.xml
+https://rss.reuters.com/reuters/topNews
+
+# Development/Programming (Safe for tech communities)
+https://github.blog/feed/
+https://stackoverflow.blog/feed/
+https://feeds.feedburner.com/oreilly/radar
+
+# Science & Research (High quality content)
+https://www.science.org/rss/news_current.xml
+https://feeds.nature.com/nature/rss/current
+
+# Open Source Projects (Good for testing GitHub integration)
+https://github.blog/feed/
+https://feeds.feedburner.com/oreilly/radar
+
+# Gaming (If relevant to your community)
+# https://kotaku.com/rss
+# https://www.polygon.com/rss/index.xml
+
+# Sports (If relevant to your community)
+# https://www.espn.com/espn/rss/news
+# https://rss.cnn.com/rss/cnn_sports.rss
+
+# Instructions for Production:
+# 1. Remove the test feeds above
+# 2. Add your actual RSS feed URLs
+# 3. Test each feed individually before adding to production
+# 4. Keep the file organized with comments for different categories
+# 5. Monitor feed reliability - remove feeds that frequently fail
+
+# Tips for RSS Feed URLs:
+# - Most news sites have /rss, /feed, or /atom endpoints
+# - Look for RSS icons on websites
+# - Use tools like RSS.app or FetchRSS for social media feeds
+# - Test feeds with online RSS validators before adding
+
+# Example format for your production feeds:
+# https://example.com/rss
+# https://another-site.com/feed.xml

@@ -444,7 +444,12 @@ async def process_feeds_once(client: discord.Client):
         # Age check (skip in test mode if FORCE_IGNORE_AGE is set)
         force_ignore_age = os.getenv('FORCE_IGNORE_AGE', 'false').lower() == 'true'
         if not force_ignore_age:
-            age = (now - e.get('published', now)).total_seconds() / 3600  # Convert to hours
+            published_date = e.get('published')
+            if published_date is None:
+                # If no published date, treat as current time (fresh entry)
+                age = 0
+            else:
+                age = (now - published_date).total_seconds() / 3600  # Convert to hours
             if age > MAX_AGE_HOURS: 
                 continue
         
