@@ -34,3 +34,12 @@ aws --endpoint-url https://<account>.r2.cloudflarestorage.com s3 cp feeds.txt s3
 Notes
 - Rotate tokens if you accidentally print or push them.
 - If a secret exposure is suspected, follow the recovery steps in `docs/devops/goals/repo-hygiene.md`.
+
+Seen state lifecycle guidance
+- We compress `seen.json` before uploading to R2 to minimize storage size.
+- Consider a lifecycle rule on the R2 bucket to automatically delete objects older than N days (e.g., 30 days) to avoid cost surprises.
+- Alternatively, store only the last N GUIDs (code currently keeps last 500) and rely on expiration to limit cost.
+
+Example lifecycle policy (Cloudflare R2/compatible):
+ - Delete objects older than 30 days.
+
