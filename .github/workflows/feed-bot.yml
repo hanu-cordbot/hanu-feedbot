@@ -54,24 +54,25 @@ jobs:
           pip install -r requirements.txt
 
       - name: Validate environment variables
-        run: |
-          python -c "
-          import os
-          required = [
-              'DISCORD_BOT_TOKEN', 
-              'GEMINI_API_KEY', 
-              'CHANNEL_ID',
-              'GLOBAL_FALLBACK_CHANNEL_ID'
-          ]
-          missing = [k for k in required if not os.getenv(k)]
+    run: |
+      python - <<'PY'
+      import os
+      required = [
+        'DISCORD_BOT_TOKEN',
+        'GEMINI_API_KEY',
+        'CHANNEL_ID',
+        'GLOBAL_FALLBACK_CHANNEL_ID',
+      ]
+      missing = [k for k in required if not os.getenv(k)]
       if missing:
         print(f'❌ Missing required secrets: {missing}')
         print('Please configure these secrets in your repository settings.')
-        exit(1)
+        raise SystemExit(1)
+
       # Confirm presence only; do NOT print secret values
       print('✅ All required environment variables present (values hidden)')
       print(f'⏰ Max age: {os.getenv("MAX_AGE_HOURS", "36")} hours')
-          "
+      PY
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
