@@ -132,6 +132,10 @@ Short-term next actions (what the agent should do now)
 - [ ] Add R2 secrets and upload `feeds.txt` to R2, or keep `feeds.txt` local to the deployment server
 - [ ] Manually dispatch `ci/clean-workflows` on `dev` to verify workflow changes
 
+Agent activity log (recent):
+
+- [2025-08-18 10:25:00 UTC] [work/add-dispatch] TASK: add manual-run workflow — RESULT: PR opened (#7) — ARTIFACTS: .github/workflows/run-bot-now.yml
+
 Appendix: commands (PowerShell)
 ------------------------------
 Create dev branch and push:
