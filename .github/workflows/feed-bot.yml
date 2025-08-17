@@ -171,20 +171,44 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "HANU Feed Bot"
           
-          # Add all state files
-          git add --force seen.json details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json
+          # Add state files. If SEEN_R2_BUCKET is configured, skip adding seen.json (we persist it to R2)
+          if [ -n "${{ env.SEEN_R2_BUCKET || secrets.SEEN_R2_BUCKET }}" ]; then
+            echo "SEEN_R2_BUCKET is set; skipping seen.json commit (persisting to R2)"
+            git add details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json || true
+          else
+            git add --force seen.json details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json || true
+          fi
           
           # Commit with timestamp
           TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
           git commit -m "🤖 Update bot state - $TIMESTAMP [skip ci]" || echo "No changes to commit"
           
-          # Push changes
+          # Push changes (use GH_BOT_PAT if provided)
           if [ -n "${{ secrets.GH_BOT_PAT }}" ]; then
             echo "Using GH_BOT_PAT for push"
             git remote set-url origin https://${{ secrets.GH_BOT_PAT }}@github.com/${{ github.repository }}.git
           fi
-          git push origin main
-          echo "✅ State changes committed and pushed"
+          git push origin main || echo "⚠️ Push failed or nothing to push"
+          echo "✅ State changes committed and pushed (or no changes)"
+
+      - name: Persist CI status to repo (docs/devops/last-ci-status.md)
+        if: always() && (secrets.GH_BOT_PAT != '')
+        run: |
+          set -e
+          git config --local user.email "action@github.com"
+          git config --local user.name "HANU Feed Bot"
+          STATUS="${{ steps.bot_run.outcome }}"
+          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "# CI last run status" > docs/devops/last-ci-status.md
+          echo "Run: $RUN_URL" >> docs/devops/last-ci-status.md
+          echo "Timestamp: $TIMESTAMP" >> docs/devops/last-ci-status.md
+          echo "Outcome: $STATUS" >> docs/devops/last-ci-status.md
+          echo "State changed: ${{ env.STATE_CHANGED || 'false' }}" >> docs/devops/last-ci-status.md
+          git add docs/devops/last-ci-status.md
+          git commit -m "ci: update last CI status - run ${{ github.run_id }}" || echo "No changes to commit"
+          git remote set-url origin https://${{ secrets.GH_BOT_PAT }}@github.com/${{ github.repository }}.git
+          git push origin main || echo "⚠️ Failed to push CI status"
 
       - name: Upload execution logs
         if: always()
