@@ -86,7 +86,7 @@ from bot.dispatcher import (
     FACEBOOK_REACTIONS,
 )
 from bot.avatar_cache import maybe_update, avatar_for
-from bot.config import GLOBAL_FALLBACK_CHANNEL_ID
+from bot.config import GLOBAL_FALLBACK_CHANNEL_ID, SEEN_R2_BUCKET, r2_client
 from bot.facebook_downloader import download_video_ytdlp, normalize_url
 
 print("✅ Configuration loaded.")
@@ -109,13 +109,28 @@ async def download_bytes(url: str) -> bytes:
 
 def load_seen_guids():
     """Loads the set of processed post IDs from the state file."""
+    # If R2 is configured, try to download seen.json from R2 first
     try:
+        client = r2_client()
+        if client:
+            try:
+                import io
+                buf = io.BytesIO()
+                client.download_fileobj(SEEN_R2_BUCKET, 'seen.json', buf)
+                buf.seek(0)
+                return set(json.load(buf))
+            except Exception as e:
+                print(f"⚠️ Could not fetch seen.json from R2: {e}")
+        # Fallback to local file
         with open(SEEN_FILE, 'r') as f:
             return set(json.load(f))
     except (FileNotFoundError, json.JSONDecodeError):
         print(f"'{SEEN_FILE}' not found or invalid. Initializing a new one.")
-        with open(SEEN_FILE, 'w') as f:
-            json.dump([], f)
+        try:
+            with open(SEEN_FILE, 'w') as f:
+                json.dump([], f)
+        except Exception:
+            pass
         return set()
 
 def save_seen_guids(guids):
@@ -139,6 +154,18 @@ def save_seen_guids(guids):
                 json.dump(list(guids)[-500:], f, indent=2)
         except Exception as e2:
             print(f"❌ Failed to write seen file: {e2}")
+
+    # If R2 is configured, also upload the seen.json to R2 for persistent state across runners
+    try:
+        client = r2_client()
+        if client:
+            import io
+            buf = io.BytesIO()
+            buf.write(json.dumps(list(guids)[-500:]).encode('utf-8'))
+            buf.seek(0)
+            client.upload_fileobj(buf, SEEN_R2_BUCKET, 'seen.json')
+    except Exception as e:
+        print(f"⚠️ Could not upload seen.json to R2: {e}")
 
 async def build_full_body(entry: dict) -> str:
     """Build full formatted body for an entry using existing logic."""
