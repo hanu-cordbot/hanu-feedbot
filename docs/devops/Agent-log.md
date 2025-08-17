@@ -1,18 +1,29 @@
-# Agent current status (single-entry) and options
 
-This file holds exactly one single-line entry describing the agent's current status and the single next action to take. Use `docs/devops/full-logs/` for full, detailed logs per task or phase.
+# Agent current status (single-entry) and per-phase turn logs
 
-Format (single entry only):
+This file contains exactly one current-status line for the agent's entire run. Detailed, turn-based logs belong in a single per-phase file under `docs/devops/full-logs/`.
 
-[YYYY-MM-DD HH:MM:SS UTC] [agent/branch] STATUS: <short status sentence>. NEXT: <one-line next action>. OPTIONS: <option1 | option2 | option3>. ARTIFACTS: <links>
+Single-entry format (current status):
 
-Example:
+[YYYY-MM-DD HH:MM:SS UTC] [agent/branch] STATUS: <short status sentence>. NEXT: <one-line next action>. OPTIONS: <opt1 | opt2 | opt3>. ARTIFACTS: <links>
 
-[2025-08-17 12:30:00 UTC] [ci/hide-feeds] STATUS: Completed moving `feeds.txt` to `feeds.example` and updating config to optionally fetch from R2. NEXT: Choose feed storage approach and upload `feeds.txt`. OPTIONS: (1) Upload to R2 now (recommended) | (2) Keep local and configure server pull | (3) Encrypt with sops/git-crypt and commit. ARTIFACTS: docs/devops/full-logs/20250817-hide-feeds.md
+Per-phase log rules (turn-based)
+- Each phase (module) must have at most one file in `docs/devops/full-logs/` named `<phase>.md` (for example `hide-feeds.md`).
+- If a new independent session starts for the same phase, the agent should create `<phase>-2.md`, `<phase>-3.md`, etc.
+- Each per-phase log file is append-only and contains a short, high-level entry per turn in the following format:
 
-Rules:
-- The agent MUST update this file at the start and end of each task iteration.
-- Full logs must be written to `docs/devops/full-logs/<YYYYMMDD>-<slug>.md` and referenced in `ARTIFACTS`.
-- When marking NEXT, the agent must provide at least two viable OPTIONS and a recommended choice.
-- The agent must keep the same final goal in mind; OPTIONS are just alternative paths to reach it.
+	[TURN N] [YYYY-MM-DD HH:MM:SS UTC] ACTION: <one-line description>. RESULT: <PASS/FAIL/IN-PROGRESS>. NOTES: <short notes or link to artifacts>
+
+- The agent must update the single-entry `Agent-log.md` to reflect the current phase status and reference the per-phase log file in `ARTIFACTS`.
+- The agent must present multiple OPTIONS in the NEXT field and recommend one; always preserve the final goal.
+
+Example `hide-feeds.md` content (turn-based):
+
+	[TURN 1] [2025-08-17 11:50:00 UTC] ACTION: Move `feeds.txt` to `feeds.example` and ignore `feeds.txt`. RESULT: PASS. NOTES: branch `ci/hide-feeds`, commits cce6c79,0627faa
+	[TURN 2] [2025-08-17 12:30:00 UTC] ACTION: Update `bot/config.py` to optionally fetch from R2. RESULT: PASS. NOTES: commit cce6c79
+
+Agent behavior rules summary
+- Update `Agent-log.md` single line at start and end of each iteration.
+- Append one TURN entry to the relevant per-phase file per action attempt.
+- Only create new per-phase files with -2/-3 suffix when a new independent session is started.
 
