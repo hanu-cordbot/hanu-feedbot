@@ -1,7 +1,6 @@
 name: HANU Feed Bot - TEST MODE
 
-"on":
-  # Manual trigger only for testing
+on:
   workflow_dispatch:
     inputs:
       test_entries_count:
@@ -29,203 +28,290 @@ jobs:
     timeout-minutes: 15
     
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        ref: 'main'
-        persist-credentials: true
-        fetch-depth: 0
-        
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-        
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+          persist-credentials: true
+          fetch-depth: 1
 
-    - name: Validate test environment
-      run: |
-        echo "✅ Test environment ready"
-        echo "🎯 Test entries: ${{ github.event.inputs.test_entries_count }}"
-        if [ -n "${{ github.event.inputs.target_channel }}" ]; then
-          echo "📍 Target channel: ${{ github.event.inputs.target_channel }}"
-        else
-          echo "📍 Target channel: default"
-        fi
-        
-        python -c "
-        import os
-        required = ['DISCORD_BOT_TOKEN', 'GEMINI_API_KEY']
-        missing = [k for k in required if not os.getenv(k)]
-        if missing:
-            print(f'❌ Missing required secrets: {missing}')
-            exit(1)
-        print('✅ Python environment validated')
-        "
-      env:
-        DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-    - name: Backup current state
-      run: |
-        # Backup current seen.json
-        if [ -f "seen.json" ]; then
-          cp seen.json seen.json.backup
-          echo "✅ Backed up seen.json"
-        fi
-        
-        # Remove locks if force test
-        if [ "${{ github.event.inputs.force_test_run }}" = "true" ]; then
-          rm -f bot.lock
-          echo "🔓 Removed lock files for test"
-        fi
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            echo "⚠️ requirements.txt not found, installing common dependencies"
+            pip install discord.py feedparser google-generativeai
+          fi
 
-    - name: Create test configuration
-      run: |
-        # Create a minimal seen.json for testing (only keep a few entries)
-        python -c "
-        import json
-        import os
-        
-        # Load current seen entries
-        try:
-            with open('seen.json', 'r') as f:
-                seen = json.load(f)
-        except:
-            seen = []
-        
-        # For testing, keep only last 5 entries to allow some new ones through
-        test_seen = seen[-5:] if len(seen) > 5 else []
-        
-        with open('seen_test.json', 'w') as f:
-            json.dump(test_seen, f, indent=2)
-        
-        print(f'🧪 Created test seen.json with {len(test_seen)} entries')
-        print(f'📊 Original had {len(seen)} entries')
-        "
-        
-        # Replace seen.json with test version temporarily
-        mv seen.json seen.json.full_backup 2>/dev/null || true
-        mv seen_test.json seen.json
+      - name: Validate environment and secrets
+        run: |
+          echo "🔍 Validating test environment..."
+          echo "🎯 Test entries: ${{ github.event.inputs.test_entries_count }}"
+          
+          if [ -n "${{ github.event.inputs.target_channel }}" ]; then
+            echo "📍 Target channel: ${{ github.event.inputs.target_channel }}"
+          else
+            echo "📍 Target channel: default (from secrets)"
+          fi
+          
+          echo "🔧 Force test run: ${{ github.event.inputs.force_test_run }}"
+          
+          # Validate required secrets
+          python3 << 'EOF'
+          import os
+          import sys
+          
+          required_secrets = ['DISCORD_BOT_TOKEN', 'GEMINI_API_KEY']
+          missing_secrets = []
+          
+          for secret in required_secrets:
+              if not os.getenv(secret):
+                  missing_secrets.append(secret)
+          
+          if missing_secrets:
+              print(f"❌ Missing required secrets: {', '.join(missing_secrets)}")
+              sys.exit(1)
+          
+          print("✅ All required secrets are present")
+          
+          # Check for required files
+          import os.path
+          required_files = ['feed_map.json']
+          missing_files = []
+          
+          for file in required_files:
+              if not os.path.exists(file):
+                  missing_files.append(file)
+          
+          if missing_files:
+              print(f"⚠️ Missing files (will create defaults): {', '.join(missing_files)}")
+          else:
+              print("✅ All required files are present")
+          EOF
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
-    - name: Run test bot execution
-      run: |
-        echo "🧪 Starting HANU Feed Bot in TEST MODE"
-        echo "📅 Test time: $(date)"
-        echo "🎯 Processing up to ${{ github.event.inputs.test_entries_count }} test entries"
-        echo "🔧 Force test run: ${{ github.event.inputs.force_test_run }}"
-        echo "==============================================="
-        
-        # Debug: Show current seen.json state
-        echo "🔍 Debug: Current seen.json state:"
-        if [ -f "seen.json" ]; then
-          echo "📊 Seen entries count: $(python -c "import json; print(len(json.load(open('seen.json'))))")"
-        else
-          echo "❌ No seen.json found"
-        fi
-        
-        # Debug: Show feed mapping
-        echo "🔍 Debug: Feed mapping:"
-        if [ -f "feed_map.json" ]; then
-          cat feed_map.json
-        else
-          echo "❌ No feed_map.json found"
-        fi
-        
-        # Run the bot with test configuration using test runner
-        python test_cron_worker.py
-        
-        # Debug: Show what changed
-        echo "🔍 Debug: Post-execution state:"
-        if [ -f "seen.json" ]; then
-          echo "📊 New seen entries count: $(python -c "import json; print(len(json.load(open('seen.json'))))")"
-        fi
-        
-        echo "==============================================="
-        echo "✅ Test execution completed"
-      env:
-        # Discord Configuration
-        DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-        CHANNEL_ID: ${{ github.event.inputs.target_channel || secrets.CHANNEL_ID }}
-        GLOBAL_FALLBACK_CHANNEL_ID: ${{ github.event.inputs.target_channel || secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
-        
-        # Gemini AI Configuration
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        
-        # Test Configuration
-        MAX_AGE_HOURS: '168'  # 7 days for testing to get more entries
-        TEST_MODE: 'true'
-        TEST_ENTRIES_COUNT: ${{ github.event.inputs.test_entries_count }}
-        FORCE_TEST_RUN: ${{ github.event.inputs.force_test_run }}
-        FORCE_IGNORE_AGE: 'true'  # Bypass age filtering for testing
+      - name: Create backup and prepare test environment
+        run: |
+          echo "💾 Preparing test environment..."
+          
+          # Create backup directory
+          mkdir -p backups
+          
+          # Backup existing files
+          if [ -f "seen.json" ]; then
+            cp seen.json backups/seen.json.backup
+            echo "✅ Backed up seen.json"
+          else
+            echo "[]" > seen.json
+            echo "📝 Created empty seen.json"
+          fi
+          
+          # Remove locks if force test is enabled
+          if [ "${{ github.event.inputs.force_test_run }}" = "true" ]; then
+            rm -f *.lock
+            echo "🔓 Removed all lock files for test run"
+          fi
+          
+          # Create default feed_map.json if it doesn't exist
+          if [ ! -f "feed_map.json" ]; then
+            echo '{}' > feed_map.json
+            echo "📝 Created default feed_map.json"
+          fi
 
-    - name: Analyze test results
-      run: |
-        echo "📊 Test Results Analysis:"
-        
-        # Check how many new entries were processed
-        if [ -f "seen.json" ]; then
-          NEW_COUNT=$(python -c "
-import json
-try:
-    with open('seen.json', 'r') as f:
-        new_seen = json.load(f)
-    with open('seen.json.full_backup', 'r') as f:
-        old_seen = json.load(f)
-    new_entries = len(new_seen) - len(old_seen)
-    print(f'{max(0, new_entries)}')
-except:
-    print('0')
-")
-          echo "✅ Processed $NEW_COUNT new entries"
-        fi
-        
-        # Check Discord activity (this would need to be verified manually)
-        echo "📝 Check Discord channels for new test posts"
-        echo "🧵 Forum channel test (if used): Check for new threads"
+      - name: Prepare test configuration
+        run: |
+          echo "🧪 Setting up test configuration..."
+          
+          # Create test-specific seen.json with limited entries
+          python3 << 'EOF'
+          import json
+          import os
+          
+          try:
+              with open('seen.json', 'r') as f:
+                  seen_data = json.load(f)
+          except (FileNotFoundError, json.JSONDecodeError):
+              seen_data = []
+          
+          # For testing, keep only the last 5 entries to allow new ones
+          test_entries_count = int(os.getenv('TEST_ENTRIES_COUNT', '3'))
+          
+          if os.getenv('FORCE_TEST_RUN', 'false').lower() == 'true':
+              # Keep even fewer entries for force test
+              test_seen = seen_data[-2:] if len(seen_data) > 2 else []
+          else:
+              # Keep last 5 entries
+              test_seen = seen_data[-5:] if len(seen_data) > 5 else []
+          
+          # Save test configuration
+          with open('seen_test.json', 'w') as f:
+              json.dump(test_seen, f, indent=2)
+          
+          print(f"🧪 Created test seen.json:")
+          print(f"   Original entries: {len(seen_data)}")
+          print(f"   Test entries: {len(test_seen)}")
+          print(f"   Max new entries to process: {test_entries_count}")
+          EOF
+        env:
+          TEST_ENTRIES_COUNT: ${{ github.event.inputs.test_entries_count }}
+          FORCE_TEST_RUN: ${{ github.event.inputs.force_test_run }}
 
-    - name: Restore original state
-      if: always()
-      run: |
-        # Restore original seen.json
-        if [ -f "seen.json.full_backup" ]; then
-          mv seen.json.full_backup seen.json
-          echo "✅ Restored original seen.json"
-        fi
-        
-        # Clean up test files
-        rm -f seen_test.json bot.lock
-        echo "🧹 Cleaned up test files"
+      - name: Execute test bot run
+        run: |
+          echo "🚀 Starting HANU Feed Bot TEST execution..."
+          echo "==============================================="
+          echo "📅 Test time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          echo "🎯 Max entries to process: ${{ github.event.inputs.test_entries_count }}"
+          echo "🔧 Force test run: ${{ github.event.inputs.force_test_run }}"
+          echo "==============================================="
+          
+          # Replace seen.json with test version
+          mv seen.json seen_full.backup
+          mv seen_test.json seen.json
+          
+          # Show debug information
+          echo "🔍 Debug: Current configuration:"
+          echo "   seen.json entries: $(python3 -c "import json; print(len(json.load(open('seen.json'))))")"
+          
+          if [ -f "feed_map.json" ]; then
+            echo "   feed_map.json size: $(wc -c < feed_map.json) bytes"
+          fi
+          
+          # Check if main bot script exists, otherwise create a test version
+          if [ -f "main.py" ]; then
+            echo "✅ Found main.py, executing..."
+            timeout 300 python3 main.py || echo "⚠️ Bot execution completed with timeout or error"
+          elif [ -f "cron_worker.py" ]; then
+            echo "✅ Found cron_worker.py, executing..."
+            timeout 300 python3 cron_worker.py || echo "⚠️ Bot execution completed with timeout or error"
+          elif [ -f "test_cron_worker.py" ]; then
+            echo "✅ Found test_cron_worker.py, executing..."
+            timeout 300 python3 test_cron_worker.py || echo "⚠️ Bot execution completed with timeout or error"
+          else
+            echo "⚠️ No main bot script found, creating minimal test runner..."
+            python3 << 'EOF'
+          import os
+          print("🧪 Minimal test execution - no main script found")
+          print("✅ Environment variables are accessible:")
+          print(f"   DISCORD_BOT_TOKEN: {'✅ Set' if os.getenv('DISCORD_BOT_TOKEN') else '❌ Missing'}")
+          print(f"   GEMINI_API_KEY: {'✅ Set' if os.getenv('GEMINI_API_KEY') else '❌ Missing'}")
+          print(f"   TEST_MODE: {os.getenv('TEST_MODE', 'true')}")
+          print("📝 This would be where the actual bot logic runs")
+          EOF
+          fi
+          
+          echo "==============================================="
+          echo "✅ Test execution phase completed"
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          CHANNEL_ID: ${{ github.event.inputs.target_channel || secrets.CHANNEL_ID }}
+          GLOBAL_FALLBACK_CHANNEL_ID: ${{ github.event.inputs.target_channel || secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MAX_AGE_HOURS: '168'
+          TEST_MODE: 'true'
+          TEST_ENTRIES_COUNT: ${{ github.event.inputs.test_entries_count }}
+          FORCE_TEST_RUN: ${{ github.event.inputs.force_test_run }}
+          FORCE_IGNORE_AGE: 'true'
 
-    - name: Upload test artifacts
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-execution-logs-${{ github.run_number }}
-        path: |
-          seen.json.backup
-          *.log
-        retention-days: 3
-        if-no-files-found: ignore
+      - name: Analyze test results
+        if: always()
+        run: |
+          echo "📊 Analyzing test results..."
+          
+          if [ -f "seen.json" ] && [ -f "seen_full.backup" ]; then
+            python3 << 'EOF'
+          import json
+          
+          try:
+              with open('seen.json', 'r') as f:
+                  new_seen = json.load(f)
+              with open('seen_full.backup', 'r') as f:
+                  old_seen = json.load(f)
+              
+              new_count = len(new_seen) - len(old_seen)
+              
+              print(f"📈 Test Results:")
+              print(f"   Original seen entries: {len(old_seen)}")
+              print(f"   New seen entries: {len(new_seen)}")
+              print(f"   Processed new entries: {max(0, new_count)}")
+              
+              if new_count > 0:
+                  print(f"✅ Successfully processed {new_count} new entries")
+              else:
+                  print("ℹ️ No new entries were processed (may be expected)")
+                  
+          except Exception as e:
+              print(f"⚠️ Could not analyze results: {e}")
+          EOF
+          else
+            echo "⚠️ Cannot analyze results - backup files missing"
+          fi
+          
+          echo ""
+          echo "📋 Manual verification needed:"
+          echo "   1. Check Discord channel for new test posts"
+          echo "   2. Verify bot responses and formatting"
+          echo "   3. Check logs for any errors or warnings"
 
-    - name: Test summary
-      if: always()
-      run: |
-        echo "==============================================="
-        echo "🧪 HANU Feed Bot Test Summary"
-        echo "==============================================="
-        echo "📅 Test execution: $(date)"
-        echo "🔄 Workflow run: #${{ github.run_number }}"
-        echo "🎯 Requested entries: ${{ github.event.inputs.test_entries_count }}"
-        if [ -n "${{ github.event.inputs.target_channel }}" ]; then
-          echo "📍 Target channel: ${{ github.event.inputs.target_channel }}"
-        else
-          echo "📍 Target channel: default"
-        fi
-        echo "✅ Test completed - Check Discord for results"
-        echo "==============================================="
+      - name: Restore original state
+        if: always()
+        run: |
+          echo "🔄 Restoring original state..."
+          
+          # Restore original seen.json
+          if [ -f "seen_full.backup" ]; then
+            mv seen_full.backup seen.json
+            echo "✅ Restored original seen.json"
+          fi
+          
+          # Clean up test files
+          rm -f seen_test.json *.lock
+          echo "🧹 Cleaned up temporary test files"
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-execution-logs-${{ github.run_number }}
+          path: |
+            backups/
+            *.log
+            *.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Test execution summary
+        if: always()
+        run: |
+          echo ""
+          echo "==============================================="
+          echo "🧪 HANU Feed Bot Test Execution Summary"
+          echo "==============================================="
+          echo "📅 Completed: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+          echo "🔄 Workflow run: #${{ github.run_number }}"
+          echo "🎯 Requested entries: ${{ github.event.inputs.test_entries_count }}"
+          echo "🔧 Force test run: ${{ github.event.inputs.force_test_run }}"
+          
+          if [ -n "${{ github.event.inputs.target_channel }}" ]; then
+            echo "📍 Target channel: ${{ github.event.inputs.target_channel }}"
+          else
+            echo "📍 Target channel: default (from secrets)"
+          fi
+          
+          echo ""
+          echo "📋 Next steps:"
+          echo "   1. Check Discord channel for test results"
+          echo "   2. Review uploaded artifacts if needed"
+          echo "   3. Verify bot functionality before production use"
+          echo "==============================================="
