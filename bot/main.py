@@ -120,8 +120,25 @@ def load_seen_guids():
 
 def save_seen_guids(guids):
     """Saves the set of processed post IDs to the state file."""
-    with open(SEEN_FILE, 'w') as f:
-        json.dump(list(guids)[-500:], f, indent=2)  # Keep last 500 posts
+    # Write atomically to avoid corruption between runs
+    try:
+        import tempfile
+        dir_name = os.path.dirname(SEEN_FILE) or '.'
+        fd, tmp_path = tempfile.mkstemp(dir=dir_name, prefix="seen-", suffix=".tmp")
+        with os.fdopen(fd, 'w') as tmpf:
+            json.dump(list(guids)[-500:], tmpf, indent=2)
+            tmpf.flush()
+            os.fsync(tmpf.fileno())
+        # Atomic replace
+        os.replace(tmp_path, SEEN_FILE)
+    except Exception as e:
+        print(f"⚠️ Failed to save seen guids atomically: {e}")
+        # Fallback to simple write
+        try:
+            with open(SEEN_FILE, 'w') as f:
+                json.dump(list(guids)[-500:], f, indent=2)
+        except Exception as e2:
+            print(f"❌ Failed to write seen file: {e2}")
 
 async def build_full_body(entry: dict) -> str:
     """Build full formatted body for an entry using existing logic."""

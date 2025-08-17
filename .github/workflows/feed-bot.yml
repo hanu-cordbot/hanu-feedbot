@@ -175,13 +175,17 @@ jobs:
           git config --local user.name "HANU Feed Bot"
           
           # Add all state files
-          git add seen.json details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json
+          git add --force seen.json details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json
           
           # Commit with timestamp
           TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')
           git commit -m "🤖 Update bot state - $TIMESTAMP [skip ci]" || echo "No changes to commit"
           
           # Push changes
+          if [ -n "${{ secrets.GH_BOT_PAT }}" ]; then
+            echo "Using GH_BOT_PAT for push"
+            git remote set-url origin https://${{ secrets.GH_BOT_PAT }}@github.com/${{ github.repository }}.git
+          fi
           git push origin main
           echo "✅ State changes committed and pushed"
 
