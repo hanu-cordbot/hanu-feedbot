@@ -23,5 +23,5 @@ COPY . .
 # Expose the port Railway expects
 EXPOSE 8080
 
-# Use Procfile command for Railway compatibility
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--timeout", "300", "--workers", "1"]
+# Use Procfile command for Railway compatibility with better settings
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--timeout", "0", "--workers", "1", "--worker-class", "sync", "--max-requests", "1000", "--preload"]

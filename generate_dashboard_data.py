@@ -103,32 +103,55 @@ def generate_stats():
             # Check if feed has metadata
             has_meta = feed_url in feed_meta
             
-            # Quick feed check (limit to avoid long execution)
+            # Get live feed data for current entry count
+            print(f"  Checking feed: {feed_url[:60]}...")
+            import feedparser
+            feed = feedparser.parse(feed_url)
+            current_entry_count = len(feed.entries) if not feed.bozo else 0
+            
+            # Quick feed check
             feed_check = {
                 'url': feed_url,
                 'has_metadata': has_meta,
                 'last_check': now.isoformat(),
-                'status': 'unknown'
+                'status': 'unknown',
+                'entry_count': current_entry_count
             }
             
             if has_meta:
                 meta = feed_meta[feed_url]
                 feed_check['title'] = meta.get('title', 'Unknown')
                 feed_check['description'] = meta.get('description', '')
-                feed_check['entry_count'] = meta.get('entry_count', 0)
-                if meta.get('entry_count', 0) > 0:
-                    feed_check['status'] = 'healthy'
-                else:
-                    feed_check['status'] = 'no_entries'
+                feed_check['last_post'] = meta.get('last_post')
+                
+            # Determine status based on current data
+            if feed.bozo:
+                feed_check['status'] = 'error'
+                feed_check['error'] = str(feed.bozo_exception) if hasattr(feed, 'bozo_exception') else 'Parse error'
+            elif current_entry_count > 0:
+                feed_check['status'] = 'healthy'
+            else:
+                feed_check['status'] = 'no_entries'
+            
+            # If we don't have metadata title, get it from the feed
+            if not has_meta or not feed_check.get('title'):
+                try:
+                    feed_check['title'] = getattr(feed.feed, 'title', 'Unknown Feed')
+                    feed_check['description'] = getattr(feed.feed, 'description', '')
+                except Exception:
+                    feed_check['title'] = 'Unknown Feed'
+                    feed_check['description'] = ''
             
             stats['feed_health'][feed_url] = feed_check
             
         except Exception as e:
+            print(f"    Error checking feed {feed_url}: {e}")
             stats['feed_health'][feed_url] = {
                 'url': feed_url,
                 'status': 'error',
                 'error': str(e),
-                'last_check': now.isoformat()
+                'last_check': now.isoformat(),
+                'entry_count': 0
             }
     
     return stats

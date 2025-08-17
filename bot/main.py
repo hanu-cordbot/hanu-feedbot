@@ -440,10 +440,21 @@ async def process_feeds_once(client: discord.Client):
         cid = user_map.get(e['feed']) or GLOBAL_FALLBACK_CHANNEL_ID
         if not cid or e['guid'] in seen: 
             continue
-        age = (now - e.get('published', now)).total_seconds() / 3600  # Convert to hours
-        if age > MAX_AGE_HOURS: 
-            continue
+        
+        # Age check (skip in test mode if FORCE_IGNORE_AGE is set)
+        force_ignore_age = os.getenv('FORCE_IGNORE_AGE', 'false').lower() == 'true'
+        if not force_ignore_age:
+            age = (now - e.get('published', now)).total_seconds() / 3600  # Convert to hours
+            if age > MAX_AGE_HOURS: 
+                continue
+        
         new_posts.append(e)
+        
+        # Limit entries in test mode
+        test_entries_count = int(os.getenv('TEST_ENTRIES_COUNT', '999'))
+        if len(new_posts) >= test_entries_count:
+            print(f"🧪 Test mode: Limited to {test_entries_count} entries")
+            break
 
     if not new_posts:
         print("No new entries this cycle.")

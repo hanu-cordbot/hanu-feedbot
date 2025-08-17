@@ -121,8 +121,30 @@ jobs:
         echo "🔧 Force test run: ${{ github.event.inputs.force_test_run }}"
         echo "==============================================="
         
-        # Run the bot with test configuration
-        python cron_worker.py
+        # Debug: Show current seen.json state
+        echo "🔍 Debug: Current seen.json state:"
+        if [ -f "seen.json" ]; then
+          echo "📊 Seen entries count: $(python -c "import json; print(len(json.load(open('seen.json'))))")"
+        else
+          echo "❌ No seen.json found"
+        fi
+        
+        # Debug: Show feed mapping
+        echo "🔍 Debug: Feed mapping:"
+        if [ -f "feed_map.json" ]; then
+          cat feed_map.json
+        else
+          echo "❌ No feed_map.json found"
+        fi
+        
+        # Run the bot with test configuration using test runner
+        python test_cron_worker.py
+        
+        # Debug: Show what changed
+        echo "🔍 Debug: Post-execution state:"
+        if [ -f "seen.json" ]; then
+          echo "📊 New seen entries count: $(python -c "import json; print(len(json.load(open('seen.json'))))")"
+        fi
         
         echo "==============================================="
         echo "✅ Test execution completed"
@@ -139,6 +161,7 @@ jobs:
         MAX_AGE_HOURS: '168'  # 7 days for testing to get more entries
         TEST_MODE: 'true'
         TEST_ENTRIES_COUNT: ${{ github.event.inputs.test_entries_count }}
+        FORCE_TEST_RUN: ${{ github.event.inputs.force_test_run }}
 
     - name: Analyze test results
       run: |
@@ -147,17 +170,17 @@ jobs:
         # Check how many new entries were processed
         if [ -f "seen.json" ]; then
           NEW_COUNT=$(python -c "
-          import json
-          try:
-              with open('seen.json', 'r') as f:
-                  new_seen = json.load(f)
-              with open('seen.json.full_backup', 'r') as f:
-                  old_seen = json.load(f)
-              new_entries = len(new_seen) - len(old_seen)
-              print(f'{max(0, new_entries)}')
-          except:
-              print('0')
-          ")
+import json
+try:
+    with open('seen.json', 'r') as f:
+        new_seen = json.load(f)
+    with open('seen.json.full_backup', 'r') as f:
+        old_seen = json.load(f)
+    new_entries = len(new_seen) - len(old_seen)
+    print(f'{max(0, new_entries)}')
+except:
+    print('0')
+")
           echo "✅ Processed $NEW_COUNT new entries"
         fi
         

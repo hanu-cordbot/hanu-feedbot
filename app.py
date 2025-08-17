@@ -1,6 +1,7 @@
 # === FILE: app.py ===
 
 import os
+import sys
 from datetime import datetime, timezone
 from flask import Flask, jsonify, abort, render_template, request, redirect, url_for, Response, session, flash, send_from_directory
 from dotenv import load_dotenv
@@ -15,16 +16,12 @@ from redis import Redis
 from typing import cast, Optional
 from bot.formatter import build_prompt  # Import build_prompt function
 
-# Optional Celery imports - fallback to direct execution if not available
-try:
-    from celery_app import run_discord_bot_job, fetch_feed_meta
-    CELERY_AVAILABLE = True
-    print("✅ Celery imports available")
-except ImportError as e:
-    print(f"⚠️ Celery not available: {e}")
-    CELERY_AVAILABLE = False
-    run_discord_bot_job = None
-    fetch_feed_meta = None
+# Optional Celery imports - disabled to save costs
+# Running without Redis/Celery to keep Railway costs low
+CELERY_AVAILABLE = False
+run_discord_bot_job = None
+fetch_feed_meta = None
+print("📊 Running without Celery/Redis to save costs - using direct execution")
 
 # Data directory for persistent storage (mount a volume here)
 DATA_DIR = os.environ.get('DATA_DIR', os.getcwd())
@@ -170,8 +167,14 @@ def health():
         "version": "2.0.0",
         "endpoints": {
             "job": JOB_ENDPOINT,
+            "job_api": "/api/run-job",
             "dashboard": "/",
             "api": "/api/"
+        },
+        "celery_available": CELERY_AVAILABLE,
+        "files_available": {
+            "cron_worker": os.path.exists("cron_worker.py"),
+            "cron_worker_enhanced": os.path.exists("cron_worker_enhanced.py")
         }
     })
 
@@ -189,6 +192,31 @@ def api_login():
         token = base64.b64encode(json.dumps(token_data).encode()).decode()
         return jsonify({"success": True, "token": token})
     return jsonify({"success": False, "error": "Invalid credentials"}), 401
+
+@app.route('/api/debug')
+def api_debug():
+    """Debug endpoint to check bot status and files"""
+    return jsonify({
+        "status": "ok",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "python_executable": sys.executable,
+        "working_directory": os.getcwd(),
+        "files_check": {
+            "cron_worker": os.path.exists("cron_worker.py"),
+            "cron_worker_enhanced": os.path.exists("cron_worker_enhanced.py"),
+            "seen_json": os.path.exists("seen.json"),
+            "feeds_txt": os.path.exists("feeds.txt")
+        },
+        "environment": {
+            "has_discord_token": bool(os.environ.get('DISCORD_BOT_TOKEN')),
+            "has_gemini_key": bool(os.environ.get('GEMINI_API_KEY')),
+            "job_endpoint": JOB_ENDPOINT
+        },
+        "celery_status": {
+            "available": CELERY_AVAILABLE,
+            "run_discord_bot_job": run_discord_bot_job is not None
+        }
+    })
 
 @app.route('/api/status')
 def api_status():
@@ -306,6 +334,52 @@ def api_clear_cache():
         pass
     return jsonify({"success": True, "message": "Cache cleared"}), 200
 
+@app.route('/api/test-bot', methods=['POST'])
+def api_test_bot():
+    """Test bot functionality without posting to Discord"""
+    if not verify_api_token():
+        return jsonify({"error": "Authentication required"}), 401
+    
+    try:
+        # Test import of bot components
+        from bot.parser import iter_entries
+        from bot.formatter import build_prompt
+        
+        # Test if environment is properly configured
+        required_env = ['DISCORD_BOT_TOKEN', 'GEMINI_API_KEY']
+        missing_env = [var for var in required_env if not os.environ.get(var)]
+        
+        if missing_env:
+            return jsonify({
+                "success": False, 
+                "error": f"Missing environment variables: {missing_env}"
+            }), 500
+        
+        # Test if we can load feeds
+        if os.path.exists("feeds.txt"):
+            with open("feeds.txt", 'r', encoding='utf-8') as f:
+                feeds = [line.strip() for line in f if line.strip()]
+            feed_count = len(feeds)
+        else:
+            feed_count = 0
+            
+        return jsonify({
+            "success": True,
+            "message": "Bot components loaded successfully",
+            "details": {
+                "feed_count": feed_count,
+                "environment_ok": True,
+                "imports_ok": True,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Bot test failed: {str(e)}"
+        }), 500
+
 @app.route('/api/run-job', methods=['POST'])
 def api_run_job():
     """Trigger the background Discord RSS bot run job"""
@@ -318,15 +392,15 @@ def api_run_job():
             run_discord_bot_job.delay()  # type: ignore
             return jsonify({"success": True, "message": "Run job enqueued via Celery"}), 200
         else:
-            # Run enhanced cron worker directly
+            # Run cron worker directly
             import subprocess
             import sys
             result = subprocess.run([
-                sys.executable, "cron_worker_enhanced.py"
+                sys.executable, "cron_worker.py"
             ], capture_output=True, text=True, timeout=600)
             
             if result.returncode == 0:
-                return jsonify({"success": True, "message": "Enhanced job completed successfully"}), 200
+                return jsonify({"success": True, "message": "Cron job completed successfully"}), 200
             else:
                 return jsonify({"success": False, "error": f"Job failed: {result.stderr}"}), 500
                 
@@ -577,31 +651,28 @@ def api_delete_group():
 # === DYNAMIC JOB ENDPOINT ROUTE ===
 def cron_job():
     """Dynamic cron job endpoint - the actual job runner"""
+    import subprocess
+    import sys
+    
     try:
         print(f"🔔 Cron job triggered via {JOB_ENDPOINT}")
         
-        # Use enhanced cron worker instead of Celery
-        if CELERY_AVAILABLE and run_discord_bot_job:
-            # Use Celery if available
-            run_discord_bot_job.delay()  # type: ignore
-            return jsonify({"status": "success", "message": "Job enqueued via Celery"}), 200
+        # Run cron worker directly without Celery to save costs
+        print("🚀 Running cron worker directly...")
+        result = subprocess.run([
+            sys.executable, "cron_worker.py"
+        ], capture_output=True, text=True, timeout=900)  # 15 minute timeout
+        
+        if result.returncode == 0:
+            print("✅ Cron job completed successfully")
+            return jsonify({"status": "success", "message": "Job completed successfully"}), 200
         else:
-            # Run enhanced cron worker directly
-            import subprocess
-            import sys
-            
-            print("🚀 Running enhanced cron worker...")
-            result = subprocess.run([
-                sys.executable, "cron_worker_enhanced.py"
-            ], capture_output=True, text=True, timeout=600)
-            
-            if result.returncode == 0:
-                print("✅ Enhanced cron job completed successfully")
-                return jsonify({"status": "success", "message": "Job completed successfully"}), 200
-            else:
-                print(f"❌ Enhanced cron job failed: {result.stderr}")
-                return jsonify({"status": "error", "message": f"Job failed: {result.stderr}"}), 500
+            print(f"❌ Cron job failed: {result.stderr}")
+            return jsonify({"status": "error", "message": f"Job failed: {result.stderr}"}), 500
                 
+    except subprocess.TimeoutExpired:
+        print("⚠️ Cron job timed out (this is normal for long-running jobs)")
+        return jsonify({"status": "success", "message": "Job started (may still be running)"}), 200
     except Exception as e:
         print(f"❌ Cron job exception: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500

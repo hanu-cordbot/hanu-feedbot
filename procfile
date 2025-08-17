@@ -1,2 +1,1 @@
 web: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 300 --workers 1 --log-level info
-worker: celery -A celery_app.celery_app worker --beat --loglevel=info
