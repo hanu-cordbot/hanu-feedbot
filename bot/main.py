@@ -167,17 +167,17 @@ def save_seen_guids(guids):
     try:
         client = r2_client()
         if client:
-            import io, gzip
+            import io
             buf = io.BytesIO()
-            with gzip.GzipFile(fileobj=buf, mode='w') as gz:
-                gz.write(json.dumps(list(guids)[-500:]).encode('utf-8'))
+            # Write plain JSON bytes (no gzip)
+            buf.write(json.dumps(list(guids)[-500:]).encode('utf-8'))
             buf.seek(0)
-            # Upload gzipped content as seen.json (compressed)
+            # Upload plain JSON content as seen.json
             try:
                 client.upload_fileobj(buf, SEEN_R2_BUCKET, 'seen.json')
             except TypeError:
                 # Fallback if client.upload_fileobj signature differs
-                client.put_object(Bucket=SEEN_R2_BUCKET, Key='seen.json', Body=buf.getvalue(), ContentEncoding='gzip')
+                client.put_object(Bucket=SEEN_R2_BUCKET, Key='seen.json', Body=buf.getvalue())
     except Exception as e:
         print(f"⚠️ Could not upload seen.json to R2: {e}")
 
