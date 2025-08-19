@@ -33,8 +33,12 @@ def _maybe_fetch_feeds_from_r2():
         target.parent.mkdir(parents=True, exist_ok=True)
         with open(target, 'wb') as f:
             s3.download_fileobj(bucket, 'feeds.txt', f)
-    except Exception:
-        # If anything goes wrong, silently fall back to local feeds.txt
+    except Exception as e:
+        # Surface download error to CI logs so we can debug missing feeds.txt
+        try:
+            print('Could not download feeds.txt from R2:', e)
+        except Exception:
+            pass
         return
 
 # Try to fetch feeds from R2 on import
@@ -56,7 +60,11 @@ def r2_client():
         import boto3
         s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret, endpoint_url=endpoint)
         return s3
-    except Exception:
+    except Exception as e:
+        try:
+            print('r2_client error:', e)
+        except Exception:
+            pass
         return None
 
 # ── Discord text limits & reactions ──────────────────────────────────────
