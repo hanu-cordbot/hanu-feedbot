@@ -186,7 +186,7 @@ jobs:
           echo "✅ State changes committed and pushed (or no changes)"
 
       - name: Persist CI status to repo (docs/devops/last-ci-status.md)
-        if: always() && (secrets.GH_BOT_PAT != '')
+        if: always()
         run: |
           set -e
           git config --local user.email "action@github.com"
@@ -201,8 +201,14 @@ jobs:
           echo "State changed: ${{ env.STATE_CHANGED || 'false' }}" >> docs/devops/last-ci-status.md
           git add docs/devops/last-ci-status.md
           git commit -m "ci: update last CI status - run ${{ github.run_id }}" || echo "No changes to commit"
-          git remote set-url origin https://${{ secrets.GH_BOT_PAT }}@github.com/${{ github.repository }}.git
-          git push origin main || echo "⚠️ Failed to push CI status"
+          # Use GH_BOT_PAT only if provided; don't attempt to push with an empty secret
+          if [ -n "${{ secrets.GH_BOT_PAT }}" ]; then
+            echo "Using GH_BOT_PAT to push CI status"
+            git remote set-url origin https://${{ secrets.GH_BOT_PAT }}@github.com/${{ github.repository }}.git
+            git push origin main || echo "⚠️ Failed to push CI status"
+          else
+            echo "GH_BOT_PAT not set; skipping push of CI status"
+          fi
 
       - name: Upload execution logs
         if: always()
