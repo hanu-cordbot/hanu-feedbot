@@ -1,0 +1,40 @@
+name: Test Facebook download + R2 upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_url:
+        description: 'Facebook post URL to download'
+        required: true
+        default: 'https://www.facebook.com/720895507364955/posts/743124275142078'
+
+jobs:
+  download-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install yt-dlp
+        run: |
+          python -m pip install --upgrade pip
+          pip install yt-dlp boto3
+
+      - name: Run download and upload
+        env:
+          VIDEO_DATA_R2_BUCKET: video-data
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          python tools/download_and_upload_fb.py "${{ inputs.post_url }}"
