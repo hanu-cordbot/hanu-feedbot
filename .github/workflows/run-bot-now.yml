@@ -40,8 +40,6 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
-          GLOBAL_FALLBACK_CHANNEL_ID: ${{ secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
-          CHANNEL_ID: ${{ secrets.TARGET_CHANNEL_ID }}
           GH_BOT_PAT: ${{ secrets.GH_BOT_PAT }}
         run: |
           echo "Starting one-off bot run"
@@ -63,24 +61,24 @@ jobs:
           echo "SEEN_R2_BUCKET='${SEEN_R2_BUCKET}'"
           if [ -f "seen.json" ] && [ -n "${SEEN_R2_BUCKET}" ]; then
             echo "found seen.json; proceeding to upload"
-      python - <<'PY'
+            python - <<'PY'
 import os, io
 import boto3
 try:
-  bucket = os.environ.get('SEEN_R2_BUCKET')
-  if not bucket:
-    print('SEEN_R2_BUCKET not set; skipping upload')
-  else:
-    with open('seen.json','rb') as f:
-      data = f.read()
-    buf = io.BytesIO()
-    buf.write(data)
-    buf.seek(0)
-    s3 = boto3.client('s3', aws_access_key_id=os.environ.get('R2_ACCESS_KEY_ID'), aws_secret_access_key=os.environ.get('R2_SECRET_ACCESS_KEY'), endpoint_url=os.environ.get('R2_ENDPOINT'))
-    s3.put_object(Bucket=bucket, Key='seen.json', Body=buf.getvalue())
-    print('Uploaded seen.json to', bucket)
+    bucket = os.environ.get('SEEN_R2_BUCKET')
+    if not bucket:
+        print('SEEN_R2_BUCKET not set; skipping upload')
+    else:
+        with open('seen.json','rb') as f:
+            data = f.read()
+        buf = io.BytesIO()
+        buf.write(data)
+        buf.seek(0)
+        s3 = boto3.client('s3', aws_access_key_id=os.environ.get('R2_ACCESS_KEY_ID'), aws_secret_access_key=os.environ.get('R2_SECRET_ACCESS_KEY'), endpoint_url=os.environ.get('R2_ENDPOINT'))
+        s3.put_object(Bucket=bucket, Key='seen.json', Body=buf.getvalue())
+        print('Uploaded seen.json to', bucket)
 except Exception as e:
-  print('Failed to upload seen.json:', e)
+    print('Failed to upload seen.json:', e)
 PY
           else
             echo "No seen.json present or SEEN_R2_BUCKET unset; skipping upload"

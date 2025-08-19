@@ -59,24 +59,20 @@ jobs:
           import os
           required = [
               'DISCORD_BOT_TOKEN', 
-              'GEMINI_API_KEY', 
-              'CHANNEL_ID',
-              'GLOBAL_FALLBACK_CHANNEL_ID'
+              'GEMINI_API_KEY'
           ]
           missing = [k for k in required if not os.getenv(k)]
-      if missing:
-        print(f'❌ Missing required secrets: {missing}')
-        print('Please configure these secrets in your repository settings.')
-        exit(1)
-      # Confirm presence only; do NOT print secret values
-      print('✅ All required environment variables present (values hidden)')
-      print(f'⏰ Max age: {os.getenv("MAX_AGE_HOURS", "36")} hours')
+          if missing:
+              print(f'❌ Missing required secrets: {missing}')
+              print('Please configure these secrets in your repository settings.')
+              exit(1)
+          # Confirm presence only; do NOT print secret values
+          print('✅ All required environment variables present (values hidden)')
+          print(f'⏰ Max age: {os.getenv(\"MAX_AGE_HOURS\", \"36\")} hours')
           "
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-          GLOBAL_FALLBACK_CHANNEL_ID: ${{ secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
           MAX_AGE_HOURS: ${{ github.event.inputs.max_age_hours || secrets.MAX_AGE_HOURS || '36' }}
 
       - name: Remove stale lock if force run
@@ -102,9 +98,6 @@ jobs:
           # Discord Configuration
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
-          GLOBAL_FALLBACK_CHANNEL_ID: ${{ secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
-          SUMMARY_CHANNEL_ID: ${{ secrets.SUMMARY_CHANNEL_ID }}
           
           # Gemini AI Configuration
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -118,10 +111,11 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_PUBLIC_BASE: ${{ secrets.R2_PUBLIC_BASE }}
           R2_MAX_BYTES: ${{ secrets.R2_MAX_BYTES || '5000000000' }}
+          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
           
           # Bot Configuration
           MAX_AGE_HOURS: ${{ github.event.inputs.max_age_hours || secrets.MAX_AGE_HOURS || '36' }}
-          FALLBACK_ENABLED: ${{ secrets.FALLBACK_ENABLED || 'true' }}
+          FALLBACK_ENABLED: ${{ secrets.FALLBACK_ENABLED || 'false' }}
           JOB_ENDPOINT: '/job'
           YT_DLP_COOKIES: 'cookies.txt'
           ADMIN_PASS: ${{ secrets.ADMIN_PASS || 'github-actions' }}

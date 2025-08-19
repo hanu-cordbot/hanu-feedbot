@@ -86,7 +86,7 @@ from bot.dispatcher import (
     FACEBOOK_REACTIONS,
 )
 from bot.avatar_cache import maybe_update, avatar_for
-from bot.config import GLOBAL_FALLBACK_CHANNEL_ID, SEEN_R2_BUCKET, r2_client
+from bot.config import SEEN_R2_BUCKET, r2_client
 from bot.facebook_downloader import download_video_ytdlp, normalize_url
 
 print("✅ Configuration loaded.")
@@ -492,11 +492,14 @@ async def process_feeds_once(client: discord.Client):
     except: 
         details_map = {}
 
-    # Collect new entries
+    # Collect new entries - scan ALL feeds but only process those with channel mappings
     new_posts = []
+    scanned_count = 0
     for e in iter_entries():
-        cid = user_map.get(e['feed']) or GLOBAL_FALLBACK_CHANNEL_ID
-        if not cid or e['guid'] in seen: 
+        scanned_count += 1
+        
+        # Skip if already seen
+        if e['guid'] in seen: 
             continue
         
         # Age check (skip in test mode if FORCE_IGNORE_AGE is set)
@@ -511,13 +514,24 @@ async def process_feeds_once(client: discord.Client):
             if age > MAX_AGE_HOURS: 
                 continue
         
-        new_posts.append(e)
+        # Check if this feed has a channel mapping
+        cid = user_map.get(e['feed'])
+        if cid:
+            # Only add entries that have explicit channel mappings
+            e['target_channel'] = int(cid)  # Store the target channel for later processing
+            new_posts.append(e)
+        
+        # Add GUID to seen set regardless of whether it has a channel mapping
+        # This prevents reprocessing the same entries even if they get channel mappings later
+        seen.add(e['guid'])
         
         # Limit entries in test mode
         test_entries_count = int(os.getenv('TEST_ENTRIES_COUNT', '999'))
         if len(new_posts) >= test_entries_count:
             print(f"🧪 Test mode: Limited to {test_entries_count} entries")
             break
+    
+    print(f"📊 Scanned {scanned_count} entries, found {len(new_posts)} with channel mappings")
 
     if not new_posts:
         # Ensure we persist the current seen set (may be freshly initialized)
@@ -528,13 +542,12 @@ async def process_feeds_once(client: discord.Client):
             print("No new entries this cycle.")
         return
 
-    # Bucket by channel
+    # Bucket by channel using the stored target_channel
     channel_groups = defaultdict(list)
     for e in new_posts:
-        cid = user_map.get(e['feed']) or GLOBAL_FALLBACK_CHANNEL_ID
-        if cid is None:
-            continue
-        channel_groups[int(cid)].append(e)
+        ch_id = e.get('target_channel')
+        if ch_id:
+            channel_groups[ch_id].append(e)
 
     # Process each channel
     for ch_id, entries in channel_groups.items():
