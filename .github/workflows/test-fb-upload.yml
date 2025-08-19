@@ -1,4 +1,4 @@
-name: Test Facebook download + R2 upload
+name: Test Facebook Upload to R2
 
 on:
   workflow_dispatch:
@@ -7,12 +7,19 @@ on:
         description: 'Facebook post URL to download'
         required: true
         default: 'https://www.facebook.com/720895507364955/posts/743124275142078'
+        type: string
+      bucket_name:
+        description: 'R2 bucket to upload to'
+        required: false
+        default: 'video-data'
+        type: string
 
 jobs:
-  download-and-upload:
+  test-fb-upload:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -20,21 +27,148 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-
-      - name: Install yt-dlp
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install yt-dlp boto3
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          
+          # Install yt-dlp if not in requirements
+          pip install yt-dlp
 
-      - name: Run download and upload
+      - name: Download and Upload Facebook Video
         env:
-          VIDEO_DATA_R2_BUCKET: video-data
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          POST_URL: ${{ inputs.post_url }}
+          BUCKET_NAME: ${{ inputs.bucket_name }}
         run: |
-          python tools/download_and_upload_fb.py "${{ inputs.post_url }}"
+          echo "🚀 Starting Facebook video download and upload test"
+          echo "📍 Post URL: $POST_URL"
+          echo "🪣 Target bucket: $BUCKET_NAME"
+          
+          # Create empty cookies file if not present
+          if [ ! -f "netscape_cookies.txt" ]; then
+            echo "⚠️ Creating empty netscape_cookies.txt (may limit download capabilities)"
+            touch netscape_cookies.txt
+          fi
+          
+          python - <<'PY'
+import os
+import sys
+import json
+import asyncio
+import tempfile
+import hashlib
+from datetime import datetime
+from pathlib import Path
+
+# Add bot directory to path
+sys.path.insert(0, 'bot')
+
+try:
+    import boto3
+    from facebook_downloader import download_video_ytdlp
+except ImportError as e:
+    print(f"❌ Import error: {e}")
+    sys.exit(1)
+
+def create_r2_client():
+    """Create R2 client"""
+    access_key = os.environ.get('R2_ACCESS_KEY_ID')
+    secret_key = os.environ.get('R2_SECRET_ACCESS_KEY') 
+    endpoint = os.environ.get('R2_ENDPOINT')
+    
+    if not all([access_key, secret_key, endpoint]):
+        print("❌ Missing R2 credentials")
+        return None
+    
+    try:
+        return boto3.client(
+            's3',
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            endpoint_url=endpoint
+        )
+    except Exception as e:
+        print(f"❌ Error creating R2 client: {e}")
+        return None
+
+async def download_and_upload():
+    """Download Facebook video and upload to R2"""
+    post_url = os.environ.get('POST_URL')
+    bucket_name = os.environ.get('BUCKET_NAME', 'video-data')
+    
+    if not post_url:
+        print("❌ POST_URL not provided")
+        return False
+    
+    print(f"📥 Downloading from: {post_url}")
+    
+    # Create temporary directory for download
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Extract post ID for filename
+        post_id = post_url.split('/')[-1]
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        temp_file = os.path.join(temp_dir, f"fb_video_{post_id}_{timestamp}.mp4")
+        
+        # Download video using facebook_downloader
+        try:
+            downloaded_file = await download_video_ytdlp(post_url, temp_file)
+            
+            if not downloaded_file or not os.path.exists(downloaded_file):
+                print("❌ Failed to download video")
+                return False
+            
+            file_size = os.path.getsize(downloaded_file)
+            print(f"✅ Downloaded video: {downloaded_file} ({file_size/1024/1024:.2f}MB)")
+            
+            # Create R2 client
+            r2_client = create_r2_client()
+            if not r2_client:
+                print("❌ Failed to create R2 client")
+                return False
+            
+            # Create key for R2 upload
+            file_hash = hashlib.md5(open(downloaded_file, 'rb').read()).hexdigest()[:8]
+            key = f"facebook_videos/{post_id}_{timestamp}_{file_hash}.mp4"
+            
+            print(f"📤 Uploading to R2 bucket '{bucket_name}' with key: {key}")
+            
+            # Upload to R2
+            try:
+                with open(downloaded_file, 'rb') as f:
+                    r2_client.upload_fileobj(f, bucket_name, key)
+                
+                print(f"✅ Successfully uploaded to R2: {key}")
+                
+                # Verify upload by checking object metadata
+                try:
+                    response = r2_client.head_object(Bucket=bucket_name, Key=key)
+                    print(f"📊 Upload verified - Size: {response['ContentLength']} bytes")
+                    print(f"📅 Last Modified: {response['LastModified']}")
+                    return True
+                except Exception as e:
+                    print(f"⚠️ Upload verification failed: {e}")
+                    return False
+                    
+            except Exception as e:
+                print(f"❌ R2 upload failed: {e}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ Download failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+# Run the test
+if __name__ == "__main__":
+    result = asyncio.run(download_and_upload())
+    if result:
+        print("🎉 Test completed successfully!")
+        sys.exit(0)
+    else:
+        print("❌ Test failed")
+        sys.exit(1)
+PY
