@@ -1,0 +1,176 @@
+name: Run HANU Feed Bot Now
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_age_hours:
+        description: 'Maximum age of posts to process (hours)'
+        required: false
+        default: '36'
+        type: string
+      force_run:
+        description: 'Force run even if lock exists'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run feed bot (one-off)
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
+          GLOBAL_FALLBACK_CHANNEL_ID: ${{ secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
+          CHANNEL_ID: ${{ secrets.TARGET_CHANNEL_ID }}
+          GH_BOT_PAT: ${{ secrets.GH_BOT_PAT }}
+        run: |
+          echo "Starting one-off bot run"
+          # Run the cron worker once; it should respect env inputs
+          python cron_worker.py || python main.py || echo "No main runner found"
+
+      - name: Upload seen.json to R2 (if present)
+        if: always()
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
+        run: |
+          echo "Checking for seen.json to upload to R2"
+          echo "PWD=$(pwd)"
+          echo "Listing repo root:"
+          ls -la
+          echo "SEEN_R2_BUCKET='${SEEN_R2_BUCKET}'"
+          if [ -f "seen.json" ] && [ -n "${SEEN_R2_BUCKET}" ]; then
+            echo "found seen.json; proceeding to upload"
+            python - <<'PY'
+import os, io, gzip
+import boto3
+try:
+    bucket = os.environ.get('SEEN_R2_BUCKET')
+    if not bucket:
+        print('SEEN_R2_BUCKET not set; skipping upload')
+    else:
+        with open('seen.json','rb') as f:
+            data = f.read()
+        buf = io.BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode='w') as gz:
+            gz.write(data)
+        buf.seek(0)
+        s3 = boto3.client('s3', aws_access_key_id=os.environ.get('R2_ACCESS_KEY_ID'), aws_secret_access_key=os.environ.get('R2_SECRET_ACCESS_KEY'), endpoint_url=os.environ.get('R2_ENDPOINT'))
+        s3.put_object(Bucket=bucket, Key='seen.json', Body=buf.getvalue(), ContentEncoding='gzip')
+        print('Uploaded seen.json to', bucket)
+except Exception as e:
+    print('Failed to upload seen.json:', e)
+PY
+          else
+            echo "No seen.json present or SEEN_R2_BUCKET unset; skipping upload"
+          fi
+name: Run HANU Feed Bot Now
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_age_hours:
+        description: 'Maximum age of posts to process (hours)'
+        required: false
+        default: '36'
+        type: string
+      force_run:
+        description: 'Force run even if lock exists'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run feed bot (one-off)
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
+          GLOBAL_FALLBACK_CHANNEL_ID: ${{ secrets.GLOBAL_FALLBACK_CHANNEL_ID }}
+          CHANNEL_ID: ${{ secrets.TARGET_CHANNEL_ID }}
+          GH_BOT_PAT: ${{ secrets.GH_BOT_PAT }}
+        run: |
+          echo "Starting one-off bot run"
+          # Run the cron worker once; it should respect env inputs
+          python cron_worker.py || python main.py || echo "No main runner found"
+
+      - name: Upload seen.json to R2 (if present)
+        if: always()
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
+        run: |
+          echo "Checking for seen.json to upload to R2"
+          echo "PWD=$(pwd)"
+          echo "Listing repo root:"
+          ls -la
+          echo "SEEN_R2_BUCKET='${SEEN_R2_BUCKET}'"
+          if [ -f "seen.json" ] && [ -n "${SEEN_R2_BUCKET}" ]; then
+            echo "found seen.json; proceeding to upload"
+            python - <<'PY'
+import os, io, gzip
+import boto3
+try:
+    bucket = os.environ.get('SEEN_R2_BUCKET')
+    if not bucket:
+        print('SEEN_R2_BUCKET not set; skipping upload')
+    else:
+        with open('seen.json','rb') as f:
+            data = f.read()
+        buf = io.BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode='w') as gz:
+            gz.write(data)
+        buf.seek(0)
+        s3 = boto3.client('s3', aws_access_key_id=os.environ.get('R2_ACCESS_KEY_ID'), aws_secret_access_key=os.environ.get('R2_SECRET_ACCESS_KEY'), endpoint_url=os.environ.get('R2_ENDPOINT'))
+        s3.put_object(Bucket=bucket, Key='seen.json', Body=buf.getvalue(), ContentEncoding='gzip')
+        print('Uploaded seen.json to', bucket)
+except Exception as e:
+    print('Failed to upload seen.json:', e)
+PY
+          else
+            echo "No seen.json present or SEEN_R2_BUCKET unset; skipping upload"
+          fi
