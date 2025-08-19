@@ -520,7 +520,12 @@ async def process_feeds_once(client: discord.Client):
             break
 
     if not new_posts:
-        print("No new entries this cycle.")
+        # Ensure we persist the current seen set (may be freshly initialized)
+        try:
+            save_seen_guids(seen)
+            print("No new entries this cycle. Persisted seen.json.")
+        except Exception:
+            print("No new entries this cycle.")
         return
 
     # Bucket by channel
@@ -579,6 +584,12 @@ async def process_feeds_once(client: discord.Client):
     # Persist thread map
     with open(DETAILS_MAP_FILE, 'w') as f:
         json.dump(details_map, f, indent=2)
+
+    # Always persist seen state at the end of a successful run (final upload to R2)
+    try:
+        save_seen_guids(seen)
+    except Exception as e:
+        print(f"⚠️ Failed to persist final seen state: {e}")
 
     print("✅ Finished per-channel summaries and details threads")
 
