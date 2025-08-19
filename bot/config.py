@@ -16,7 +16,10 @@ FEED_LIST = Path(__file__).resolve().parent.parent / "feeds.txt" # Default: read
 def _maybe_fetch_feeds_from_r2():
     import os
     from pathlib import Path
-    bucket = os.getenv('FEEDS_R2_BUCKET')
+    # Prefer explicit FEEDS_R2_BUCKET, but fall back to SEEN_R2_BUCKET which
+    # the workflow already exposes. This lets CI jobs that only set
+    # SEEN_R2_BUCKET still fetch `feeds.txt` from the same bucket.
+    bucket = os.getenv('FEEDS_R2_BUCKET') or os.getenv('SEEN_R2_BUCKET')
     access_key = os.getenv('R2_ACCESS_KEY_ID')
     secret = os.getenv('R2_SECRET_ACCESS_KEY')
     endpoint = os.getenv('R2_ENDPOINT')
