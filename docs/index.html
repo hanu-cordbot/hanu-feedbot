@@ -231,13 +231,15 @@
         
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         
-        const data = await response.json();
-        feeds = data.feeds || [];
-        metadata = data.metadata || {};
-        groups = data.groups || {};
-        mappings = data.mappings || {};
-        channels = data.channels || [];
-        lastUpdate = data.last_update || null;
+  const data = await response.json();
+  // Support multiple possible shapes from the generator (legacy and newer keys)
+  feeds = data.feeds || [];
+  metadata = data.metadata || data.meta || {};
+  groups = data.groups || {};
+  mappings = data.mappings || data.map || {};
+  channels = data.channels || data.channel_list || [];
+  // last update may be reported as last_update or lastUpdated in different generators
+  lastUpdate = data.last_update || data.lastUpdated || (data.meta && data.meta.lastUpdated) || null;
         
         renderFeeds();
         updateStats();
@@ -477,11 +479,19 @@
     }
 
     function getLastPost(feed) {
-      return metadata[feed.url]?.last_post || feed.lastPost || null;
+      // Try several possible fields produced by different generators
+      return (
+        (metadata && metadata[feed.url] && (metadata[feed.url].last_post || metadata[feed.url].lastUpdated || metadata[feed.url].last_updated)) ||
+        feed.lastPost || feed.last_post || feed.last_updated || null
+      );
     }
 
     function getPageUrl(feed) {
-      return metadata[feed.url]?.page_url || feed.pageUrl || feed.url;
+      // Prefer an explicit page_url from metadata, then feed.pageUrl or feed.page or a facebook_page field
+      return (
+        (metadata && metadata[feed.url] && (metadata[feed.url].page_url || metadata[feed.url].pageUrl)) ||
+        feed.pageUrl || feed.page_url || feed.page || feed.facebook_page || feed.url
+      );
     }
 
     function getGroupName(feed) {
@@ -494,18 +504,24 @@
     }
 
     function getChannelName(feed) {
-      const channelId = mappings[feed.url];
+      // mappings may contain channel id or channel name depending on generator
+      let channelId = (mappings && mappings[feed.url]) || feed.channel || feed.channel_id || (metadata && metadata[feed.url] && metadata[feed.url].channel_id) || null;
       if (!channelId) return 'Not mapped';
-      
-      // Find channel by ID in the channels array and use real Discord name
-      const channel = channels.find(ch => ch.id == channelId);
-      if (channel) {
-        const typeEmoji = channel.type === 'forum' ? '💬' : (channel.type === 'voice' ? '🔊' : '📝');
-        return `${typeEmoji} ${channel.name || `Channel-${channelId.toString().slice(-4)}`}`;
+
+      // If channels array is available, try to resolve id -> real name
+      if (Array.isArray(channels) && channels.length > 0) {
+        const channel = channels.find(ch => String(ch.id) === String(channelId) || ch.name === channelId);
+        if (channel) {
+          const typeEmoji = channel.type === 'forum' ? '💬' : (channel.type === 'voice' ? '🔊' : '📝');
+          return `${typeEmoji} ${channel.name || `Channel-${String(channelId).slice(-4)}`}`;
+        }
       }
-      
-      // Fallback - generate name from ID
-      return `📝 Channel-${channelId.toString().slice(-4)}`;
+
+      // If channelId looks like a numeric id, format a friendly fallback; otherwise assume it's already a human name
+      if (/^\d+$/.test(String(channelId))) {
+        return `📝 Channel-${String(channelId).slice(-4)}`;
+      }
+      return `📝 ${channelId}`;
     }
 
     function isActiveFeed(feed) {
