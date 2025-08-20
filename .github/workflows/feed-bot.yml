@@ -52,77 +52,83 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-    - name: Fetch feed_map.json from R2 (if configured) — verbose
-    run: |
-      python3 - << 'PY'
-      import os, sys, traceback
+      - name: Fetch feed_map.json from R2 (if configured) — verbose
+        run: |
+          python3 - << 'PY'
+          import os, sys, traceback
 
-      def present(name):
-        return bool(os.getenv(name))
+          def present(name):
+            return bool(os.getenv(name))
 
-      envs = [
-        ('R2_BUCKET', 'R2_BUCKET'),
-        ('SEEN_R2_BUCKET', 'SEEN_R2_BUCKET'),
-        ('R2_ACCESS_KEY_ID', 'R2_ACCESS_KEY_ID'),
-        ('R2_SECRET_ACCESS_KEY', 'R2_SECRET_ACCESS_KEY'),
-        ('R2_ENDPOINT', 'R2_ENDPOINT'),
-      ]
+          envs = [
+            ('R2_BUCKET', 'R2_BUCKET'),
+            ('SEEN_R2_BUCKET', 'SEEN_R2_BUCKET'),
+            ('R2_ACCESS_KEY_ID', 'R2_ACCESS_KEY_ID'),
+            ('R2_SECRET_ACCESS_KEY', 'R2_SECRET_ACCESS_KEY'),
+            ('R2_ENDPOINT', 'R2_ENDPOINT'),
+          ]
 
-      print('🔍 R2 env presence:')
-      for k, _ in envs:
-        print(f'  {k}:', 'SET' if present(k) else 'MISSING')
+          print('🔍 R2 env presence:')
+          for k, _ in envs:
+            print(f'  {k}:', 'SET' if present(k) else 'MISSING')
 
-      bucket = os.getenv('R2_BUCKET') or os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET')
-      access = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')
-      secret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')
-      endpoint = os.getenv('R2_ENDPOINT')
+          bucket = os.getenv('R2_BUCKET') or os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET')
+          access = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')
+          secret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')
+          endpoint = os.getenv('R2_ENDPOINT')
 
-      if not bucket or not access or not secret:
-        print('\n⚠️ Missing required R2 credentials — will not attempt download.\n')
-        if not os.path.exists('feed_map.json'):
-          open('feed_map.json', 'w').write('{}')
-          print('📝 Created default empty feed_map.json')
-        sys.exit(0)
+          if not bucket or not access or not secret:
+            print('\n⚠️ Missing required R2 credentials — will not attempt download.\n')
+            # Create an empty feed_map.json so downstream steps see a file rather than fail silently
+            if not os.path.exists('feed_map.json'):
+              open('feed_map.json', 'w').write('{}')
+              print('📝 Created default empty feed_map.json')
+            sys.exit(0)
 
-      try:
-        import boto3
-      except Exception as e:
-        print('❌ boto3 not available in runner:', e)
-        sys.exit(2)
-
-      try:
-        s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
-        s3.download_file(bucket, 'feed_map.json', 'feed_map.json')
-        print('✅ Downloaded feed_map.json from R2')
-        import json
-        with open('feed_map.json','r',encoding='utf-8') as f:
           try:
-            m = json.load(f)
-            print(f"🔎 feed_map.json contains {len(m)} entries; sample keys:")
-            for k in list(m.keys())[:10]:
-              print('  -', k)
+            import boto3
           except Exception as e:
-            print('⚠️ Could not parse feed_map.json:', e)
-      except Exception as e:
-        print('❌ Failed to download feed_map.json:', repr(e))
-        try:
-          resp = s3.list_objects_v2(Bucket=bucket, Prefix='')
-          keys = [o['Key'] for o in resp.get('Contents', [])][:20]
-          print('📦 Bucket sample keys (first 20):')
-          for k in keys:
-            print('  -', k)
-        except Exception as e2:
-          print('⚠️ Could not list bucket contents:', repr(e2))
-        if not os.path.exists('feed_map.json'):
-          open('feed_map.json', 'w').write('{}')
-          print('📝 Created default empty feed_map.json')
-      PY
-    env:
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
-      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+            print('❌ boto3 not available in runner:', e)
+            sys.exit(2)
+
+          try:
+            s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
+            s3.download_file(bucket, 'feed_map.json', 'feed_map.json')
+            print('✅ Downloaded feed_map.json from R2')
+            # print a small sample for debugging
+            import json
+            with open('feed_map.json','r',encoding='utf-8') as f:
+              try:
+                m = json.load(f)
+                print(f"🔎 feed_map.json contains {len(m)} entries; sample keys:")
+                for k in list(m.keys())[:10]:
+                  print('  -', k)
+              except Exception as e:
+                print('⚠️ Could not parse feed_map.json:', e)
+          except Exception as e:
+            print('❌ Failed to download feed_map.json:', repr(e))
+            try:
+              # Try to list objects for diagnostics
+              resp = s3.list_objects_v2(Bucket=bucket, Prefix='')
+              keys = [o['Key'] for o in resp.get('Contents', [])][:20]
+              print('📦 Bucket sample keys (first 20):')
+              for k in keys:
+                print('  -', k)
+            except Exception as e2:
+              print('⚠️ Could not list bucket contents:', repr(e2))
+            # Ensure feed_map.json exists so bot doesn't crash later
+            if not os.path.exists('feed_map.json'):
+              open('feed_map.json', 'w').write('{}')
+              print('📝 Created default empty feed_map.json')
+            # exit non-zero so run shows failure if desired
+            # sys.exit(3)
+          PY
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
       - name: Validate environment variables
         run: |
@@ -137,7 +143,7 @@ jobs:
               print(f'❌ Missing required secrets: {missing}')
               print('Please configure these secrets in your repository settings.')
               exit(1)
-          # Confirm presence only; do NOT print secret values
+          
           print('✅ All required environment variables present (values hidden)')
           print(f'⏰ Max age: {os.getenv(\"MAX_AGE_HOURS\", \"36\")} hours')
           "
