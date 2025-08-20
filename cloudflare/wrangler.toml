@@ -8,6 +8,8 @@ workers_dev = true
 [vars]
 # Backend Railway URL the Worker will proxy to
 RAILWAY_BASE = "https://splendid-eagerness-production-4843.up.railway.app"
+# Prefix inside the bucket where dashboard files are stored (no leading/trailing slash)
+DASHBOARD_PREFIX = "dashboard/data"
 
 # NOTE: This worker has been updated to serve static dashboard data from an R2 bucket.
 # To deploy the R2-backed endpoints you must add an R2 binding and an admin token.
@@ -23,6 +25,3 @@ RAILWAY_BASE = "https://splendid-eagerness-production-4843.up.railway.app"
 [[r2_buckets]]
 binding = "FEEDS_BUCKET"
 bucket_name = "hanu-feedbot-seen"
-
-# Prefix inside the bucket where dashboard files are stored (no leading/trailing slash)
-DASHBOARD_PREFIX = "dashboard/data"
