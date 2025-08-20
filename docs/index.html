@@ -28,9 +28,10 @@
     /* Simple controls */
     .controls { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
     .controls label { font-weight: 500; margin-right: 10px; }
-    .controls a { color: #007bff; text-decoration: none; margin: 0 8px; padding: 4px 8px; border-radius: 4px; }
-    .controls a:hover { text-decoration: underline; background: rgba(0, 123, 255, 0.1); }
-    .controls a.active { font-weight: 600; color: #495057; background: #007bff; color: white; }
+  /* control buttons use same visual system as group headers (muted primary) */
+  .controls a { color: inherit; text-decoration: none; margin: 0 8px; padding: 6px 10px; border-radius: 6px; background: rgba(44,110,164,0.06); border: 1px solid transparent; }
+  .controls a:hover { text-decoration: none; background: rgba(36,90,140,0.12); }
+  .controls a.active { font-weight: 600; background: rgba(44,110,164,0.95); color: #fff; border-color: rgba(0,0,0,0.06); }
     .controls .group-by-section { display: flex; align-items: center; gap: 10px; }
     
     /* Table layout - matching your old design */
@@ -66,13 +67,13 @@
     .group-section.inactive-group { order: 2; }
     .group-section.active-group { order: 1; }
     
-    /* group header visually attached to the table below */
+    /* group header visually attached to the table below; headers connect to each other */
+    .group-section { margin: 6px 0; }
     .group-header { 
       background: rgba(44,110,164,0.95); 
       color: #fff; 
       padding: 10px 15px; 
-      border-top-left-radius: 6px; 
-      border-top-right-radius: 6px; 
+      border-radius: 0; 
       margin-bottom: 0; 
       font-weight: 600; 
       display: flex; 
@@ -84,6 +85,12 @@
       border-bottom: none;
     }
     .group-header:hover { background: rgba(36,90,140,0.98); }
+    /* first header keeps rounded top corners */
+    .group-section:first-child .group-header { border-top-left-radius: 6px; border-top-right-radius: 6px; }
+    /* make content have a matching border and rounded bottom corners */
+    .group-content { border: 1px solid rgba(0,0,0,0.06); border-top: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
+    /* connect adjacent headers by removing spacing between them */
+    .group-section + .group-section { margin-top: 0; }
     .group-header.inactive { background: #6c757d; }
     .group-count { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; }
     .group-arrow { 
