@@ -47,20 +47,78 @@ async function handleRequest(event) {
       return jsonResponse({ ok: true, key }, 200);
     }
 
-    // If no R2 route matched, proxy to Railway backend (preserves admin/auth functionality)
-    // Construct target URL using RAILWAY_BASE env var
-    const targetUrl = `${RAILWAY_BASE}${url.pathname}${url.search}`;
-    const init = {
-      method: request.method,
-      headers: request.headers,
-      body: request.body,
-      redirect: 'follow'
-    };
-    const proxied = await fetch(targetUrl, init);
-    // append CORS headers
-    const newHeaders = new Headers(proxied.headers);
-    Object.entries(corsHeaders()).forEach(([k, v]) => newHeaders.set(k, v));
-    return new Response(proxied.body, { status: proxied.status, headers: newHeaders });
+    // Authentication: POST /api/auth/login -> validate ADMIN_USER/ADMIN_PASS and return token
+    if (request.method === 'POST' && pathname === '/api/auth/login') {
+      const body = await request.json().catch(() => ({}));
+      const username = (body.username || '').toString();
+      const password = (body.password || '').toString();
+      const ADMIN_USER = ADMIN_USER_BINDING || 'admin';
+      const ADMIN_PASS = ADMIN_PASS_BINDING || '';
+      if (username === ADMIN_USER && password === ADMIN_PASS) {
+        const now = Math.floor(Date.now() / 1000);
+        const tokenData = { user: username, exp: now + 3600 };
+        const token = btoa(JSON.stringify(tokenData));
+        return jsonResponse({ success: true, token }, 200);
+      }
+      return jsonResponse({ success: false, error: 'Invalid credentials' }, 401);
+    }
+
+    // Token verification endpoint used by dashboard: GET /api/status
+    if (request.method === 'GET' && pathname === '/api/status') {
+      const auth = request.headers.get('Authorization') || '';
+      if (!auth.startsWith('Bearer ')) return jsonResponse({ error: 'Authentication required' }, 401);
+      const token = auth.slice('Bearer '.length).trim();
+      try {
+        const decoded = JSON.parse(atob(token));
+        if (decoded.exp && decoded.exp > Math.floor(Date.now() / 1000)) {
+          return jsonResponse({ status: 'ok' }, 200);
+        }
+      } catch (e) {}
+      return jsonResponse({ error: 'Authentication required' }, 401);
+    }
+
+    // Admin API: GET /api/feeds (protected) -> return list of feed URLs
+    if (request.method === 'GET' && pathname === '/api/feeds') {
+      if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
+      const obj = await FEEDS_BUCKET.get('data/feeds.json');
+      if (!obj) return jsonResponse({ feeds: [] }, 200);
+      const text = await obj.text();
+      try {
+        const data = JSON.parse(text);
+        // Support both array of strings and new format with objects
+        if (Array.isArray(data)) return jsonResponse({ feeds: data }, 200);
+        if (data.feeds && Array.isArray(data.feeds)) {
+          const urls = data.feeds.map(f => (typeof f === 'string' ? f : f.url)).filter(Boolean);
+          return jsonResponse({ feeds: urls }, 200);
+        }
+        return jsonResponse({ feeds: [] }, 200);
+      } catch (e) {
+        return jsonResponse({ feeds: [] }, 200);
+      }
+    }
+
+    // Admin API: POST /api/feeds (protected) -> add feed URL to feeds.json
+    if (request.method === 'POST' && pathname === '/api/feeds') {
+      if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
+      const body = await request.json().catch(() => ({}));
+      const feedUrl = (body.feedUrl || body.url || '').toString();
+      if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
+      // Read existing
+      const obj = await FEEDS_BUCKET.get('data/feeds.json');
+      let feedsArr = [];
+      if (obj) {
+        try { const existing = JSON.parse(await obj.text()); if (existing.feeds) feedsArr = existing.feeds; else if (Array.isArray(existing)) feedsArr = existing; } catch(e){}
+      }
+      // Normalize entries as objects with url
+      const exists = feedsArr.some(f => (typeof f === 'string' ? f : f.url) === feedUrl);
+      if (!exists) feedsArr.push({ url: feedUrl });
+      const contents = JSON.stringify({ last_updated: new Date().toISOString(), feeds: feedsArr });
+      await FEEDS_BUCKET.put('data/feeds.json', contents, { httpMetadata: { contentType: 'application/json' } });
+      return jsonResponse({ success: true, feed: feedUrl }, 200);
+    }
+
+    // Fallback: route not handled
+    return jsonResponse({ error: 'not_found' }, 404);
 
   } catch (err) {
     return jsonResponse({ error: 'internal_error', message: String(err) }, 500);
