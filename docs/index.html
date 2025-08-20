@@ -335,10 +335,10 @@
         <table class="feeds-table">
             <colgroup>
               <col style="width:50%" />
-              <col style="width:10%" />
-              <col style="width:13%" />
-              <col style="width:13%" />
               <col style="width:14%" />
+              <col style="width:12%" />
+              <col style="width:12%" />
+              <col style="width:12%" />
             </colgroup>
           <thead>
             <tr>
@@ -438,10 +438,10 @@
               <table class="feeds-table" style="border-top-left-radius:0; border-top-right-radius:0; margin-top:0;">
                 <colgroup>
                   <col style="width:50%" />
-                  <col style="width:10%" />
-                  <col style="width:13%" />
-                  <col style="width:13%" />
                   <col style="width:14%" />
+                  <col style="width:12%" />
+                  <col style="width:12%" />
+                  <col style="width:12%" />
                 </colgroup>
                 <thead>
                   <tr>
@@ -530,7 +530,9 @@
 
     // Helper functions
     function getTitle(feed) {
-      return metadata[feed.url]?.title || feed.title || 'Unknown Feed';
+      const raw = metadata[feed.url]?.title || feed.title || 'Unknown Feed';
+      // Remove common suffixes like " on Facebook" (case-insensitive) for cleaner display
+      return String(raw).replace(/\s+on facebook$/i, '').trim();
     }
 
     function getLastPost(feed) {
