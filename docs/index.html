@@ -34,11 +34,12 @@
   .controls a.active { font-weight: 600; background: rgba(44,110,164,0.95); color: #fff; border-color: rgba(0,0,0,0.06); }
     .controls .group-by-section { display: flex; align-items: center; gap: 10px; }
     
-    /* Table layout - matching your old design */
-    .feeds-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    .feeds-table th, .feeds-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e9ecef; }
-    .feeds-table th { background: #f8f9fa; font-weight: 600; color: #495057; font-size: 0.9rem; }
-    .feeds-table tbody tr:hover { background: #f8f9fa; }
+  /* Table layout - matching your old design */
+  .feeds-table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: fixed; }
+  .feeds-table th, .feeds-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e9ecef; }
+  .feeds-table th { background: #f8f9fa; font-weight: 600; color: #495057; font-size: 0.9rem; }
+  .feeds-table tbody tr:hover { background: #f8f9fa; }
+  .feeds-table td, .feeds-table th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     
     /* Feed row styling */
     .feed-name { font-weight: 500; color: #495057; }
@@ -246,13 +247,15 @@
         
   const data = await response.json();
   // Support multiple possible shapes from the generator (legacy and newer keys)
-  feeds = data.feeds || [];
-  metadata = data.metadata || data.meta || {};
-  groups = data.groups || {};
-  mappings = data.mappings || data.map || {};
-  channels = data.channels || data.channel_list || [];
-  // last update may be reported as last_update or lastUpdated in different generators
-  lastUpdate = data.last_update || data.lastUpdated || (data.meta && data.meta.lastUpdated) || null;
+  feeds = data.feeds || data.stats?.feeds || [];
+  metadata = data.metadata || data.meta || data.stats?.metadata || {};
+  groups = data.groups || data.stats?.groups || {};
+  mappings = data.mappings || data.map || data.stats?.mappings || {};
+  channels = data.channels || data.channel_list || data.stats?.channels || [];
+  // last update may be reported in multiple places depending on generator
+  lastUpdate = data.last_update || data.lastUpdated || data.last_updated ||
+         (data.stats && (data.stats.last_updated || data.stats.lastUpdated)) ||
+         (data.meta && (data.meta.lastUpdated || data.meta.last_updated)) || null;
         
         renderFeeds();
         updateStats();
@@ -478,13 +481,20 @@
 
       document.getElementById('active-feeds').textContent = activeFeeds.length;
       document.getElementById('total-feeds').textContent = feeds.length;
-      // Show only time, full datetime on hover
+      // Show only time, full datetime on hover and allow click to toggle
       const elLast = document.getElementById('last-update');
       if (lastUpdate) {
         const dt = new Date(lastUpdate);
         elLast.textContent = dt.toLocaleTimeString();
         // Full datetime tooltip on value
         elLast.title = dt.toLocaleString();
+        // Store full datetime on dataset for toggling
+        elLast.dataset.full = dt.toLocaleString();
+        elLast.dataset.short = dt.toLocaleTimeString();
+        // toggle on click
+        elLast.onclick = () => {
+          if (elLast.textContent === elLast.dataset.short) elLast.textContent = elLast.dataset.full; else elLast.textContent = elLast.dataset.short;
+        };
         // Explanatory tooltip on label
         const label = elLast.nextElementSibling;
         if (label && label.classList.contains('stat-label')) {
@@ -495,6 +505,7 @@
       } else {
         elLast.textContent = '--';
         elLast.removeAttribute('title');
+  elLast.onclick = null;
         const label = elLast.nextElementSibling;
         if (label && label.classList.contains('stat-label')) {
           label.removeAttribute('title');
