@@ -74,6 +74,74 @@ except Exception as e:
     print('Wrote empty feed_map.json')
 PY
 
+    - name: Debug R2 bucket and preview feed_map
+    env:
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    run: |
+      python - << 'PY'
+import os, sys, json
+bucket = os.getenv('R2_BUCKET')
+access = os.getenv('R2_ACCESS_KEY_ID')
+secret = os.getenv('R2_SECRET_ACCESS_KEY')
+endpoint = os.getenv('R2_ENDPOINT')
+if not bucket or not access or not secret:
+  print('R2 creds missing, skipping debug listing')
+  sys.exit(0)
+try:
+  import boto3
+  s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
+  print('Listing up to 100 keys in bucket:', bucket)
+  resp = s3.list_objects_v2(Bucket=bucket, Prefix='')
+  keys = [o['Key'] for o in resp.get('Contents', [])]
+  print('Found', len(keys), 'objects (showing first 100):')
+  for k in keys[:100]:
+    print(' -', k)
+except Exception as e:
+  print('Failed to list bucket contents:', e)
+
+# Locate downloaded feed_map file if present or try to fetch fallback keys
+local_candidates = ['docs/data/feed_map.json', 'feed_map.json']
+found = None
+for p in local_candidates:
+  if os.path.exists(p):
+    found = p
+    break
+
+if not found:
+  print('No local feed_map.json found at expected locations; attempting to download docs/data/feed_map.json directly for debug')
+  try:
+    s3.download_file(bucket, 'docs/data/feed_map.json', 'docs/data/feed_map.json')
+    found = 'docs/data/feed_map.json'
+    print('Downloaded docs/data/feed_map.json for debug')
+  except Exception as e:
+    print('Could not download docs/data/feed_map.json:', e)
+
+if found:
+  print('Using feed_map at', found)
+  try:
+    with open(found, 'r', encoding='utf-8') as f:
+      m = json.load(f)
+    # write preview into docs/data for artifact
+    os.makedirs('docs/data', exist_ok=True)
+    preview_path = 'docs/data/feed_map_preview.json'
+    with open(preview_path, 'w', encoding='utf-8') as out:
+      json.dump({'source': found, 'sample_keys': list(m.keys())[:50], 'len': len(m)}, out, indent=2, ensure_ascii=False)
+    print('Wrote preview to', preview_path)
+  except Exception as e:
+    print('Failed reading/parsing feed_map.json:', e)
+else:
+  print('No feed_map.json available locally or in R2 under docs/data/feed_map.json')
+PY
+
+    - name: Upload feed_map preview artifact
+    uses: actions/upload-artifact@v4
+    with:
+      name: feed_map_preview
+      path: docs/data/feed_map_preview.json
+
       - name: Fetch channel names (CI only)
         if: secrets.DISCORD_BOT_TOKEN != ''
         env:
