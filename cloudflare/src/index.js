@@ -47,8 +47,20 @@ async function handleRequest(event) {
       return jsonResponse({ ok: true, key }, 200);
     }
 
-    // Fallback: unknown route
-    return jsonResponse({ error: 'not_found' }, 404);
+    // If no R2 route matched, proxy to Railway backend (preserves admin/auth functionality)
+    // Construct target URL using RAILWAY_BASE env var
+    const targetUrl = `${RAILWAY_BASE}${url.pathname}${url.search}`;
+    const init = {
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      redirect: 'follow'
+    };
+    const proxied = await fetch(targetUrl, init);
+    // append CORS headers
+    const newHeaders = new Headers(proxied.headers);
+    Object.entries(corsHeaders()).forEach(([k, v]) => newHeaders.set(k, v));
+    return new Response(proxied.body, { status: proxied.status, headers: newHeaders });
 
   } catch (err) {
     return jsonResponse({ error: 'internal_error', message: String(err) }, 500);
