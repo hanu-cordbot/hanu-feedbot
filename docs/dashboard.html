@@ -210,20 +210,34 @@
     import HanuAuth from './shared/auth.js';
     import HanuAPI, { runBotTest } from './shared/api.js';
 
-    // Initialization: wait for DOM and auth, then load dashboard
+    // Initialization: wait for DOM and auth (unless local data mode), then load dashboard
     document.addEventListener('DOMContentLoaded', async () => {
       // Setup auth UI elements
       HanuAuth.setupAuthUI();
-      // Block until user logs in
-      await HanuAuth.requireLogin();
-      // Fetch channels (with names) to populate mappings
+
+      // If local data sync is enabled (GitHub Pages static mode), skip login and show a read-only UI
+      const localDataMode = (window.CONFIG && window.CONFIG.DATA_SYNC && window.CONFIG.DATA_SYNC.enabled) || false;
+      if (!localDataMode) {
+        // Block until user logs in for full admin functionality
+        await HanuAuth.requireLogin();
+      } else {
+        // Hide auth UI and show main content in read-only mode
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('main-content').classList.remove('hidden');
+        // Display a notice about read-only mode (optional)
+        const status = document.getElementById('auth-status');
+        if (status) {
+          status.innerText = '🔎 Read-only local data mode enabled (no login required). Some actions are disabled.';
+        }
+      }
+
+      // Fetch channels (with names) to populate mappings; in local mode this will attempt local data
       await loadChannels();
-      // Switch UI to main content
-      document.getElementById('auth-section').classList.add('hidden');
-      document.getElementById('main-content').classList.remove('hidden');
+
       // Load all data and start refresh
       await loadDashboardData();
       setupPerformanceChart();
+
       // Only auto-refresh in non-GitHub Pages environments to allow backend idling
       if (!window.location.hostname.endsWith('github.io')) {
         startAutoRefresh();
