@@ -34,6 +34,46 @@ jobs:
             python -m pytest -q || true
           fi
 
+    - name: Fetch feed_map.json from R2 (if configured)
+    env:
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    run: |
+      python - << 'PY'
+import os, sys
+bucket = os.getenv('R2_BUCKET')
+access = os.getenv('R2_ACCESS_KEY_ID')
+secret = os.getenv('R2_SECRET_ACCESS_KEY')
+endpoint = os.getenv('R2_ENDPOINT')
+if not bucket or not access or not secret:
+  print('R2 credentials not present; skipping fetch of feed_map.json')
+  sys.exit(0)
+try:
+  import boto3
+  s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
+  # Try docs/data/feed_map.json first (dashboard storage), fallback to root feed_map.json
+  tried = []
+  for key in ['docs/data/feed_map.json', 'feed_map.json']:
+    try:
+      s3.download_file(bucket, key, os.path.basename(key))
+      print('Downloaded', key)
+      break
+    except Exception as e:
+      tried.append((key, str(e)))
+  else:
+    print('Could not download feed_map.json from R2; attempts:')
+    for k, err in tried:
+      print(' -', k, err)
+except Exception as e:
+  print('boto3 not available or download failed:', e)
+  # ensure a file exists so generator doesn't crash
+  if not os.path.exists('feed_map.json'):
+    open('feed_map.json','w').write('{}')
+    print('Wrote empty feed_map.json')
+PY
+
       - name: Fetch channel names (CI only)
         if: secrets.DISCORD_BOT_TOKEN != ''
         env:
