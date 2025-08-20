@@ -8,3 +8,15 @@ workers_dev = true
 [vars]
 # Backend Railway URL the Worker will proxy to
 RAILWAY_BASE = "https://splendid-eagerness-production-4843.up.railway.app"
+
+# NOTE: This worker has been updated to serve static dashboard data from an R2 bucket.
+# To deploy the R2-backed endpoints you must add an R2 binding and an admin token.
+# Example wrangler bindings (do NOT commit secrets):
+#
+# [[r2_buckets]]
+# binding = "FEEDS_BUCKET"
+# bucket_name = "hanu-feedbot-feeds"
+#
+# To provide an admin token for write access, set a secret:
+#   wrangler secret put ADMIN_TOKEN
+#
