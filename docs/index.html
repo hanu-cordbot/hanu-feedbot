@@ -47,10 +47,11 @@
     .feed-link:hover { text-decoration: underline; }
     
     /* Status indicators */
-    .status { padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
-    .status-active { background: #d4edda; color: #155724; }
-    .status-inactive { background: #f8d7da; color: #721c24; }
-  .status-unmapped { background: #fff3cd; color: #856404; }
+  .status { padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: 500; }
+  /* more muted / lower-luminance colors */
+  .status-active { background: #eaf6ef; color: #1c5b34; }
+  .status-inactive { background: #fbefef; color: #6b2a2a; }
+  .status-unmapped { background: #fff8ea; color: #6f5a10; }
     
     /* Admin link */
     .admin-link { position: fixed; bottom: 20px; right: 20px; background: #007bff; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
@@ -65,20 +66,24 @@
     .group-section.inactive-group { order: 2; }
     .group-section.active-group { order: 1; }
     
+    /* group header visually attached to the table below */
     .group-header { 
-      background: #007bff; 
-      color: white; 
+      background: rgba(44,110,164,0.95); 
+      color: #fff; 
       padding: 10px 15px; 
-      border-radius: 6px; 
-      margin-bottom: 10px; 
+      border-top-left-radius: 6px; 
+      border-top-right-radius: 6px; 
+      margin-bottom: 0; 
       font-weight: 600; 
       display: flex; 
       justify-content: space-between; 
       align-items: center;
       cursor: pointer;
       user-select: none;
+      border: 1px solid rgba(0,0,0,0.06);
+      border-bottom: none;
     }
-    .group-header:hover { background: #0056b3; }
+    .group-header:hover { background: rgba(36,90,140,0.98); }
     .group-header.inactive { background: #6c757d; }
     .group-count { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; }
     .group-arrow { 
@@ -298,6 +303,8 @@
       } else {
         renderFlatView(filteredFeeds);
       }
+    // Re-parse emojis after rendering to keep them stable
+    try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (e) {}
     }
 
     // Return status: 'active', 'unmapped', or 'inactive'
@@ -411,7 +418,7 @@
               <span class="group-count">${groupFeeds.length}</span>
             </div>
             <div class="group-content" id="${groupId}">
-              <table class="feeds-table">
+              <table class="feeds-table" style="border-top-left-radius:0; border-top-right-radius:0; margin-top:0;">
                 <thead>
                   <tr>
                     <th>Name</th>
