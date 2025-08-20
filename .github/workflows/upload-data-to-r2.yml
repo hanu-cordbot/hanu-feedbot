@@ -14,34 +14,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload docs/data/*.json to R2
+      - name: Upload docs/data/*.json to R2 (S3-compatible via aws-cli)
         env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          FEEDS_R2_BUCKET: ${{ secrets.FEEDS_R2_BUCKET }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
           set -e
-          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ] || [ -z "$R2_BUCKET_NAME" ]; then
-            echo "Missing required secrets: CF_API_TOKEN, CF_ACCOUNT_ID, R2_BUCKET_NAME"
+          # Determine bucket name (prefer FEEDS_R2_BUCKET, fall back to R2_BUCKET)
+          BUCKET="${FEEDS_R2_BUCKET:-$R2_BUCKET}"
+          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$BUCKET" ]; then
+            echo "Missing required secrets: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, and FEEDS_R2_BUCKET or R2_BUCKET"
             exit 1
           fi
+
+          echo "Installing awscli v2"
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+          unzip -q awscliv2.zip
+          sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin || true
+
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION="us-east-1"
 
           for f in docs/data/*.json; do
             [ -f "$f" ] || continue
             key="data/$(basename "$f")"
-            echo "Uploading $f -> $key"
-            resp=$(curl -sS -w "\n%{http_code}" -X PUT \
-              -H "Authorization: Bearer $CF_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              --data-binary @"$f" \
-              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/$R2_BUCKET_NAME/objects/$key")
-
-            status=$(echo "$resp" | tail -n1)
-            body=$(echo "$resp" | sed '$d')
-            if [ "$status" != "200" ] && [ "$status" != "201" ]; then
-              echo "Upload failed for $f (HTTP $status)"
-              echo "$body"
-              exit 1
-            fi
-            echo "Uploaded $f (HTTP $status)"
+            echo "Uploading $f -> s3://$BUCKET/$key (endpoint: $R2_ENDPOINT)"
+            aws --endpoint-url "$R2_ENDPOINT" s3 cp "$f" "s3://$BUCKET/$key" --acl public-read
+            echo "Uploaded $f"
           done
