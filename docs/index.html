@@ -50,6 +50,7 @@
     .status { padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
     .status-active { background: #d4edda; color: #155724; }
     .status-inactive { background: #f8d7da; color: #721c24; }
+  .status-unmapped { background: #fff3cd; color: #856404; }
     
     /* Admin link */
     .admin-link { position: fixed; bottom: 20px; right: 20px; background: #007bff; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
@@ -264,7 +265,7 @@
         return;
       }
 
-      // Apply filtering
+  // Apply filtering
       let filteredFeeds = feeds.filter(feed => {
         if (currentFilter === 'all') return true;
         const isActive = isActiveFeed(feed);
@@ -299,6 +300,17 @@
       }
     }
 
+    // Return status: 'active', 'unmapped', or 'inactive'
+    function getFeedStatus(feed) {
+      const channelId = mappings[feed.url] || feed.channel;
+      const lastPost = getLastPost(feed);
+      const hasRecent = lastPost && (Date.now() - new Date(lastPost)) <= (14 * 24 * 60 * 60 * 1000);
+
+      if (channelId) return 'active';
+      if (hasRecent) return 'unmapped';
+      return 'inactive';
+    }
+
     function renderFlatView(feedList) {
       const container = document.getElementById('feeds-container');
       
@@ -320,8 +332,10 @@
         const title = getTitle(feed);
         const lastPost = formatDate(getLastPost(feed));
         const pageUrl = getPageUrl(feed);
-        const isActive = isActiveFeed(feed);
-        const channelName = getChannelName(feed);
+  const status = getFeedStatus(feed);
+  const isActive = status === 'active';
+  const isUnmapped = status === 'unmapped';
+  const channelName = getChannelName(feed);
 
         html += `
           <tr>
@@ -330,8 +344,8 @@
               <small style="color: #666;">${getGroupName(feed)}</small>
             </td>
             <td>
-              <span class="status ${isActive ? 'status-active' : 'status-inactive'}">
-                ${isActive ? '🟢 Active' : '🔴 Inactive'}
+              <span class="status ${isActive ? 'status-active' : (isUnmapped ? 'status-unmapped' : 'status-inactive')}">
+                ${isActive ? '🟢 Active' : (isUnmapped ? '� Unmapped' : '�🔴 Inactive')}
               </span>
             </td>
             <td class="feed-date">${lastPost}</td>
@@ -348,7 +362,7 @@
     function renderGroupedView(feedList) {
       const container = document.getElementById('feeds-container');
       
-      // Group feeds based on currentGroupBy
+    // Group feeds based on currentGroupBy
       const groupedFeeds = {};
       feedList.forEach(feed => {
         let groupKey;
@@ -357,7 +371,9 @@
             groupKey = getGroupName(feed) || 'Other';
             break;
           case 'status':
-            groupKey = isActiveFeed(feed) ? 'Active' : 'Inactive';
+      // Add Unmapped between Active and Inactive
+      const st = getFeedStatus(feed);
+      groupKey = st === 'active' ? 'Active' : (st === 'unmapped' ? 'Unmapped' : 'Inactive');
             break;
           default:
             groupKey = 'All';
