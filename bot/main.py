@@ -486,6 +486,14 @@ async def process_feeds_once(client: discord.Client):
             user_map = json.load(f)
     except Exception:
         user_map = {}
+    # Debug: surface how many mappings we loaded and a small sample
+    try:
+        print(f"🔎 Loaded feed_map.json with {len(user_map)} mappings")
+        if user_map:
+            sample_keys = list(user_map.keys())[:10]
+            print(f"🔎 Sample feed_map keys: {sample_keys}")
+    except Exception:
+        pass
     try:
         with open(DETAILS_MAP_FILE) as f: 
             details_map = json.load(f)
@@ -495,6 +503,7 @@ async def process_feeds_once(client: discord.Client):
     # Collect new entries - scan ALL feeds but only process those with channel mappings
     new_posts = []
     scanned_count = 0
+    unmatched_examples = set()
     for e in iter_entries():
         scanned_count += 1
         
@@ -515,11 +524,20 @@ async def process_feeds_once(client: discord.Client):
                 continue
         
         # Check if this feed has a channel mapping
-        cid = user_map.get(e['feed'])
+        # Try a couple of normalized fallbacks to avoid accidental mismatch (trailing slashes/whitespace)
+        raw_feed = e.get('feed')
+        cid = None
+        try:
+            cid = user_map.get(raw_feed) or user_map.get(str(raw_feed).strip()) or user_map.get(str(raw_feed).rstrip('/'))
+        except Exception:
+            cid = user_map.get(raw_feed)
         if cid:
             # Only add entries that have explicit channel mappings
             e['target_channel'] = int(cid)  # Store the target channel for later processing
             new_posts.append(e)
+        else:
+            if raw_feed and len(unmatched_examples) < 10:
+                unmatched_examples.add(raw_feed)
         
         # Add GUID to seen set regardless of whether it has a channel mapping
         # This prevents reprocessing the same entries even if they get channel mappings later
@@ -532,6 +550,12 @@ async def process_feeds_once(client: discord.Client):
             break
     
     print(f"📊 Scanned {scanned_count} entries, found {len(new_posts)} with channel mappings")
+
+    if unmatched_examples:
+        try:
+            print(f"⚠️ Sample unmatched feeds (first {len(unmatched_examples)}): {list(unmatched_examples)}")
+        except Exception:
+            pass
 
     if not new_posts:
         # Ensure we persist the current seen set (may be freshly initialized)
