@@ -123,6 +123,13 @@ def generate_stats():
                 feed_check['title'] = meta.get('title', 'Unknown')
                 feed_check['description'] = meta.get('description', '')
                 feed_check['last_post'] = meta.get('last_post')
+                # If metadata contains a page URL, propagate it here
+                if 'page_url' in meta:
+                    feed_check['page_url'] = meta.get('page_url')
+                elif 'page' in meta:
+                    feed_check['page_url'] = meta.get('page')
+                elif 'pageUrl' in meta:
+                    feed_check['page_url'] = meta.get('pageUrl')
                 
             # Determine status based on current data
             if feed.bozo:
@@ -138,9 +145,21 @@ def generate_stats():
                 try:
                     feed_check['title'] = getattr(feed.feed, 'title', 'Unknown Feed')
                     feed_check['description'] = getattr(feed.feed, 'description', '')
+                    # Try to capture the canonical page URL from the feed (often feed.feed.link)
+                    page_link = getattr(feed.feed, 'link', None)
+                    if page_link:
+                        feed_check.setdefault('page_url', page_link)
                 except Exception:
                     feed_check['title'] = 'Unknown Feed'
                     feed_check['description'] = ''
+
+            # Attach any channel mapping we know from feed_map (may be id or name)
+            try:
+                channel_map = feed_map.get(feed_url)
+                if channel_map:
+                    feed_check['channel'] = channel_map
+            except Exception:
+                pass
             
             stats['feed_health'][feed_url] = feed_check
             
