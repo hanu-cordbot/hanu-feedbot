@@ -156,7 +156,7 @@ def generate_stats():
     
     return stats
 
-def generate_feeds_data():
+def generate_feeds_data(stats=None):
     """Generate feeds data for the dashboard"""
     print("📡 Generating feeds data...")
     
@@ -176,23 +176,50 @@ def generate_feeds_data():
             feeds = [line.strip() for line in f if line.strip() and not line.startswith('#')]
     
     for feed_url in feeds:
+        # Build canonical feed object with fallbacks from stats and feed_meta
         feed_info = {
             'url': feed_url,
             'title': 'Unknown Feed',
             'description': '',
             'entry_count': 0,
+            # canonical last_post field (prefer stats.feed_health > feed_meta)
+            'last_post': None,
             'last_updated': None,
-            'has_metadata': feed_url in feed_meta
+            'has_metadata': feed_url in feed_meta,
+            # optional channel mapping (feed_map), may be id or name
+            'channel': feed_map.get(feed_url)
         }
         
+        # Merge feed_meta values if present
         if feed_url in feed_meta:
             meta = feed_meta[feed_url]
             feed_info.update({
                 'title': meta.get('title', 'Unknown Feed'),
                 'description': meta.get('description', ''),
                 'entry_count': meta.get('entry_count', 0),
-                'last_updated': meta.get('last_updated')
+                'last_updated': meta.get('last_updated'),
+                # prefer explicit page_url from metadata
+                'page_url': meta.get('page_url') or meta.get('pageUrl') or meta.get('page')
             })
+
+        # If stats were provided, prefer last_post from stats.feed_health
+        try:
+            if stats and isinstance(stats, dict):
+                fh = stats.get('feed_health', {})
+                stat_entry = fh.get(feed_url) if fh else None
+                if stat_entry:
+                    # prefer last_post from stats health
+                    lp = stat_entry.get('last_post') or stat_entry.get('lastPost') or stat_entry.get('last_post')
+                    if lp:
+                        feed_info['last_post'] = lp
+                    # if page_url missing, try title/url from stats entry
+                    if not feed_info.get('page_url'):
+                        feed_info['page_url'] = stat_entry.get('page_url') or stat_entry.get('page')
+                    # merge entry_count if available
+                    if 'entry_count' in stat_entry and (not feed_info.get('entry_count')):
+                        feed_info['entry_count'] = stat_entry.get('entry_count')
+        except Exception:
+            pass
         
         feeds_data['feeds'].append(feed_info)
     
@@ -237,20 +264,20 @@ def main():
         # Generate stats
         stats = generate_stats()
         save_json_file('docs/data/stats.json', {'stats': stats})
-        
-        # Generate feeds data
-        feeds_data = generate_feeds_data()
+
+        # Generate feeds data (pass stats so feeds can inherit canonical fields)
+        feeds_data = generate_feeds_data(stats=stats)
         save_json_file('docs/data/feeds.json', feeds_data)
-        
+
         # Generate meta data
         meta_data = generate_meta_data()
         save_json_file('docs/data/meta.json', meta_data)
-        
+
         print("\n✅ Dashboard data generation completed!")
         print(f"📊 Generated stats for {stats['total_feeds']} feeds")
         print(f"📡 Processed {len(feeds_data['feeds'])} feed entries")
         print(f"🔍 Configured {len(meta_data['channels'])} channels")
-        
+
     except Exception as e:
         print(f"❌ Error generating dashboard data: {e}")
         import traceback
