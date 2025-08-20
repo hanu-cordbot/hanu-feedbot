@@ -345,7 +345,7 @@
             </td>
             <td>
               <span class="status ${isActive ? 'status-active' : (isUnmapped ? 'status-unmapped' : 'status-inactive')}">
-                ${isActive ? '🟢 Active' : (isUnmapped ? '� Unmapped' : '�🔴 Inactive')}
+                ${isActive ? '🟢 Active' : (isUnmapped ? '🟡 Unmapped' : '🔴 Inactive')}
               </span>
             </td>
             <td class="feed-date">${lastPost}</td>
@@ -426,8 +426,8 @@
                     <tr>
                       <td class="feed-name">${getTitle(feed)}</td>
                       <td>
-                        <span class="status ${isActiveFeed(feed) ? 'status-active' : 'status-inactive'}">
-                          ${isActiveFeed(feed) ? '🟢 Active' : '🔴 Inactive'}
+                        <span class="status ${getFeedStatus(feed) === 'active' ? 'status-active' : (getFeedStatus(feed) === 'unmapped' ? 'status-unmapped' : 'status-inactive')}">
+                          ${getFeedStatus(feed) === 'active' ? '🟢 Active' : (getFeedStatus(feed) === 'unmapped' ? '� Unmapped' : '🔴 Inactive')}
                         </span>
                       </td>
                       <td class="feed-date">${formatDate(getLastPost(feed))}</td>
