@@ -56,8 +56,8 @@
   .status-unmapped { background: #fff8ea; color: #6f5a10; }
     
     /* Admin link */
-    .admin-link { position: fixed; bottom: 20px; right: 20px; background: #007bff; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-    .admin-link:hover { background: #0056b3; }
+  .admin-link { position: fixed; bottom: 20px; right: 20px; background: #6c757d; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+  .admin-link:hover { background: #565e64; }
     
     /* Loading/error states */
     .loading, .error { text-align: center; padding: 40px; color: #6c757d; }
@@ -333,6 +333,13 @@
       
       let html = `
         <table class="feeds-table">
+            <colgroup>
+              <col style="width:50%" />
+              <col style="width:10%" />
+              <col style="width:13%" />
+              <col style="width:13%" />
+              <col style="width:14%" />
+            </colgroup>
           <thead>
             <tr>
               <th>Name</th>
@@ -429,6 +436,13 @@
             </div>
             <div class="group-content" id="${groupId}">
               <table class="feeds-table" style="border-top-left-radius:0; border-top-right-radius:0; margin-top:0;">
+                <colgroup>
+                  <col style="width:50%" />
+                  <col style="width:10%" />
+                  <col style="width:13%" />
+                  <col style="width:13%" />
+                  <col style="width:14%" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -444,7 +458,7 @@
                       <td class="feed-name">${getTitle(feed)}</td>
                       <td>
                         <span class="status ${getFeedStatus(feed) === 'active' ? 'status-active' : (getFeedStatus(feed) === 'unmapped' ? 'status-unmapped' : 'status-inactive')}">
-                          ${getFeedStatus(feed) === 'active' ? '🟢 Active' : (getFeedStatus(feed) === 'unmapped' ? '� Unmapped' : '🔴 Inactive')}
+                          ${getFeedStatus(feed) === 'active' ? '🟢 Active' : (getFeedStatus(feed) === 'unmapped' ? '🟡 Unmapped' : '🔴 Inactive')}
                         </span>
                       </td>
                       <td class="feed-date">${formatDate(getLastPost(feed))}</td>
