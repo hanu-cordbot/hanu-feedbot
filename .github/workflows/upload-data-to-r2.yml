@@ -39,9 +39,14 @@ jobs:
           export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
           export AWS_DEFAULT_REGION="us-east-1"
 
+          # Use dashboard prefix if provided, default to 'dashboard/data'
+          PREFIX="${{ secrets.DASHBOARD_PREFIX || 'dashboard/data' }}"
+          # Trim slashes
+          PREFIX=$(echo "$PREFIX" | sed 's#^/*##; s#/*$##')
+
           for f in docs/data/*.json; do
             [ -f "$f" ] || continue
-            key="data/$(basename "$f")"
+            key="$PREFIX/$(basename "$f")"
             echo "Uploading $f -> s3://$BUCKET/$key (endpoint: $R2_ENDPOINT)"
             aws --endpoint-url "$R2_ENDPOINT" s3 cp "$f" "s3://$BUCKET/$key" --acl public-read
             echo "Uploaded $f"

@@ -127,15 +127,20 @@ async function handleRequest(event) {
 
 function mapPathToKey(pathname) {
   // Map public routes to keys in the R2 bucket
+  // Allow configurable prefix via DASHBOARD_PREFIX binding or default to 'dashboard/data'
+  const rawPrefix = typeof DASHBOARD_PREFIX !== 'undefined' ? DASHBOARD_PREFIX : 'dashboard/data';
+  const prefix = rawPrefix.replace(/^\/+|\/+$/g, ''); // trim slashes
   switch (pathname) {
     case '/api/public/feeds':
-      return 'data/feeds.json';
+      return `${prefix}/feeds.json`;
     case '/api/public/meta':
-      return 'data/meta.json';
+      return `${prefix}/meta.json`;
     case '/api/public/stats':
-      return 'data/stats.json';
+      return `${prefix}/stats.json`;
     default:
-      return pathname.replace(/^\//, '');
+      // For other keys, treat pathname as a key under the prefix
+      const trimmed = pathname.replace(/^\//, '');
+      return `${prefix}/${trimmed}`;
   }
 }
 
