@@ -34,6 +34,13 @@ jobs:
             python -m pytest -q || true
           fi
 
+      - name: Fetch channel names (CI only)
+        if: secrets.DISCORD_BOT_TOKEN != ''
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+        run: |
+          python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
+
       - name: Generate dashboard data
         run: |
           # Ensure feed_map.json and channels.json exist to avoid generator failures
