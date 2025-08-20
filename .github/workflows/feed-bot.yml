@@ -52,7 +52,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-
     - name: Fetch feed_map.json from R2 (if configured) — verbose
     run: |
       python3 - << 'PY'
@@ -124,12 +123,12 @@ jobs:
         # exit non-zero so run shows failure if desired
         # sys.exit(3)
       PY
-        env:
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+    env:
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
 
       - name: Validate environment variables
         run: |
