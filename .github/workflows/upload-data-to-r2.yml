@@ -1,0 +1,47 @@
+name: Upload dashboard data to Cloudflare R2
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'docs/data/**'
+  workflow_dispatch: {}
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Upload docs/data/*.json to R2
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+        run: |
+          set -e
+          if [ -z "$CF_API_TOKEN" ] || [ -z "$CF_ACCOUNT_ID" ] || [ -z "$R2_BUCKET_NAME" ]; then
+            echo "Missing required secrets: CF_API_TOKEN, CF_ACCOUNT_ID, R2_BUCKET_NAME"
+            exit 1
+          fi
+
+          for f in docs/data/*.json; do
+            [ -f "$f" ] || continue
+            key="data/$(basename "$f")"
+            echo "Uploading $f -> $key"
+            resp=$(curl -sS -w "\n%{http_code}" -X PUT \
+              -H "Authorization: Bearer $CF_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data-binary @"$f" \
+              "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/r2/buckets/$R2_BUCKET_NAME/objects/$key")
+
+            status=$(echo "$resp" | tail -n1)
+            body=$(echo "$resp" | sed '$d')
+            if [ "$status" != "200" ] && [ "$status" != "201" ]; then
+              echo "Upload failed for $f (HTTP $status)"
+              echo "$body"
+              exit 1
+            fi
+            echo "Uploaded $f (HTTP $status)"
+          done
