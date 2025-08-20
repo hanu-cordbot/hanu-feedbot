@@ -43,3 +43,14 @@ Seen state lifecycle guidance
 Example lifecycle policy (Cloudflare R2/compatible):
  - Delete objects older than 30 days.
 
+## Recent changes (2025-08-20)
+
+- Updated workflows to remove dev-only test workflows and to avoid referencing secrets in `if:` expressions. See `docs/devops/full-logs/ci-workflows.md` for the run log.
+- Required secrets for CI runs: `DISCORD_BOT_TOKEN`, `GEMINI_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `SEEN_R2_BUCKET`. `GH_BOT_PAT` is optional and only needed if CI should push state back to the repo.
+
+## Recommended next steps
+
+1. Add a PR-level GitHub Actions job that validates YAML and flags disallowed expressions (for example, using a small script that parses workflow YAML and searches for `secrets.` inside `if:` expressions).
+2. Add a lightweight smoke test step at the start of `feed-bot.yml` that echoes a validation message; fail early if basic preconditions (presence of required secrets) are not met.
+3. Configure `SEEN_R2_BUCKET` and verify R2 credentials in a single manual run.
+

@@ -7,6 +7,8 @@ Single-entry format (current status):
 
 [2025-08-18 09:40:00 UTC] [ci/hide-feeds] STATUS: Implemented R2-backed feeds loading and R2 persistence for `seen.json`. NEXT: Test R2 round-trip for `seen.json` in CI. OPTIONS: (1) Add CI test that reads/writes seen.json using secrets (recommended) | (2) Manually run cron_worker locally with env set | (3) Skip testing and rely on runtime monitoring. ARTIFACTS: docs/devops/full-logs/hide-feeds.md
 
+[2025-08-20 22:58:00 UTC] [ci/clean-workflows] STATUS: Fixed `feed-bot.yml` invalid conditional (secrets in `if:`), removed dev-only test workflows, and updated bot logic to scan all feeds but only post to mapped channels. NEXT: Verify scheduled runs and add a CI validation step to reject invalid workflow expressions. OPTIONS: (1) Add pre-merge YAML validation job (recommended) | (2) Rely on manual run-throughs | (3) Add a small smoke test in each workflow. ARTIFACTS: docs/devops/full-logs/ci-workflows.md
+
 [YYYY-MM-DD HH:MM:SS UTC] [agent/branch] STATUS: <short status sentence>. NEXT: <one-line next action>. OPTIONS: <opt1 | opt2 | opt3>. ARTIFACTS: <links>
 
 Per-phase log rules (turn-based)

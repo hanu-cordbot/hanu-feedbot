@@ -45,13 +45,13 @@ Top-level checklist
 - [ ] 2. CI & workflows: clean and consolidate workflows
    - [ ] 2.1 Create `ci/clean-workflows` branch
    - [ ] 2.2 Remove hard-coded secrets; use GitHub Actions secrets only
-   - [ ] 2.3 Validate environment variables early and fail fast
+      - [x] 2.3 Validate environment variables early and fail fast (basic validation added)
    - [ ] 2.4 Use a scoped `GH_BOT_PAT` secret for commits from CI (if needed)
    - [ ] 2.5 Add a manual dispatch workflow for testing before scheduling hourly runs
 - [x] 2. CI & workflows: clean and consolidate workflows
    - [x] 2.1 Create `ci/clean-workflows` branch (work performed on `ci/hide-feeds`)
    - [x] 2.2 Remove hard-coded secrets; use GitHub Actions secrets only (no secret values printed)
-   - [ ] 2.3 Validate environment variables early and fail fast
+   - [x] 2.3 Validate environment variables early and fail fast (basic validation added; add PR-level YAML validation suggested)
    - [x] 2.4 Use a scoped `GH_BOT_PAT` secret for commits from CI (if needed)
    - [x] 2.5 Add a manual dispatch workflow for testing before scheduling hourly runs (added `test-seen-r2.yml`)
 
@@ -131,6 +131,7 @@ Short-term next actions (what the agent should do now)
 - [ ] Open PR for `ci/hide-feeds` (branch already pushed)
 - [ ] Add R2 secrets and upload `feeds.txt` to R2, or keep `feeds.txt` local to the deployment server
 - [ ] Manually dispatch `ci/clean-workflows` on `dev` to verify workflow changes
+ - [ ] Add a PR-level YAML validation job to catch invalid expressions (for example, referencing `secrets.*` inside `if:`) before merging workflows
 
 Agent activity log (recent):
 
