@@ -24,6 +24,5 @@ RAILWAY_BASE = "https://splendid-eagerness-production-4843.up.railway.app"
 binding = "FEEDS_BUCKET"
 bucket_name = "hanu-feedbot-seen"
 
-[vars]
 # Prefix inside the bucket where dashboard files are stored (no leading/trailing slash)
 DASHBOARD_PREFIX = "dashboard/data"
