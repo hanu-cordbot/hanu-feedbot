@@ -79,7 +79,6 @@ jobs:
 
       if not bucket or not access or not secret:
         print('\n⚠️ Missing required R2 credentials — will not attempt download.\n')
-        # Create an empty feed_map.json so downstream steps see a file rather than fail silently
         if not os.path.exists('feed_map.json'):
           open('feed_map.json', 'w').write('{}')
           print('📝 Created default empty feed_map.json')
@@ -95,7 +94,6 @@ jobs:
         s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
         s3.download_file(bucket, 'feed_map.json', 'feed_map.json')
         print('✅ Downloaded feed_map.json from R2')
-        # print a small sample for debugging
         import json
         with open('feed_map.json','r',encoding='utf-8') as f:
           try:
@@ -108,7 +106,6 @@ jobs:
       except Exception as e:
         print('❌ Failed to download feed_map.json:', repr(e))
         try:
-          # Try to list objects for diagnostics
           resp = s3.list_objects_v2(Bucket=bucket, Prefix='')
           keys = [o['Key'] for o in resp.get('Contents', [])][:20]
           print('📦 Bucket sample keys (first 20):')
@@ -116,12 +113,9 @@ jobs:
             print('  -', k)
         except Exception as e2:
           print('⚠️ Could not list bucket contents:', repr(e2))
-        # Ensure feed_map.json exists so bot doesn't crash later
         if not os.path.exists('feed_map.json'):
           open('feed_map.json', 'w').write('{}')
           print('📝 Created default empty feed_map.json')
-        # exit non-zero so run shows failure if desired
-        # sys.exit(3)
       PY
     env:
       R2_BUCKET: ${{ secrets.R2_BUCKET }}
