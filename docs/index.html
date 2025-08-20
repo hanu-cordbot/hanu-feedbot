@@ -462,7 +462,13 @@
                         </span>
                       </td>
                       <td class="feed-date">${formatDate(getLastPost(feed))}</td>
-                      <td class="feed-channel">${getChannelName(feed)}</td>
+                      <td class="feed-channel">
+                        ${(() => {
+                          const ch = getChannelName(feed);
+                          const fetchBtn = (ch.unresolved && ch.id) ? `<button class="fetch-channel" data-id="${ch.id}" onclick="fetchChannelName('${ch.id}', this)">🔎 Fetch</button>` : '';
+                          return `${ch.emoji} ${ch.name} ${fetchBtn}`;
+                        })()}
+                      </td>
                       <td><a href="${getPageUrl(feed)}" target="_blank" class="feed-link">🔗 Visit</a></td>
                     </tr>
                   `).join('')}
@@ -487,6 +493,25 @@
       } else {
         content.classList.add('collapsed');
         header.classList.add('collapsed');
+      }
+    }
+
+    async function fetchChannelName(channelId, btn) {
+      if (!channelId) return;
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        const res = await fetch('/api/channels/fetch-name', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ channelId }) });
+        if (!res.ok) throw new Error('failed');
+        const data = await res.json();
+        // Reload data to reflect updated channels.json
+        await loadData();
+      } catch (e) {
+        console.error('fetchChannelName error', e);
+        btn.textContent = 'Err';
+        setTimeout(() => btn.textContent = '🔎 Fetch', 3000);
+      } finally {
+        btn.disabled = false;
       }
     }
 
@@ -561,24 +586,25 @@
     }
 
     function getChannelName(feed) {
-      // mappings may contain channel id or channel name depending on generator
+      // returns { id, name, emoji, unresolved }
       let channelId = (mappings && mappings[feed.url]) || feed.channel || feed.channel_id || (metadata && metadata[feed.url] && metadata[feed.url].channel_id) || null;
-      if (!channelId) return 'Not mapped';
+      if (!channelId) return { id: null, name: 'Not mapped', emoji: '—', unresolved: false };
 
-      // If channels array is available, try to resolve id -> real name
+      // Try to resolve from channels array
       if (Array.isArray(channels) && channels.length > 0) {
         const channel = channels.find(ch => String(ch.id) === String(channelId) || ch.name === channelId);
         if (channel) {
           const typeEmoji = channel.type === 'forum' ? '💬' : (channel.type === 'voice' ? '🔊' : '📝');
-          return `${typeEmoji} ${channel.name || `Channel-${String(channelId).slice(-4)}`}`;
+          return { id: String(channel.id), name: channel.name || `Channel-${String(channel.id).slice(-4)}`, emoji: typeEmoji, unresolved: false };
         }
       }
 
-      // If channelId looks like a numeric id, format a friendly fallback; otherwise assume it's already a human name
+      // If channelId looks like a numeric id, show unresolved numeric fallback
       if (/^\d+$/.test(String(channelId))) {
-        return `📝 Channel-${String(channelId).slice(-4)}`;
+        return { id: String(channelId), name: `Channel-${String(channelId).slice(-4)}`, emoji: '📝', unresolved: true };
       }
-      return `📝 ${channelId}`;
+      // Otherwise assume it's a human-provided name
+      return { id: String(channelId), name: String(channelId), emoji: '📝', unresolved: false };
     }
 
     function isActiveFeed(feed) {
