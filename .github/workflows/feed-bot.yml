@@ -48,6 +48,44 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Optional fetch cookies from R2
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          NETSCAPE_COOKIES_KEY: ${{ secrets.NETSCAPE_COOKIES_KEY }}
+        run: |
+          set -e
+          if [ -z "${NETSCAPE_COOKIES_KEY}" ]; then
+            echo "NETSCAPE_COOKIES_KEY not set; skipping cookies fetch"
+            exit 0
+          fi
+          if [ -z "${R2_BUCKET}" ] || [ -z "${R2_ACCESS_KEY_ID}" ] || [ -z "${R2_SECRET_ACCESS_KEY}" ] || [ -z "${R2_ENDPOINT}" ]; then
+            echo "R2 credentials missing; skipping cookies fetch"
+            exit 0
+          fi
+          python -m pip install --upgrade pip
+          # Ensure boto3 is available for a simple download
+          if ! python -c "import boto3" >/dev/null 2>&1; then
+            python -m pip install boto3
+          fi
+          python - <<'PY'
+          import os
+          import boto3
+          bucket = os.environ.get('R2_BUCKET')
+          key = os.environ.get('NETSCAPE_COOKIES_KEY')
+          endpoint = os.environ.get('R2_ENDPOINT')
+          access = os.environ.get('R2_ACCESS_KEY_ID')
+          secret = os.environ.get('R2_SECRET_ACCESS_KEY')
+          try:
+              client = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
+              client.download_file(bucket, key, 'cookies.txt')
+              print('Downloaded cookies.txt from R2')
+          except Exception as e:
+              print('Could not download cookies:', e)
+          PY
+
       - name: Validate R2 configuration (fast)
         run: |
           python - <<'PY'
