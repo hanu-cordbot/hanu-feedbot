@@ -1,25 +1,14 @@
 {
-  "last_updated": "2025-08-21T01:40:29.172395+00:00",
+  "last_updated": "2025-08-21T01:47:54.851357+00:00",
   "version": "1.0.0",
-  "channels": [
-    {
-      "id": "1393729514927947817",
-      "name": "test",
-      "type": "forum"
-    },
-    {
-      "id": "1393802593704083486",
-      "name": "test2",
-      "type": "text"
-    }
-  ],
+  "channels": [],
   "groups": {},
   "system_prompt": {},
   "configuration": {
     "max_age_hours": "36",
     "fallback_enabled": "true",
-    "has_discord_token": true,
-    "has_gemini_key": false,
+    "has_discord_token": false,
+    "has_gemini_key": true,
     "has_webhook": false,
     "channel_id": null,
     "summary_channel_id": null
