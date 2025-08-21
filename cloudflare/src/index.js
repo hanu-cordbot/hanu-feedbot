@@ -150,9 +150,14 @@ function mapPathToKey(pathname) {
     case '/api/public/stats':
       return `${prefix}/stats.json`;
     default:
-      // For other keys, treat pathname as a key under the prefix
-      const trimmed = pathname.replace(/^\//, '');
-      return `${prefix}/${trimmed}`;
+        // For other keys, treat pathname as a key under the prefix
+        const trimmed = pathname.replace(/^\//, '');
+        // If the request already includes the prefix (e.g. /dashboard/data/feed_map.json),
+        // avoid doubling the prefix and use the trimmed path as the key directly.
+        if (trimmed === prefix || trimmed.startsWith(prefix + '/')) {
+          return trimmed;
+        }
+        return `${prefix}/${trimmed}`;
   }
 }
 

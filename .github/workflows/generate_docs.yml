@@ -76,6 +76,13 @@ jobs:
               print('Wrote empty feed_map.json')
           PY
 
+      - name: Fetch channel names (CI only)
+        if: ${{ env.DISCORD_BOT_TOKEN != '' }}
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+        run: |
+          python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
+
       - name: Debug R2 bucket and preview feed_map
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
@@ -132,14 +139,6 @@ jobs:
               with open(preview_path, 'w', encoding='utf-8') as out:
                 json.dump({'source': found, 'sample_keys': list(m.keys())[:50], 'len': len(m)}, out, indent=2, ensure_ascii=False)
               print('Wrote preview to', preview_path)
-              # Also write the authoritative feed_map.json into docs/data so the
-              # upload-to-R2 workflow will publish the real mapping (not just preview).
-              try:
-                with open('docs/data/feed_map.json', 'w', encoding='utf-8') as full_out:
-                  json.dump(m, full_out, indent=2, ensure_ascii=False)
-                print('Wrote docs/data/feed_map.json for upload')
-              except Exception as ee:
-                print('Failed to write docs/data/feed_map.json:', ee)
             except Exception as e:
               print('Failed reading/parsing feed_map.json:', e)
           else:

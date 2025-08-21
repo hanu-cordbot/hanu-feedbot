@@ -296,7 +296,37 @@ def main():
         # to R2 under the dashboard prefix (dashboard/data/feed_map.json).
         try:
             feed_map_root = load_json_file('feed_map.json', {})
-            save_json_file('docs/data/feed_map.json', feed_map_root)
+            # Enrich the feed_map for dashboard consumption with channel name/type
+            # without changing the root feed_map.json (which other components may rely on).
+            channels = load_json_file('channels.json', [])
+            # Build lookup by id
+            channels_by_id = {str(ch.get('id')): {'id': str(ch.get('id')), 'name': ch.get('name'), 'type': ch.get('type')} for ch in channels if ch.get('id')}
+
+            def enrich_value(v):
+                # If mapping is a list of ids/names, enrich each item
+                if isinstance(v, list):
+                    out = []
+                    for item in v:
+                        sid = str(item) if item is not None else None
+                        if sid and sid in channels_by_id:
+                            out.append(channels_by_id[sid])
+                        else:
+                            out.append(item)
+                    return out
+                # If mapping is a single id-like value, try to enrich
+                sid = str(v) if v is not None else None
+                if sid and sid in channels_by_id:
+                    return channels_by_id[sid]
+                return v
+
+            enriched = {}
+            for k, v in feed_map_root.items():
+                try:
+                    enriched[k] = enrich_value(v)
+                except Exception:
+                    enriched[k] = v
+
+            save_json_file('docs/data/feed_map.json', enriched)
         except Exception as e:
             print('❌ Failed to write docs/data/feed_map.json:', e)
 
