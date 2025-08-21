@@ -156,6 +156,20 @@ jobs:
               name: feed_map_preview
               path: docs/data/feed_map_preview.json
 
+          - name: Collect full mapping files for artifact
+            run: |
+              mkdir -p docs/data/artifacts
+              if [ -f feed_map.json ]; then cp feed_map.json docs/data/artifacts/feed_map.json; fi
+              if [ -f channels.json ]; then cp channels.json docs/data/artifacts/channels.json; fi
+              if [ -f docs/data/feed_map_preview.json ]; then cp docs/data/feed_map_preview.json docs/data/artifacts/feed_map_preview.json; fi
+              ls -la docs/data/artifacts || true
+
+          - name: Upload full feed_map and channels artifact
+            uses: actions/upload-artifact@v4
+            with:
+              name: feed_map_full
+              path: docs/data/artifacts
+
           - name: Fetch channel names (CI only)
             if: ${{ secrets.DISCORD_BOT_TOKEN != '' }}
             env:
