@@ -5,12 +5,7 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 3 * * *' # daily at 03:00 UTC
-  workflow_dispatch:
-    inputs:
-      preserve_channels:
-        description: 'If true, preserve existing channels.json names instead of overwriting from Discord API'
-        required: false
-        default: 'false'
+  workflow_dispatch: {}
 
 jobs:
   build-and-publish:
@@ -166,13 +161,13 @@ jobs:
           if [ -f docs/data/feed_map_preview.json ]; then cp docs/data/feed_map_preview.json docs/data/artifacts/feed_map_preview.json; fi
           ls -la docs/data/artifacts || true
 
-  - name: Upload full feed_map and channels artifact
+      - name: Upload full feed_map and channels artifact
         uses: actions/upload-artifact@v4
         with:
           name: feed_map_full
           path: docs/data/artifacts
 
-  # removed duplicate fetch here; the single fetch above ensures names are fresh
+      # removed duplicate fetch here; the single fetch above ensures names are fresh
 
       - name: Generate dashboard data
         run: |
