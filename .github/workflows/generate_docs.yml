@@ -183,17 +183,40 @@ jobs:
           PY
           python generate_dashboard_data.py
 
-      - name: Commit generated docs/data
+      - name: Upload generated docs/data -> R2 (no repo commit)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          FEEDS_R2_BUCKET: ${{ secrets.FEEDS_R2_BUCKET }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data || true
-          git add feed_map.json channels.json || true
-          if ! git diff --cached --quiet; then
-            git commit -m "ci: update generated docs data [skip ci]" || true
-            git push origin HEAD:main
-          else
-            echo "No generated changes to commit."
+          set -e
+          # prefer canonical R2_BUCKET, then FEEDS_R2_BUCKET, then SEEN_R2_BUCKET
+          BUCKET="${R2_BUCKET:-${FEEDS_R2_BUCKET:-$SEEN_R2_BUCKET}}"
+          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$BUCKET" ]; then
+            echo "Missing required R2 secrets; skipping upload"
+            exit 1
           fi
+
+          # install aws cli if not present (safe to skip if already installed)
+          if ! command -v aws >/dev/null 2>&1; then
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+            unzip -q awscliv2.zip
+            sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin || true
+          fi
+
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION="us-east-1"
+
+          PREFIX="dashboard/data"
+          PREFIX=$(echo "$PREFIX" | sed 's#^/*##; s#/*$##')
+
+          for f in docs/data/*.json; do
+            [ -f "$f" ] || continue
+            key="$PREFIX/$(basename "$f")"
+            echo "Uploading $f -> s3://$BUCKET/$key (endpoint: $R2_ENDPOINT)"
+            aws --endpoint-url "$R2_ENDPOINT" s3 cp "$f" "s3://$BUCKET/$key" --acl public-read
+            echo "Uploaded $f"
+          done
