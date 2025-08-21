@@ -5,7 +5,12 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 3 * * *' # daily at 03:00 UTC
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      preserve_channels:
+        description: 'If true, preserve existing channels.json names instead of overwriting from Discord API'
+        required: false
+        default: 'false'
 
 jobs:
   build-and-publish:
