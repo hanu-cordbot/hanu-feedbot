@@ -71,8 +71,8 @@ def load_existing(out='channels.json'):
 
 if __name__ == '__main__':
     import argparse
-    p = argparse.ArgumentParser(description='Fetch channel names (merges with existing channels.json by default)')
-    p.add_argument('--force', action='store_true', help='Always overwrite names with values from Discord API')
+    p = argparse.ArgumentParser(description='Fetch channel names (prefers Discord API names by default)')
+    p.add_argument('--preserve', action='store_true', help='Preserve existing names from channels.json instead of overwriting with Discord API')
     args = p.parse_args()
 
     if not TOKEN:
@@ -102,7 +102,8 @@ if __name__ == '__main__':
             ch_type = TYPE_MAP.get(info.get('type'), 'text')
             # prefer Discord API name unless we should preserve an existing custom name
             api_name = info.get('name') or f'channel-{str(info.get("id"))[-4:]}'
-            if not args.force and str(info.get('id')) in existing and existing[str(info.get('id'))].get('name'):
+            # Default: prefer API name. Use --preserve to keep existing custom names.
+            if args.preserve and str(info.get('id')) in existing and existing[str(info.get('id'))].get('name'):
                 name = existing[str(info.get('id'))].get('name')
             else:
                 name = api_name

@@ -77,11 +77,12 @@ jobs:
               print('Wrote empty feed_map.json')
           PY
 
-      - name: Fetch channel names (CI only)
+      - name: Fetch channel names (CI only; prefer Discord API)
         if: ${{ env.DISCORD_BOT_TOKEN != '' }}
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
         run: |
+          # Run without --preserve so CI always writes current Discord API names
           python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
 
       - name: Debug R2 bucket and preview feed_map
@@ -160,18 +161,13 @@ jobs:
           if [ -f docs/data/feed_map_preview.json ]; then cp docs/data/feed_map_preview.json docs/data/artifacts/feed_map_preview.json; fi
           ls -la docs/data/artifacts || true
 
-      - name: Upload full feed_map and channels artifact
+  - name: Upload full feed_map and channels artifact
         uses: actions/upload-artifact@v4
         with:
           name: feed_map_full
           path: docs/data/artifacts
 
-      - name: Fetch channel names (CI only)
-        if: ${{ env.DISCORD_BOT_TOKEN != '' }}
-        env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-        run: |
-          python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
+  # removed duplicate fetch here; the single fetch above ensures names are fresh
 
       - name: Generate dashboard data
         run: |
