@@ -1,0 +1,62 @@
+name: Test Facebook Upload to R2
+
+on:
+  workflow_dispatch:
+    inputs:
+      post_url:
+        description: 'Facebook post URL to download'
+        required: true
+        default: 'https://www.facebook.com/720895507364955/posts/743124275142078'
+        type: string
+      bucket_name:
+        description: 'R2 bucket to upload to'
+        required: false
+        default: 'video-data'
+        type: string
+
+jobs:
+  test-fb-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          
+          # Install yt-dlp if not in requirements
+          pip install yt-dlp
+
+      - name: Download and Upload Facebook Video
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          POST_URL: ${{ inputs.post_url }}
+          BUCKET_NAME: ${{ inputs.bucket_name }}
+        run: |
+          echo "🚀 Starting Facebook video download and upload test"
+          echo "📍 Post URL: $POST_URL"
+          echo "🪣 Target bucket: $BUCKET_NAME"
+          
+          # Create proper cookies file if not present
+          if [ ! -f "netscape_cookies.txt" ]; then
+            echo "⚠️ Creating minimal netscape_cookies.txt"
+            if [ ! -f "netscape_cookies.txt" ]; then
+              echo "⚠️ Creating minimal netscape_cookies.txt"
+              cat > netscape_cookies.txt << 'EOF'
+            # Netscape HTTP Cookie File
+            # This is a generated file!  Do not edit.
+            EOF
+            fi
+
+            # Test the standalone script
+            python tools/standalone_fb_upload.py

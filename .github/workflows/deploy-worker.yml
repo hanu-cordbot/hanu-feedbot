@@ -1,0 +1,24 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Publish Cloudflare Worker
+        uses: cloudflare/wrangler-action@1
+        with:
+          apiToken: ${{ secrets.CF_API_TOKEN }}
+          workingDirectory: cloudflare
+          command: publish
+
+        # Note: this action requires the repo to have a valid cloudflare/wrangler
+        # config in cloudflare/wrangler.toml and the secret CF_API_TOKEN configured
+        # in the repository settings. The worker will be published and will use the
+        # R2 binding configured in wrangler.toml.
