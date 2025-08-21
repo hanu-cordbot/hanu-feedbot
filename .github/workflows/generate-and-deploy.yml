@@ -103,21 +103,20 @@ jobs:
           if ! python -c "import boto3" >/dev/null 2>&1; then
             python -m pip install boto3
           fi
-          python - <<'PY'
-          import os
-          import boto3
-          b=os.environ.get('R2_BUCKET')
-          e=os.environ.get('R2_ENDPOINT')
-          a=os.environ.get('R2_ACCESS_KEY_ID')
-          s=os.environ.get('R2_SECRET_ACCESS_KEY')
-          key=os.environ.get('NETSCAPE_COOKIES_KEY')
-          client=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
-          try:
-              client.download_file(b, key, 'netscape_cookies.txt')
-              print('Downloaded netscape_cookies.txt from R2 (private key)')
-          except Exception as ex:
-              print('Could not download netscape_cookies.txt:', ex)
-          PY
+      python - <<'PY'
+      import os, boto3
+      b=os.environ.get('R2_BUCKET')
+      e=os.environ.get('R2_ENDPOINT')
+      a=os.environ.get('R2_ACCESS_KEY_ID')
+      s=os.environ.get('R2_SECRET_ACCESS_KEY')
+      key=os.environ.get('NETSCAPE_COOKIES_KEY')
+      client=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
+      try:
+        client.download_file(b, key, 'netscape_cookies.txt')
+        print('Downloaded netscape_cookies.txt from R2 (private key)')
+      except Exception as ex:
+        print('Could not download netscape_cookies.txt:', ex)
+      PY
 
       - name: Optional: Download Facebook video and upload to R2 (repo helper)
         if: ${{ github.event.inputs.fb_post_url != '' }}
