@@ -1,12 +1,4 @@
 {
-  "https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss": {
-    "channel": "111111111111111111",
-    "channel_name": "announcements",
-    "channel_type": "announcement"
-  },
-  "https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss": {
-    "channel": "222222222222222222",
-    "channel_name": "dev-updates",
-    "channel_type": "text"
-  }
+  "https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss": "1393802593704083486",
+  "https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss": "1393729514927947817"
 }
