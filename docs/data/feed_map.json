@@ -1,0 +1,12 @@
+{
+  "https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss": {
+    "channel": "111111111111111111",
+    "channel_name": "announcements",
+    "channel_type": "announcement"
+  },
+  "https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss": {
+    "channel": "222222222222222222",
+    "channel_name": "dev-updates",
+    "channel_type": "text"
+  }
+}
