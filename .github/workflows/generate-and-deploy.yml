@@ -86,7 +86,7 @@ jobs:
         run: |
           python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
 
-      - name: Optional: fetch secrets (netscape cookies) from R2
+      - name: fetch secrets (netscape cookies) from R2
         if: ${{ github.event.inputs.fb_post_url != '' && secrets.NETSCAPE_COOKIES_KEY != '' }}
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -119,7 +119,7 @@ jobs:
               print('Could not download netscape_cookies.txt:', ex)
           PY
 
-      - name: Optional: Download Facebook video and upload to R2 (repo helper)
+      - name: Download Facebook video and upload to R2 (repo helper)
         if: ${{ github.event.inputs.fb_post_url != '' }}
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
