@@ -48,6 +48,21 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
+      - name: Validate R2 configuration (fast)
+        run: |
+          python - <<'PY'
+          import os, sys
+          # If any R2 bucket is configured, ensure credentials are present
+          bucket = os.getenv('R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('SEEN_R2_BUCKET')
+          access = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')
+          secret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')
+          endpoint = os.getenv('R2_ENDPOINT')
+          if bucket and (not access or not secret):
+              print('❌ R2 bucket configured but R2 credentials missing. Set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY in repo secrets.')
+              sys.exit(1)
+          print('✅ R2 configuration check passed (bucket presence and credentials validated)')
+          PY
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

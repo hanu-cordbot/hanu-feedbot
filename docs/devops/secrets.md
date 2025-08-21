@@ -12,7 +12,9 @@ Required secrets (examples):
 - GEMINI_API_KEY
 - CHANNEL_ID
 - GLOBAL_FALLBACK_CHANNEL_ID
-- R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT
+- R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT
+- R2_BUCKET (preferred canonical bucket name)
+- FEEDS_R2_BUCKET, SEEN_R2_BUCKET (accepted as fallbacks for backward compatibility)
 - ADMIN_PASS
 - GH_BOT_PAT (scoped, if you want CI to push state files back to the repo)
 
@@ -29,6 +31,13 @@ How to upload feeds to R2 (example using aws-cli):
 ```powershell
 # Configure aws-cli with R2 credentials (or use environment variables)
 aws --endpoint-url https://<account>.r2.cloudflarestorage.com s3 cp feeds.txt s3://<bucket>/feeds.txt
+
+Quick example to set all three secrets to the same bucket (recommended to avoid surprises):
+```powershell
+gh secret set R2_BUCKET --body "hanu-feedbot-seen" --repo <owner>/<repo>
+gh secret set FEEDS_R2_BUCKET --body "hanu-feedbot-seen" --repo <owner>/<repo>
+gh secret set SEEN_R2_BUCKET --body "hanu-feedbot-seen" --repo <owner>/<repo>
+```
 ```
 
 Notes
@@ -51,6 +60,6 @@ Example lifecycle policy (Cloudflare R2/compatible):
 ## Recommended next steps
 
 1. Add a PR-level GitHub Actions job that validates YAML and flags disallowed expressions (for example, using a small script that parses workflow YAML and searches for `secrets.` inside `if:` expressions).
-2. Add a lightweight smoke test step at the start of `feed-bot.yml` that echoes a validation message; fail early if basic preconditions (presence of required secrets) are not met.
+2. Add a lightweight smoke test step at the start of `feed-bot.yml` that echoes a validation message; fail early if basic preconditions (presence of required secrets) are not met. See `feed-bot.yml` for an example validation step added on 2025-08-21.
 3. Configure `SEEN_R2_BUCKET` and verify R2 credentials in a single manual run.
 
