@@ -1,13 +1,9 @@
 {
   "stats": {
-<<<<<<< HEAD
-    "last_updated": "2025-08-21T01:47:18.196602+00:00",
-=======
-    "last_updated": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+    "last_updated": "2025-08-21T01:50:29.053265+00:00",
     "total_feeds": 45,
-    "total_channels": 0,
-    "total_seen_items": 48,
+    "total_channels": 2,
+    "total_seen_items": 0,
     "feeds_with_metadata": 45,
     "feed_mappings": 2,
     "recent_activity": [],
@@ -15,11 +11,7 @@
       "https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss": {
         "url": "https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Ban Văn nghệ Đoàn Thanh Niên - Hội sinh viên Trường Đại học Hà Nội on Facebook",
@@ -31,11 +23,7 @@
       "https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss": {
         "url": "https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "CLB Kinh doanh và Khởi nghiệp Dynamic HANU on Facebook",
@@ -47,11 +35,7 @@
       "https://fetchrss.com/feed/aGodTe41mlsiaGodXWXnJQxT.rss": {
         "url": "https://fetchrss.com/feed/aGodTe41mlsiaGodXWXnJQxT.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "CLB SÁCH HANU on Facebook",
@@ -62,11 +46,7 @@
       "https://fetchrss.com/feed/aGodmsgm16DSaGodtXnq9JNT.rss": {
         "url": "https://fetchrss.com/feed/aGodmsgm16DSaGodtXnq9JNT.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "CLB Thanh niên vận động hiến máu -  Trường Đại học Hà Nội on Facebook",
@@ -77,11 +57,7 @@
       "https://fetchrss.com/feed/aGofPBbyt2OTaGofTuUxe6tC.rss": {
         "url": "https://fetchrss.com/feed/aGofPBbyt2OTaGofTuUxe6tC.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "DEL HANU on Facebook",
@@ -92,11 +68,7 @@
       "https://fetchrss.com/feed/aGoff8m9BPfyaGofjQsm79iT.rss": {
         "url": "https://fetchrss.com/feed/aGoff8m9BPfyaGofjQsm79iT.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Future Speakers HANU on Facebook",
@@ -107,11 +79,7 @@
       "https://fetchrss.com/feed/aGof11xD9MLzaGof4z-8xb0D.rss": {
         "url": "https://fetchrss.com/feed/aGof11xD9MLzaGof4z-8xb0D.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "HAC - CLB Kế Toán Trường Đại Học Hà Nội on Facebook",
@@ -122,11 +90,7 @@
       "https://fetchrss.com/feed/aGogAA_Bc-_zaGogD__Xyrdy.rss": {
         "url": "https://fetchrss.com/feed/aGogAA_Bc-_zaGogD__Xyrdy.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "HANU Basketball on Facebook",
@@ -137,11 +101,7 @@
       "https://fetchrss.com/feed/aGogK1V1WOGDaGogRmKtCCWS.rss": {
         "url": "https://fetchrss.com/feed/aGogK1V1WOGDaGogRmKtCCWS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "HANU FC - CLB Bóng đá Trường Đại học Hà Nội on Facebook",
@@ -152,11 +112,7 @@
       "https://fetchrss.com/feed/aGohDPImZcJCaGohGxoGRmwS.rss": {
         "url": "https://fetchrss.com/feed/aGohDPImZcJCaGohGxoGRmwS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Hanu Grows Green on Facebook",
@@ -167,11 +123,7 @@
       "https://fetchrss.com/feed/aGohQf39Xn4zaGohUGsJIN6S.rss": {
         "url": "https://fetchrss.com/feed/aGohQf39Xn4zaGohUGsJIN6S.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Hanu Music Club - HMC on Facebook",
@@ -182,11 +134,7 @@
       "https://fetchrss.com/feed/aGohjEYALmGiaGohmVpNDMij.rss": {
         "url": "https://fetchrss.com/feed/aGohjEYALmGiaGohmVpNDMij.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "HDC - Hanu Dancing Club on Facebook",
@@ -197,11 +145,7 @@
       "https://fetchrss.com/feed/aGohtgJMF0cSaGohxoEX3lei.rss": {
         "url": "https://fetchrss.com/feed/aGohtgJMF0cSaGohxoEX3lei.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "HGC - Hanu Guitar Club on Facebook",
@@ -212,11 +156,7 @@
       "https://fetchrss.com/feed/aGo8YeYfCd_zaGo8bkjDu2zy.rss": {
         "url": "https://fetchrss.com/feed/aGo8YeYfCd_zaGo8bkjDu2zy.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "TRC HANU - HANU's Tourism Community on Facebook",
@@ -227,11 +167,7 @@
       "https://fetchrss.com/feed/aGo8hs_rDxxSaGo8kuAHUO8C.rss": {
         "url": "https://fetchrss.com/feed/aGo8hs_rDxxSaGo8kuAHUO8C.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Voice Of Hanu on Facebook",
@@ -242,11 +178,7 @@
       "https://fetchrss.com/feed/aGo8s-AHUO8DaGo8vp-MK5dS.rss": {
         "url": "https://fetchrss.com/feed/aGo8s-AHUO8DaGo8vp-MK5dS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "ItaHanu - Khoa tiếng Italia/Dipartimento di Italianistica on Facebook",
@@ -257,11 +189,7 @@
       "https://fetchrss.com/feed/aGo84FCG0tCjaGo871SfQqcz.rss": {
         "url": "https://fetchrss.com/feed/aGo84FCG0tCjaGo871SfQqcz.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa Công nghệ thông tin - Trường Đại học Hà Nội on Facebook",
@@ -272,11 +200,7 @@
       "https://fetchrss.com/feed/aGo9FuBbGUZSaGo9Iv075iU0.rss": {
         "url": "https://fetchrss.com/feed/aGo9FuBbGUZSaGo9Iv075iU0.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa Quản trị Kinh doanh và Du lịch, Đại học Hà Nội - FMT HANU on Facebook",
@@ -287,11 +211,7 @@
       "https://fetchrss.com/feed/aGo9kXd7J7YzaGo9nkc56_jS.rss": {
         "url": "https://fetchrss.com/feed/aGo9kXd7J7YzaGo9nkc56_jS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa Sau Đại học - Đại học Hà Nội on Facebook",
@@ -302,11 +222,7 @@
       "https://fetchrss.com/feed/aGpBre9XzXyCaGpBtT6s1qaT.rss": {
         "url": "https://fetchrss.com/feed/aGpBre9XzXyCaGpBtT6s1qaT.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Bồ Đào Nha - Hanu on Facebook",
@@ -317,11 +233,7 @@
       "https://fetchrss.com/feed/aGpB1MkMWAJzaGpB4u9XzXyD.rss": {
         "url": "https://fetchrss.com/feed/aGpB1MkMWAJzaGpB4u9XzXyD.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Anh - Trường Đại học Hà Nội on Facebook",
@@ -332,11 +244,7 @@
       "https://fetchrss.com/feed/aGpDCIMhPP3EaGpDE1CjXrxj.rss": {
         "url": "https://fetchrss.com/feed/aGpDCIMhPP3EaGpDE1CjXrxj.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Anh chuyên ngành - HANU on Facebook",
@@ -347,11 +255,7 @@
       "https://fetchrss.com/feed/aGpDWgdgFZoyaGpDZZryyQdi.rss": {
         "url": "https://fetchrss.com/feed/aGpDWgdgFZoyaGpDZZryyQdi.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa Tiếng Hàn Quốc Hanu - 하노이대 한국어과 on Facebook",
@@ -362,11 +266,7 @@
       "https://fetchrss.com/feed/aGpDs_J4VIuyaGpDvl20AQeS.rss": {
         "url": "https://fetchrss.com/feed/aGpDs_J4VIuyaGpDvl20AQeS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Nga HANU - Факультет русского языка on Facebook",
@@ -377,11 +277,7 @@
       "https://fetchrss.com/feed/aGpFi8-e60YSaGpFnTifgSvS.rss": {
         "url": "https://fetchrss.com/feed/aGpFi8-e60YSaGpFnTifgSvS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Nhật - Trường Đại học Hà Nội on Facebook",
@@ -392,11 +288,7 @@
       "https://fetchrss.com/feed/aGpFxl20AQeTaGpF0CcVlUAS.rss": {
         "url": "https://fetchrss.com/feed/aGpFxl20AQeTaGpF0CcVlUAS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Pháp - Trường Đại học Hà Nội on Facebook",
@@ -407,11 +299,7 @@
       "https://fetchrss.com/feed/aGpF57AgiTKTaGpF_DR2Qb2z.rss": {
         "url": "https://fetchrss.com/feed/aGpF57AgiTKTaGpF_DR2Qb2z.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa Tiếng Trung Quốc HANU on Facebook",
@@ -422,11 +310,7 @@
       "https://fetchrss.com/feed/aGpGFKr0UEDyaGpGIAdgFZoz.rss": {
         "url": "https://fetchrss.com/feed/aGpGFKr0UEDyaGpGIAdgFZoz.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Tây Ban Nha - HANU on Facebook",
@@ -437,11 +321,7 @@
       "https://fetchrss.com/feed/aGpGOEEuVolSaGpGQr5NvsiC.rss": {
         "url": "https://fetchrss.com/feed/aGpGOEEuVolSaGpGQr5NvsiC.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Đức - Trường Đại học Hà Nội on Facebook",
@@ -452,11 +332,7 @@
       "https://fetchrss.com/feed/aGpGYoU_hgryaGpGbmAHHh4S.rss": {
         "url": "https://fetchrss.com/feed/aGpGYoU_hgryaGpGbmAHHh4S.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa Việt Nam học - Hanu on Facebook",
@@ -467,11 +343,7 @@
       "https://fetchrss.com/feed/aGmzFdASj7NFaGmzIicPETjj.rss": {
         "url": "https://fetchrss.com/feed/aGmzFdASj7NFaGmzIicPETjj.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Trang thông tin khoa QUỐC TẾ HỌC - HANU on Facebook",
@@ -482,11 +354,7 @@
       "https://fetchrss.com/feed/aGpGiaB283WiaGpGt2jHSB9y.rss": {
         "url": "https://fetchrss.com/feed/aGpGiaB283WiaGpGt2jHSB9y.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "International Office - Hanoi University on Facebook",
@@ -497,11 +365,7 @@
       "https://fetchrss.com/feed/aGpGyzQ-jT9iaGpG1ruHacwC.rss": {
         "url": "https://fetchrss.com/feed/aGpGyzQ-jT9iaGpG1ruHacwC.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "ItaCentro - Italia Center on Facebook",
@@ -512,11 +376,7 @@
       "https://fetchrss.com/feed/aGpG8OX1segyaGpG-qB283Wj.rss": {
         "url": "https://fetchrss.com/feed/aGpG8OX1segyaGpG-qB283Wj.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "ITEC HANU on Facebook",
@@ -527,11 +387,7 @@
       "https://fetchrss.com/feed/aGpHCsGHGmZyaGpHHTifgSvT.rss": {
         "url": "https://fetchrss.com/feed/aGpHCsGHGmZyaGpHHTifgSvT.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "KTX Hanu on Facebook",
@@ -542,11 +398,7 @@
       "https://fetchrss.com/feed/aGpHLnElUTOEaGpHOScVlUAT.rss": {
         "url": "https://fetchrss.com/feed/aGpHLnElUTOEaGpHOScVlUAT.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Phòng Công tác sinh viên - Hanu on Facebook",
@@ -557,11 +409,7 @@
       "https://fetchrss.com/feed/aGpHSYKAgLeiaGpHVSYx-_GS.rss": {
         "url": "https://fetchrss.com/feed/aGpHSYKAgLeiaGpHVSYx-_GS.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Phòng Quản lý Đào tạo - HANU on Facebook",
@@ -572,11 +420,7 @@
       "https://fetchrss.com/feed/aGpHaUoQeJpDaGpHei0B-MSD.rss": {
         "url": "https://fetchrss.com/feed/aGpHaUoQeJpDaGpHei0B-MSD.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Thư viện Trường Đại học Hà Nội on Facebook",
@@ -587,11 +431,7 @@
       "https://fetchrss.com/feed/aGpHnlNw71YCaGpHq4U_hgrz.rss": {
         "url": "https://fetchrss.com/feed/aGpHnlNw71YCaGpHq4U_hgrz.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Trung tâm Khảo thí Trường Đại học Hà Nội on Facebook",
@@ -602,11 +442,7 @@
       "https://fetchrss.com/feed/aGpHwYnhTCHiaGpHzBt5LfkT.rss": {
         "url": "https://fetchrss.com/feed/aGpHwYnhTCHiaGpHzBt5LfkT.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Trung Tâm Đào Tạo Từ Xa - Trường Đại Học Hà Nội on Facebook",
@@ -617,11 +453,7 @@
       "https://fetchrss.com/feed/aGpIB98iYZkiaGpIEXO_OKjz.rss": {
         "url": "https://fetchrss.com/feed/aGpIB98iYZkiaGpIEXO_OKjz.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Viện Khổng Tử Hanu on Facebook",
@@ -632,11 +464,7 @@
       "https://fetchrss.com/feed/aGpILhAhnvNyaGpIQEjDu2zz.rss": {
         "url": "https://fetchrss.com/feed/aGpILhAhnvNyaGpIQEjDu2zz.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Đào tạo Quốc tế -Trường Đại học Hà Nội Iec - Hanu on Facebook",
@@ -647,11 +475,7 @@
       "https://fetchrss.com/feed/aGpIYAsmKbgjaKAXH-sQCkti.rss": {
         "url": "https://fetchrss.com/feed/aGpIYAsmKbgjaKAXH-sQCkti.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "HANU Confessions on Facebook",
@@ -662,11 +486,7 @@
       "https://fetchrss.com/feed/aKAX3Q_1UbOTaKAX6ewHsDai.rss": {
         "url": "https://fetchrss.com/feed/aKAX3Q_1UbOTaKAX6ewHsDai.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "Khoa tiếng Bồ Đào Nha - Hanu on Facebook",
@@ -677,11 +497,7 @@
       "https://fetchrss.com/feed/aKAYDesQCktjaKAYGOsQCktk.rss": {
         "url": "https://fetchrss.com/feed/aKAYDesQCktjaKAYGOsQCktk.rss",
         "has_metadata": true,
-<<<<<<< HEAD
-        "last_check": "2025-08-21T01:47:18.196602+00:00",
-=======
-        "last_check": "2025-08-21T01:44:29.634241+00:00",
->>>>>>> b3102c92cd4b95f87b9f02b373bb2cc4db232677
+        "last_check": "2025-08-21T01:50:29.053265+00:00",
         "status": "healthy",
         "entry_count": 5,
         "title": "HanuTimes.net - Kênh thông tin sinh viên trường Đại Học Hà Nội on Facebook",
