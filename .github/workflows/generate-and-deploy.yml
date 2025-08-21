@@ -86,49 +86,51 @@ jobs:
         run: |
           python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
 
-      - name: Optional: Download Facebook video and upload to R2
+      - name: Optional: fetch secrets (netscape cookies) from R2
+        if: ${{ github.event.inputs.fb_post_url != '' && secrets.NETSCAPE_COOKIES_KEY != '' }}
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          NETSCAPE_COOKIES_KEY: ${{ secrets.NETSCAPE_COOKIES_KEY }}
+        run: |
+          set -e
+          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$R2_BUCKET" ]; then
+            echo "R2 not configured; skipping cookies fetch"
+            exit 0
+          fi
+          if ! python -c "import boto3" >/dev/null 2>&1; then
+            python -m pip install boto3
+          fi
+          python - <<'PY'
+          import os
+          import boto3
+          b=os.environ.get('R2_BUCKET')
+          e=os.environ.get('R2_ENDPOINT')
+          a=os.environ.get('R2_ACCESS_KEY_ID')
+          s=os.environ.get('R2_SECRET_ACCESS_KEY')
+          key=os.environ.get('NETSCAPE_COOKIES_KEY')
+          client=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
+          try:
+              client.download_file(b, key, 'netscape_cookies.txt')
+              print('Downloaded netscape_cookies.txt from R2 (private key)')
+          except Exception as ex:
+              print('Could not download netscape_cookies.txt:', ex)
+          PY
+
+      - name: Optional: Download Facebook video and upload to R2 (repo helper)
         if: ${{ github.event.inputs.fb_post_url != '' }}
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          FB_POST_URL: ${{ github.event.inputs.fb_post_url }}
         run: |
           set -e
-          echo "FB_POST_URL=$FB_POST_URL"
           python -m pip install --upgrade pip
-          pip install yt-dlp
-
-          TMP=$(mktemp -d)
-          OUT="$TMP/facebook_video.mp4"
-          echo "Downloading video to $OUT"
-          yt-dlp --cookies netscape_cookies.txt -f best -o "$OUT" "$FB_POST_URL" || (echo "yt-dlp failed"; exit 0)
-
-          if [ ! -f "$OUT" ]; then
-            echo "No output file; skipping upload"
-            exit 0
-          fi
-
-          # Upload to R2 if configured
-          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$R2_BUCKET" ]; then
-            echo "R2 not configured; skipping upload"
-            exit 0
-          fi
-
-          if ! command -v aws >/dev/null 2>&1; then
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
-            unzip -q awscliv2.zip
-            sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin || true
-          fi
-
-          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
-          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
-          export AWS_DEFAULT_REGION="us-east-1"
-
-          KEY="videos/$(date +%s)_facebook_video.mp4"
-          echo "Uploading $OUT to s3://$R2_BUCKET/$KEY"
-          aws --endpoint-url "$R2_ENDPOINT" s3 cp "$OUT" "s3://$R2_BUCKET/$KEY" --acl public-read || echo "Upload failed"
+          pip install -r requirements.txt || true
+          python tools/fb_upload_run.py "${{ github.event.inputs.fb_post_url }}" || echo "FB upload step failed (non-fatal)"
 
       - name: Generate dashboard data
         run: |
