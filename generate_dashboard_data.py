@@ -292,6 +292,14 @@ def main():
         meta_data = generate_meta_data()
         save_json_file('docs/data/meta.json', meta_data)
 
+        # Ensure the authoritative feed_map is published into docs/data so it gets uploaded
+        # to R2 under the dashboard prefix (dashboard/data/feed_map.json).
+        try:
+            feed_map_root = load_json_file('feed_map.json', {})
+            save_json_file('docs/data/feed_map.json', feed_map_root)
+        except Exception as e:
+            print('❌ Failed to write docs/data/feed_map.json:', e)
+
         print("\n✅ Dashboard data generation completed!")
         print(f"📊 Generated stats for {stats['total_feeds']} feeds")
         print(f"📡 Processed {len(feeds_data['feeds'])} feed entries")
