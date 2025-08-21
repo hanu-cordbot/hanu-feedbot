@@ -12,193 +12,179 @@ jobs:
     permissions:
       contents: write
 
-    name: Generate and publish docs data
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    on:
-      push:
-        branches: [ main ]
-      schedule:
-        - cron: '0 3 * * *' # daily at 03:00 UTC
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    jobs:
-      build-and-publish:
-        runs-on: ubuntu-latest
-        permissions:
-          contents: write
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-        steps:
-          - name: Checkout
-            uses: actions/checkout@v4
-            with:
-              fetch-depth: 0
+      - name: Run tests (fast smoke)
+        run: |
+          if [ -f pytest.ini ] || [ -d tests ]; then
+            python -m pytest -q || true
+          fi
 
-          - name: Set up Python
-            uses: actions/setup-python@v4
-            with:
-              python-version: '3.11'
+      - name: Fetch feed_map.json from R2 (if configured)
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          python - << 'PY'
+          import os, sys
+          bucket = os.getenv('R2_BUCKET')
+          access = os.getenv('R2_ACCESS_KEY_ID')
+          secret = os.getenv('R2_SECRET_ACCESS_KEY')
+          endpoint = os.getenv('R2_ENDPOINT')
+          if not bucket or not access or not secret:
+            print('R2 credentials not present; skipping fetch of feed_map.json')
+            sys.exit(0)
+          try:
+            import boto3
+            s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
+            # Try docs/data/feed_map.json first (dashboard storage), fallback to root feed_map.json
+            tried = []
+            for key in ['docs/data/feed_map.json', 'feed_map.json']:
+              try:
+                s3.download_file(bucket, key, os.path.basename(key))
+                print('Downloaded', key)
+                break
+              except Exception as e:
+                tried.append((key, str(e)))
+            else:
+              print('Could not download feed_map.json from R2; attempts:')
+              for k, err in tried:
+                print(' -', k, err)
+          except Exception as e:
+            print('boto3 not available or download failed:', e)
+            # ensure a file exists so generator doesn't crash
+            if not os.path.exists('feed_map.json'):
+              open('feed_map.json','w').write('{}')
+              print('Wrote empty feed_map.json')
+          PY
 
-          - name: Install dependencies
-            run: |
-              python -m pip install --upgrade pip
-              if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Debug R2 bucket and preview feed_map
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          python - << 'PY'
+          import os, sys, json
+          bucket = os.getenv('R2_BUCKET')
+          access = os.getenv('R2_ACCESS_KEY_ID')
+          secret = os.getenv('R2_SECRET_ACCESS_KEY')
+          endpoint = os.getenv('R2_ENDPOINT')
+          if not bucket or not access or not secret:
+            print('R2 creds missing, skipping debug listing')
+            sys.exit(0)
+          try:
+            import boto3
+            s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
+            print('Listing up to 100 keys in bucket:', bucket)
+            resp = s3.list_objects_v2(Bucket=bucket, Prefix='')
+            keys = [o['Key'] for o in resp.get('Contents', [])]
+            print('Found', len(keys), 'objects (showing first 100):')
+            for k in keys[:100]:
+              print(' -', k)
+          except Exception as e:
+            print('Failed to list bucket contents:', e)
 
-          - name: Run tests (fast smoke)
-            run: |
-              if [ -f pytest.ini ] || [ -d tests ]; then
-                python -m pytest -q || true
-              fi
+          # Locate downloaded feed_map file if present or try to fetch fallback keys
+          local_candidates = ['docs/data/feed_map.json', 'feed_map.json']
+          found = None
+          for p in local_candidates:
+            if os.path.exists(p):
+              found = p
+              break
 
-          - name: Fetch feed_map.json from R2 (if configured)
-            env:
-              R2_BUCKET: ${{ secrets.R2_BUCKET }}
-              R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-              R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-              R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-            run: |
-              python - << 'PY'
-    import os, sys
-    bucket = os.getenv('R2_BUCKET')
-    access = os.getenv('R2_ACCESS_KEY_ID')
-    secret = os.getenv('R2_SECRET_ACCESS_KEY')
-    endpoint = os.getenv('R2_ENDPOINT')
-    if not bucket or not access or not secret:
-      print('R2 credentials not present; skipping fetch of feed_map.json')
-      sys.exit(0)
-    try:
-      import boto3
-      s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
-      # Try docs/data/feed_map.json first (dashboard storage), fallback to root feed_map.json
-      tried = []
-      for key in ['docs/data/feed_map.json', 'feed_map.json']:
-        try:
-          s3.download_file(bucket, key, os.path.basename(key))
-          print('Downloaded', key)
-          break
-        except Exception as e:
-          tried.append((key, str(e)))
-      else:
-        print('Could not download feed_map.json from R2; attempts:')
-        for k, err in tried:
-          print(' -', k, err)
-    except Exception as e:
-      print('boto3 not available or download failed:', e)
-      # ensure a file exists so generator doesn't crash
-      if not os.path.exists('feed_map.json'):
-        open('feed_map.json','w').write('{}')
-        print('Wrote empty feed_map.json')
-    PY
+          if not found:
+            print('No local feed_map.json found at expected locations; attempting to download docs/data/feed_map.json directly for debug')
+            try:
+              s3.download_file(bucket, 'docs/data/feed_map.json', 'docs/data/feed_map.json')
+              found = 'docs/data/feed_map.json'
+              print('Downloaded docs/data/feed_map.json for debug')
+            except Exception as e:
+              print('Could not download docs/data/feed_map.json:', e)
 
-          - name: Debug R2 bucket and preview feed_map
-            env:
-              R2_BUCKET: ${{ secrets.R2_BUCKET }}
-              R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-              R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-              R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-            run: |
-              python - << 'PY'
-    import os, sys, json
-    bucket = os.getenv('R2_BUCKET')
-    access = os.getenv('R2_ACCESS_KEY_ID')
-    secret = os.getenv('R2_SECRET_ACCESS_KEY')
-    endpoint = os.getenv('R2_ENDPOINT')
-    if not bucket or not access or not secret:
-      print('R2 creds missing, skipping debug listing')
-      sys.exit(0)
-    try:
-      import boto3
-      s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
-      print('Listing up to 100 keys in bucket:', bucket)
-      resp = s3.list_objects_v2(Bucket=bucket, Prefix='')
-      keys = [o['Key'] for o in resp.get('Contents', [])]
-      print('Found', len(keys), 'objects (showing first 100):')
-      for k in keys[:100]:
-        print(' -', k)
-    except Exception as e:
-      print('Failed to list bucket contents:', e)
+          if found:
+            print('Using feed_map at', found)
+            try:
+              with open(found, 'r', encoding='utf-8') as f:
+                m = json.load(f)
+              # write preview into docs/data for artifact
+              os.makedirs('docs/data', exist_ok=True)
+              preview_path = 'docs/data/feed_map_preview.json'
+              with open(preview_path, 'w', encoding='utf-8') as out:
+                json.dump({'source': found, 'sample_keys': list(m.keys())[:50], 'len': len(m)}, out, indent=2, ensure_ascii=False)
+              print('Wrote preview to', preview_path)
+            except Exception as e:
+              print('Failed reading/parsing feed_map.json:', e)
+          else:
+            print('No feed_map.json available locally or in R2 under docs/data/feed_map.json')
+          PY
 
-    # Locate downloaded feed_map file if present or try to fetch fallback keys
-    local_candidates = ['docs/data/feed_map.json', 'feed_map.json']
-    found = None
-    for p in local_candidates:
-      if os.path.exists(p):
-        found = p
-        break
+      - name: Upload feed_map preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed_map_preview
+          path: docs/data/feed_map_preview.json
 
-    if not found:
-      print('No local feed_map.json found at expected locations; attempting to download docs/data/feed_map.json directly for debug')
-      try:
-        s3.download_file(bucket, 'docs/data/feed_map.json', 'docs/data/feed_map.json')
-        found = 'docs/data/feed_map.json'
-        print('Downloaded docs/data/feed_map.json for debug')
-      except Exception as e:
-        print('Could not download docs/data/feed_map.json:', e)
+      - name: Collect full mapping files for artifact
+        run: |
+          mkdir -p docs/data/artifacts
+          if [ -f feed_map.json ]; then cp feed_map.json docs/data/artifacts/feed_map.json; fi
+          if [ -f channels.json ]; then cp channels.json docs/data/artifacts/channels.json; fi
+          if [ -f docs/data/feed_map_preview.json ]; then cp docs/data/feed_map_preview.json docs/data/artifacts/feed_map_preview.json; fi
+          ls -la docs/data/artifacts || true
 
-    if found:
-      print('Using feed_map at', found)
-      try:
-        with open(found, 'r', encoding='utf-8') as f:
-          m = json.load(f)
-        # write preview into docs/data for artifact
-        os.makedirs('docs/data', exist_ok=True)
-        preview_path = 'docs/data/feed_map_preview.json'
-        with open(preview_path, 'w', encoding='utf-8') as out:
-          json.dump({'source': found, 'sample_keys': list(m.keys())[:50], 'len': len(m)}, out, indent=2, ensure_ascii=False)
-        print('Wrote preview to', preview_path)
-      except Exception as e:
-        print('Failed reading/parsing feed_map.json:', e)
-    else:
-      print('No feed_map.json available locally or in R2 under docs/data/feed_map.json')
-    PY
+      - name: Upload full feed_map and channels artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed_map_full
+          path: docs/data/artifacts
 
-          - name: Upload feed_map preview artifact
-            uses: actions/upload-artifact@v4
-            with:
-              name: feed_map_preview
-              path: docs/data/feed_map_preview.json
+      - name: Fetch channel names (CI only)
+        if: ${{ secrets.DISCORD_BOT_TOKEN != '' }}
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+        run: |
+          python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
 
-          - name: Collect full mapping files for artifact
-            run: |
-              mkdir -p docs/data/artifacts
-              if [ -f feed_map.json ]; then cp feed_map.json docs/data/artifacts/feed_map.json; fi
-              if [ -f channels.json ]; then cp channels.json docs/data/artifacts/channels.json; fi
-              if [ -f docs/data/feed_map_preview.json ]; then cp docs/data/feed_map_preview.json docs/data/artifacts/feed_map_preview.json; fi
-              ls -la docs/data/artifacts || true
+      - name: Generate dashboard data
+        run: |
+          # Ensure feed_map.json and channels.json exist to avoid generator failures
+          python - <<'PY'
+          import os, json
+          for fn, default in [('feed_map.json', {}), ('channels.json', [])]:
+              if not os.path.exists(fn):
+                  open(fn, 'w', encoding='utf-8').write(json.dumps(default, indent=2))
+          PY
+          python generate_dashboard_data.py
 
-          - name: Upload full feed_map and channels artifact
-            uses: actions/upload-artifact@v4
-            with:
-              name: feed_map_full
-              path: docs/data/artifacts
-
-          - name: Fetch channel names (CI only)
-            if: ${{ secrets.DISCORD_BOT_TOKEN != '' }}
-            env:
-              DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-            run: |
-              python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
-
-          - name: Generate dashboard data
-            run: |
-              # Ensure feed_map.json and channels.json exist to avoid generator failures
-              python - <<'PY'
-    import os, json
-    for fn, default in [('feed_map.json', {}), ('channels.json', [])]:
-        if not os.path.exists(fn):
-            open(fn, 'w', encoding='utf-8').write(json.dumps(default, indent=2))
-    PY
-              python generate_dashboard_data.py
-
-          - name: Commit generated docs/data
-            env:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            run: |
-              git config user.name "github-actions[bot]"
-              git config user.email "github-actions[bot]@users.noreply.github.com"
-              git add docs/data || true
-              git add feed_map.json channels.json || true
-              if ! git diff --cached --quiet; then
-                git commit -m "ci: update generated docs data [skip ci]" || true
-                git push origin HEAD:main
-              else
-                echo "No generated changes to commit."
-              fi
+      - name: Commit generated docs/data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data || true
+          git add feed_map.json channels.json || true
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: update generated docs data [skip ci]" || true
+            git push origin HEAD:main
+          else
+            echo "No generated changes to commit."
+          fi
