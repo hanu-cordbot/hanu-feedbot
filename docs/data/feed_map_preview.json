@@ -1,5 +1,5 @@
 {
-  "source": "docs/data/feed_map.json",
+  "source": "feed_map.json",
   "sample_keys": [
     "https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss",
     "https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss"
