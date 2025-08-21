@@ -214,8 +214,10 @@
     let feeds = [];
     let metadata = {};
     let groups = {};
-    let mappings = {};
-    let channels = [];
+  let mappings = {};
+  let channels = [];
+  // Lookup by channel id for quick resolution (populated from channels.json or feed_map.json)
+  let channelsById = {};
     let lastUpdate = null;
     let currentView = 'grouped';
     let currentGroupBy = 'status';
@@ -261,9 +263,31 @@
     if (mapResp.ok) {
       const mapJson = await mapResp.json().catch(() => null);
       if (mapJson && typeof mapJson === 'object') {
-        // If the feed_map contains nested shapes, try to find the mapping object
+        // feed_map.json may use different shapes. Possible forms:
+        // { "feed_url": "<channelId>" }
+        // { "feed_url": { "channel": "<id>", "channel_name": "name", "channel_type": "forum" } }
+        // or { map: { ... } }
         const candidate = mapJson.map || mapJson.mappings || mapJson || {};
-        mappings = Object.assign({}, mappings, candidate);
+        // Merge feed->channel mapping
+        for (const [feedUrl, v] of Object.entries(candidate)) {
+          if (typeof v === 'string' || typeof v === 'number') {
+            mappings[feedUrl] = String(v);
+          } else if (v && typeof v === 'object') {
+            // prefer explicit channel id fields
+            const chId = v.channel || v.channel_id || v.id || v.discord_channel || null;
+            if (chId) mappings[feedUrl] = String(chId);
+            // if channel metadata present, record to channelsById
+            const recordedId = chId ? String(chId) : null;
+            if (recordedId) {
+              channelsById[recordedId] = channelsById[recordedId] || {};
+              if (v.channel_name) channelsById[recordedId].name = v.channel_name;
+              if (v.channel_display_name) channelsById[recordedId].name = v.channel_display_name;
+              if (v.name) channelsById[recordedId].name = v.name;
+              if (v.channel_type) channelsById[recordedId].type = v.channel_type;
+              if (v.type) channelsById[recordedId].type = v.type;
+            }
+          }
+        }
       }
     }
   } catch (e) { console.debug('feed_map.json fetch failed', e); }
@@ -279,6 +303,22 @@
       }
     }
   } catch (e) { console.debug('channels.json fetch failed', e); }
+
+  // Populate channelsById from channels array (channels.json) so lookups can resolve names/types
+  try {
+    if (Array.isArray(channels)) {
+      for (const ch of channels) {
+        if (!ch) continue;
+        const id = ch.id || ch.channel_id || ch.discord_id || ch.name;
+        if (!id) continue;
+        const sid = String(id);
+        channelsById[sid] = channelsById[sid] || {};
+        if (ch.name) channelsById[sid].name = ch.name;
+        if (ch.type) channelsById[sid].type = ch.type;
+        if (ch.channel_type) channelsById[sid].type = ch.channel_type;
+      }
+    }
+  } catch(e) { console.debug('channelsById populate failed', e); }
   // last update may be reported in multiple places depending on generator
   lastUpdate = data.last_update || data.lastUpdated || data.last_updated ||
          (data.stats && (data.stats.last_updated || data.stats.lastUpdated)) ||
@@ -617,9 +657,20 @@
       let channelId = (mappings && mappings[feed.url]) || feed.channel || feed.channel_id || (metadata && metadata[feed.url] && metadata[feed.url].channel_id) || null;
       if (!channelId) return { id: null, name: 'Not mapped', emoji: '—', unresolved: false };
 
-      // Try to resolve from channels array
+      const sid = String(channelId);
+
+      // Prefer channelsById (populated from channels.json or feed_map.json)
+      if (channelsById && channelsById[sid]) {
+        const ch = channelsById[sid];
+        const type = ch.type || 'text';
+        const typeEmoji = type === 'forum' ? '💬' : (type === 'voice' ? '🔊' : '📝');
+        const name = ch.name || `Channel-${sid.slice(-4)}`;
+        return { id: sid, name, emoji: typeEmoji, unresolved: false };
+      }
+
+      // Fallback to scanning channels array
       if (Array.isArray(channels) && channels.length > 0) {
-        const channel = channels.find(ch => String(ch.id) === String(channelId) || ch.name === channelId);
+        const channel = channels.find(ch => String(ch.id) === sid || ch.name === channelId);
         if (channel) {
           const typeEmoji = channel.type === 'forum' ? '💬' : (channel.type === 'voice' ? '🔊' : '📝');
           return { id: String(channel.id), name: channel.name || `Channel-${String(channel.id).slice(-4)}`, emoji: typeEmoji, unresolved: false };
@@ -627,11 +678,11 @@
       }
 
       // If channelId looks like a numeric id, show unresolved numeric fallback
-      if (/^\d+$/.test(String(channelId))) {
-        return { id: String(channelId), name: `Channel-${String(channelId).slice(-4)}`, emoji: '📝', unresolved: true };
+      if (/^\d+$/.test(sid)) {
+        return { id: sid, name: `Channel-${sid.slice(-4)}`, emoji: '📝', unresolved: true };
       }
       // Otherwise assume it's a human-provided name
-      return { id: String(channelId), name: String(channelId), emoji: '📝', unresolved: false };
+      return { id: sid, name: String(channelId), emoji: '📝', unresolved: false };
     }
 
     function isActiveFeed(feed) {
