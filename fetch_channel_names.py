@@ -59,7 +59,22 @@ TYPE_MAP = {
     2: 'voice',
 }
 
+
+def load_existing(out='channels.json'):
+    try:
+        if os.path.exists(out):
+            arr = json.load(open(out, 'r', encoding='utf-8'))
+            return {str(item.get('id')): item for item in arr if item and item.get('id')}
+    except Exception:
+        pass
+    return {}
+
 if __name__ == '__main__':
+    import argparse
+    p = argparse.ArgumentParser(description='Fetch channel names (merges with existing channels.json by default)')
+    p.add_argument('--force', action='store_true', help='Always overwrite names with values from Discord API')
+    args = p.parse_args()
+
     if not TOKEN:
         print('DISCORD_BOT_TOKEN not set; exiting (no changes).')
         sys.exit(0)
@@ -78,17 +93,28 @@ if __name__ == '__main__':
         print('No numeric channel IDs found in feed_map.json; nothing to fetch.')
         sys.exit(0)
 
+    existing = load_existing('channels.json')
     channels = []
     for cid in sorted(candidates):
         print(f'Fetching channel {cid}...')
         info = fetch_channel_info(cid)
         if info:
             ch_type = TYPE_MAP.get(info.get('type'), 'text')
+            # prefer Discord API name unless we should preserve an existing custom name
+            api_name = info.get('name') or f'channel-{str(info.get("id"))[-4:]}'
+            if not args.force and str(info.get('id')) in existing and existing[str(info.get('id'))].get('name'):
+                name = existing[str(info.get('id'))].get('name')
+            else:
+                name = api_name
             channels.append({
                 'id': str(info.get('id')),
-                'name': info.get('name') or f'channel-{str(info.get("id"))[-4:]}',
+                'name': name,
                 'type': ch_type
             })
+        else:
+            # no API info: fall back to existing record if present
+            if cid in existing:
+                channels.append(existing[cid])
 
     if channels:
         out = 'channels.json'
