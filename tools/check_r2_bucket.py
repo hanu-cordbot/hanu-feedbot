@@ -16,7 +16,8 @@ def check_r2_bucket():
     access_key = os.environ.get('R2_ACCESS_KEY_ID')
     secret_key = os.environ.get('R2_SECRET_ACCESS_KEY') 
     endpoint = os.environ.get('R2_ENDPOINT')
-    bucket_name = os.environ.get('SEEN_R2_BUCKET')
+    # Prefer canonical R2_BUCKET, then FEEDS_R2_BUCKET, then SEEN_R2_BUCKET
+    bucket_name = os.environ.get('R2_BUCKET') or os.environ.get('FEEDS_R2_BUCKET') or os.environ.get('SEEN_R2_BUCKET')
     
     if not all([access_key, secret_key, endpoint, bucket_name]):
         print("❌ Missing R2 credentials. Need: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, SEEN_R2_BUCKET")

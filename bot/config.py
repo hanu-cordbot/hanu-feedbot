@@ -16,10 +16,9 @@ FEED_LIST = Path(__file__).resolve().parent.parent / "feeds.txt" # Default: read
 def _maybe_fetch_feeds_from_r2():
     import os
     from pathlib import Path
-    # Prefer explicit FEEDS_R2_BUCKET, but fall back to SEEN_R2_BUCKET which
-    # the workflow already exposes. This lets CI jobs that only set
-    # SEEN_R2_BUCKET still fetch `feeds.txt` from the same bucket.
-    bucket = os.getenv('FEEDS_R2_BUCKET') or os.getenv('SEEN_R2_BUCKET')
+    # Prefer canonical R2_BUCKET, then FEEDS_R2_BUCKET, then SEEN_R2_BUCKET.
+    # This keeps backward-compatibility while making R2_BUCKET the primary name.
+    bucket = os.getenv('R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('SEEN_R2_BUCKET')
     access_key = os.getenv('R2_ACCESS_KEY_ID')
     secret = os.getenv('R2_SECRET_ACCESS_KEY')
     endpoint = os.getenv('R2_ENDPOINT')
@@ -46,7 +45,7 @@ _maybe_fetch_feeds_from_r2()
 SEEN_DB   = BASE_DIR / "seen.json"          # This will now be /data/seen.json on Railway
 
 # Optional R2/S3 bucket for persisting runtime state (seen.json)
-SEEN_R2_BUCKET = os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET')
+SEEN_R2_BUCKET = os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('R2_BUCKET')
 
 def r2_client():
     """Return a boto3 S3-compatible client if R2 envs are set, else None."""

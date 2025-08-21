@@ -2,7 +2,7 @@ import boto3,os,json,sys
 endpoint = os.environ.get('R2_ENDPOINT')
 access = os.environ.get('R2_ACCESS_KEY_ID')
 secret = os.environ.get('R2_SECRET_ACCESS_KEY')
-bucket = os.environ.get('FEEDS_R2_BUCKET') or os.environ.get('SEEN_R2_BUCKET') or 'hanu-feedbot-seen'
+bucket = os.environ.get('R2_BUCKET') or os.environ.get('FEEDS_R2_BUCKET') or os.environ.get('SEEN_R2_BUCKET') or 'hanu-feedbot-seen'
 if not (endpoint and access and secret):
     print('Missing R2 env vars: R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY')
     sys.exit(1)

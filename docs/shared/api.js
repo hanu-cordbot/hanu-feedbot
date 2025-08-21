@@ -238,6 +238,14 @@ class HanuAPI {
   // ===== CHANNEL MANAGEMENT =====
 
   async getChannels() {
+    if (this.localDataEnabled) {
+      try {
+        const meta = await this.loadDataSmart('/api/channels', 'meta.json');
+        if (meta && meta.channels) return { channels: meta.channels };
+      } catch (err) {
+        console.warn('Failed to load local meta.json for channels:', err);
+      }
+    }
     return this.get('/api/channels');
   }
 
@@ -286,6 +294,14 @@ class HanuAPI {
   // ===== GROUP MANAGEMENT =====
 
   async getGroups() {
+    if (this.localDataEnabled) {
+      try {
+        const meta = await this.loadDataSmart('/api/groups', 'meta.json');
+        if (meta && meta.groups) return { groups: meta.groups };
+      } catch (err) {
+        console.warn('Failed to load local meta.json for groups:', err);
+      }
+    }
     return this.get('/api/groups');
   }
 
@@ -443,6 +459,23 @@ class HanuAPI {
 
   async getPublicFeeds() {
     try {
+      // If the static dashboard is configured to use local data, prefer the generated JSON files
+      if (this.localDataEnabled) {
+        try {
+          const localFeeds = await this.loadDataSmart('/api/public/feeds', 'feeds.json');
+          const localMeta = await this.loadDataSmart('/api/public/meta', 'meta.json');
+          // Normalize shape expected by callers
+          return {
+            feeds: localFeeds?.feeds || localFeeds || [],
+            mappings: localFeeds?.mappings || {},
+            metadata: localMeta || {},
+            groups: (localMeta && localMeta.groups) || {}
+          };
+        } catch (err) {
+          console.warn('Failed to load local dashboard data, falling back to API:', err);
+        }
+      }
+
       const url = `${this.baseUrl}/api/public/feeds`;
       const response = await fetch(url, {
         headers: { 'Content-Type': 'application/json' }
@@ -454,7 +487,7 @@ class HanuAPI {
 
       return await response.json();
     } catch (error) {
-      console.warn('Public feeds endpoint not available');
+      console.warn('Public feeds endpoint not available:', error);
       return { feeds: [] };
     }
   }

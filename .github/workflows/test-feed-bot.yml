@@ -56,7 +56,8 @@ jobs:
         run: |
           python3 - << 'PY'
           import os, sys
-          bucket = os.getenv('R2_BUCKET') or os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET')
+          # Prefer canonical R2_BUCKET, then FEEDS_R2_BUCKET, then SEEN_R2_BUCKET
+          bucket = os.getenv('R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('SEEN_R2_BUCKET')
           access = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')
           secret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')
           endpoint = os.getenv('R2_ENDPOINT')

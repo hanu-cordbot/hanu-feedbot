@@ -1,0 +1,36 @@
+name: Test R2 seen.json round-trip
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/hide-feeds
+
+jobs:
+  r2-roundtrip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install boto3
+
+      - name: Run R2 seen.json round-trip test
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          # Provide canonical set of bucket envs to the test
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          FEEDS_R2_BUCKET: ${{ secrets.FEEDS_R2_BUCKET }}
+          SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
+        run: |
+          python tools/test_seen_r2.py
