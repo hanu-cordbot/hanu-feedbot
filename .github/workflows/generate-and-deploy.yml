@@ -5,7 +5,12 @@ on:
     branches: [ main ]
   schedule:
     - cron: '0 3 * * *' # daily at 03:00 UTC
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      fb_post_url:
+        description: 'Optional Facebook post URL to download and upload to R2'
+        required: false
+        default: ''
   # Trigger after the feed-bot workflow completes (so data produced by the bot is available)
   workflow_run:
     workflows:
@@ -80,6 +85,50 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
         run: |
           python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
+
+      - name: Optional: Download Facebook video and upload to R2
+        if: ${{ github.event.inputs.fb_post_url != '' }}
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          FB_POST_URL: ${{ github.event.inputs.fb_post_url }}
+        run: |
+          set -e
+          echo "FB_POST_URL=$FB_POST_URL"
+          python -m pip install --upgrade pip
+          pip install yt-dlp
+
+          TMP=$(mktemp -d)
+          OUT="$TMP/facebook_video.mp4"
+          echo "Downloading video to $OUT"
+          yt-dlp --cookies netscape_cookies.txt -f best -o "$OUT" "$FB_POST_URL" || (echo "yt-dlp failed"; exit 0)
+
+          if [ ! -f "$OUT" ]; then
+            echo "No output file; skipping upload"
+            exit 0
+          fi
+
+          # Upload to R2 if configured
+          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$R2_BUCKET" ]; then
+            echo "R2 not configured; skipping upload"
+            exit 0
+          fi
+
+          if ! command -v aws >/dev/null 2>&1; then
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+            unzip -q awscliv2.zip
+            sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin || true
+          fi
+
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION="us-east-1"
+
+          KEY="videos/$(date +%s)_facebook_video.mp4"
+          echo "Uploading $OUT to s3://$R2_BUCKET/$KEY"
+          aws --endpoint-url "$R2_ENDPOINT" s3 cp "$OUT" "s3://$R2_BUCKET/$KEY" --acl public-read || echo "Upload failed"
 
       - name: Generate dashboard data
         run: |
