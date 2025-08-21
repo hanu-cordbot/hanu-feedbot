@@ -117,6 +117,18 @@ async function handleRequest(event) {
       return jsonResponse({ success: true, feed: feedUrl }, 200);
     }
 
+    // Public GET: allow serving arbitrary JSON files from the configured dashboard prefix
+    // Examples: GET /feed_map.json -> dashboard/data/feed_map.json
+    if (request.method === 'GET') {
+      const key = mapPathToKey(pathname);
+      const obj = await FEEDS_BUCKET.get(key);
+      if (obj) {
+        const text = await obj.text();
+        return new Response(text, { status: 200, headers: jsonCorsHeaders() });
+      }
+      // else continue to return not_found at the end
+    }
+
     // Fallback: route not handled
     return jsonResponse({ error: 'not_found' }, 404);
 
