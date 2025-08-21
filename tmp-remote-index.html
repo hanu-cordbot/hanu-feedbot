@@ -1,0 +1,622 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HANU-cordbot Feed Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js"></script>
+  <style>
+    /* Discord emoji styling */
+    img.emoji { height: 1em; width: 1em; margin: 0 0.05em 0 0.1em; vertical-align: -0.1em; }
+    
+    /* Minimal design matching your old layout */
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: #f8f9fa; color: #333; line-height: 1.5; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    
+    /* Simple header - no gradients */
+    .header { margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #e9ecef; }
+    .header h1 { margin: 0; font-size: 1.8rem; color: #495057; font-weight: 600; }
+    .header p { margin: 5px 0 0 0; color: #6c757d; font-size: 0.95rem; }
+    .header a { color: #007bff; text-decoration: none; }
+    .header a:hover { text-decoration: underline; }
+    
+    /* Stats bar - minimal */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 6px; }
+    .stat { text-align: center; }
+    .stat-value { font-size: 1.5rem; font-weight: 600; color: #495057; }
+    .stat-label { font-size: 0.85rem; color: #6c757d; margin-top: 4px; }
+    
+    /* Simple controls */
+    .controls { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center; }
+    .controls label { font-weight: 500; margin-right: 10px; }
+    .controls a { color: #007bff; text-decoration: none; margin: 0 8px; padding: 4px 8px; border-radius: 4px; }
+    .controls a:hover { text-decoration: underline; background: rgba(0, 123, 255, 0.1); }
+    .controls a.active { font-weight: 600; color: #495057; background: #007bff; color: white; }
+    .controls .group-by-section { display: flex; align-items: center; gap: 10px; }
+    
+    /* Table layout - matching your old design */
+    .feeds-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .feeds-table th, .feeds-table td { padding: 12px; text-align: left; border-bottom: 1px solid #e9ecef; }
+    .feeds-table th { background: #f8f9fa; font-weight: 600; color: #495057; font-size: 0.9rem; }
+    .feeds-table tbody tr:hover { background: #f8f9fa; }
+    
+    /* Feed row styling */
+    .feed-name { font-weight: 500; color: #495057; }
+    .feed-date { color: #6c757d; font-size: 0.9rem; }
+    .feed-channel { color: #6c757d; font-size: 0.9rem; }
+    .feed-link { color: #007bff; text-decoration: none; font-size: 0.9rem; }
+    .feed-link:hover { text-decoration: underline; }
+    
+    /* Status indicators */
+    .status { padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
+    .status-active { background: #d4edda; color: #155724; }
+    .status-inactive { background: #f8d7da; color: #721c24; }
+    
+    /* Admin link */
+    .admin-link { position: fixed; bottom: 20px; right: 20px; background: #007bff; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+    .admin-link:hover { background: #0056b3; }
+    
+    /* Loading/error states */
+    .loading, .error { text-align: center; padding: 40px; color: #6c757d; }
+    .error { color: #dc3545; }
+    
+    /* Group sections */
+    .group-section { margin: 30px 0; }
+    .group-section.inactive-group { order: 2; }
+    .group-section.active-group { order: 1; }
+    
+    .group-header { 
+      background: #007bff; 
+      color: white; 
+      padding: 10px 15px; 
+      border-radius: 6px; 
+      margin-bottom: 10px; 
+      font-weight: 600; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+    }
+    .group-header:hover { background: #0056b3; }
+    .group-header.inactive { background: #6c757d; }
+    .group-count { background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; }
+    .group-arrow { 
+      transition: transform 0.2s ease; 
+      font-size: 0.8rem;
+      margin-right: 8px;
+    }
+    .group-header.collapsed .group-arrow { transform: rotate(-90deg); }
+    .group-content { overflow: hidden; transition: max-height 0.3s ease; }
+    .group-content.collapsed { max-height: 0; }
+    .group-content:not(.collapsed) { max-height: 2000px; }
+    
+    /* Footer */
+    .footer { margin-top: 50px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center; color: #6c757d; font-size: 0.9rem; }
+    .footer a { color: #007bff; text-decoration: none; margin: 0 10px; }
+    .footer a:hover { text-decoration: underline; }
+    .footer .support-btn { background: #28a745; color: white; padding: 8px 16px; border-radius: 4px; display: inline-block; margin-top: 10px; }
+    .footer .support-btn:hover { background: #218838; text-decoration: none; }
+    
+    /* Responsive */
+    @media (max-width: 768px) { 
+      .stats { grid-template-columns: repeat(2, 1fr); } 
+      .feeds-table { font-size: 0.9rem; }
+      .feeds-table th, .feeds-table td { padding: 8px; }
+      .controls { flex-direction: column; align-items: stretch; }
+    }
+  /* Hoverable dashed underline for last-update label */
+  #last-update + .stat-label {
+    display: inline-block;
+    border-bottom: 1px dashed currentColor;
+    cursor: help;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <!-- Simple header -->
+    <div class="header">
+      <h1>≡ƒôï HANU-cordbot Feed Tracker</h1>
+      <p>~a tracker for all posts scanned by <a href="https://discord.gg/P8mmcvTM5P" target="_blank">hanu-cordbot</a></p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value" id="active-feeds">--</div>
+        <div class="stat-label">Active Feeds</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="total-feeds">--</div>
+        <div class="stat-label">Total Monitored</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="last-update">--</div>
+        <div class="stat-label">Last Update</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value" id="system-status">--</div>
+        <div class="stat-label">System Status</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <label>View:</label>
+      <a href="#" onclick="setView('flat')" id="flat-link">Flat</a>
+      <a href="#" onclick="setView('grouped')" class="active" id="grouped-link">Grouped</a>
+      
+      <!-- Group by section -->
+      <div class="group-by-section" id="group-by-section">
+        <label>Group by:</label>
+        <a href="#" onclick="setGroupBy('category')" id="group-category">Category</a>
+        <a href="#" onclick="setGroupBy('status')" class="active" id="group-status">Status</a>
+      </div>
+      
+      <label>Sort by:</label>
+      <a href="#" onclick="setSortBy('name')" id="sort-name">Name</a>
+      <a href="#" onclick="setSortBy('date')" class="active" id="sort-date">Date Γåæ</a>
+      <a href="#" onclick="setSortBy('channel')" id="sort-channel">Channel</a>
+      
+      <label>Filter:</label>
+      <a href="#" onclick="setFilter('all')" class="active" id="filter-all">All</a>
+      <a href="#" onclick="setFilter('active')" id="filter-active">Active</a>
+      <a href="#" onclick="setFilter('inactive')" id="filter-inactive">Inactive</a>
+    </div>
+
+    <!-- Loading state -->
+    <div id="loading-state" class="loading">
+      ≡ƒôí Loading feed data...
+    </div>
+
+    <!-- Error state -->
+    <div id="error-state" class="error" style="display: none;">
+      ΓÜá∩╕Å Unable to load feed data. <button onclick="loadData()" style="margin-left: 10px;">Retry</button>
+    </div>
+
+    <!-- Feeds display container -->
+    <div id="feeds-container" style="display: none;">
+      <!-- Content will be inserted here -->
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div>
+        <a href="https://github.com/hanu-cordbot/hanu-feedbot" target="_blank">Github</a>
+        <span> ΓÇó  </span>
+        <span>made with Γ¥ñ∩╕Å by namesn_pe</span>
+        <span>  ΓÇó </span>
+        <span><a href="https://discord.gg/P8mmcvTM5P" target="_blank">HANUcord</a></span>
+      </div>
+    </div>
+
+    <!-- Admin link -->
+    <a href="dashboard.html" class="admin-link">≡ƒöº Admin</a>
+  </div>
+
+  <script>
+    // Base URL for API calls (via Cloudflare Worker proxy)
+    const API_BASE = 'https://hanu-api-proxy.snacky496.workers.dev';
+    let feeds = [];
+    let metadata = {};
+    let groups = {};
+    let mappings = {};
+    let channels = [];
+    let lastUpdate = null;
+    let currentView = 'grouped';
+    let currentGroupBy = 'status';
+    let currentSort = 'date';
+    let currentFilter = 'all';
+    let sortOrder = { name: 'asc', date: 'asc', channel: 'asc' }; // Newest first by default
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+      await loadData();
+      // Parse emojis once on initial load
+      twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
+      // Only auto-refresh in non-GitHub Pages environments to allow backend idling
+      if (!window.location.hostname.endsWith('github.io')) {
+        setInterval(loadData, 5 * 60 * 1000); // Auto-refresh every 5 minutes
+      }
+    });
+
+    async function loadData() {
+      document.getElementById('loading-state').style.display = 'block';
+      document.getElementById('error-state').style.display = 'none';
+      document.getElementById('feeds-container').style.display = 'none';
+
+      try {
+        // Fetch from Flask backend using relative API path
+        const response = await fetch(`${API_BASE}/api/public/feeds`);
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+  const data = await response.json();
+  // Support multiple possible shapes from the generator (legacy and newer keys)
+  feeds = data.feeds || [];
+  metadata = data.metadata || data.meta || {};
+  groups = data.groups || {};
+  mappings = data.mappings || data.map || {};
+  channels = data.channels || data.channel_list || [];
+  // last update may be reported as last_update or lastUpdated in different generators
+  lastUpdate = data.last_update || data.lastUpdated || (data.meta && data.meta.lastUpdated) || null;
+        
+        renderFeeds();
+        updateStats();
+        
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('feeds-container').style.display = 'block';
+        
+        // Parse emojis
+        
+      } catch (error) {
+        console.error('Failed to load data:', error);
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('error-state').style.display = 'block';
+      }
+    }
+
+    function renderFeeds() {
+      const container = document.getElementById('feeds-container');
+      
+      if (feeds.length === 0) {
+        container.innerHTML = '<div class="loading">No feeds available</div>';
+        return;
+      }
+
+      // Apply filtering
+      let filteredFeeds = feeds.filter(feed => {
+        if (currentFilter === 'all') return true;
+        const isActive = isActiveFeed(feed);
+        if (currentFilter === 'active') return isActive;
+        if (currentFilter === 'inactive') return !isActive;
+        return true;
+      });
+
+      // Apply sorting
+      filteredFeeds.sort((a, b) => {
+        let result = 0;
+        switch (currentSort) {
+          case 'name':
+            result = getTitle(a).localeCompare(getTitle(b));
+            break;
+          case 'date':
+            result = new Date(getLastPost(b) || 0) - new Date(getLastPost(a) || 0);
+            break;
+          case 'channel':
+            result = getChannelName(a).localeCompare(getChannelName(b));
+            break;
+          default:
+            return 0;
+        }
+        return sortOrder[currentSort] === 'desc' ? -result : result;
+      });
+
+      if (currentView === 'grouped') {
+        renderGroupedView(filteredFeeds);
+      } else {
+        renderFlatView(filteredFeeds);
+      }
+    }
+
+    function renderFlatView(feedList) {
+      const container = document.getElementById('feeds-container');
+      
+      let html = `
+        <table class="feeds-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Last Post</th>
+              <th>Channel</th>
+              <th>Page</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      feedList.forEach(feed => {
+        const title = getTitle(feed);
+        const lastPost = formatDate(getLastPost(feed));
+        const pageUrl = getPageUrl(feed);
+        const isActive = isActiveFeed(feed);
+        const channelName = getChannelName(feed);
+
+        html += `
+          <tr>
+            <td>
+              <div class="feed-name">${title}</div>
+              <small style="color: #666;">${getGroupName(feed)}</small>
+            </td>
+            <td>
+              <span class="status ${isActive ? 'status-active' : 'status-inactive'}">
+                ${isActive ? '≡ƒƒó Active' : '≡ƒö┤ Inactive'}
+              </span>
+            </td>
+            <td class="feed-date">${lastPost}</td>
+            <td class="feed-channel">${channelName}</td>
+            <td><a href="${pageUrl}" target="_blank" class="feed-link">≡ƒöù Visit Page</a></td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function renderGroupedView(feedList) {
+      const container = document.getElementById('feeds-container');
+      
+      // Group feeds based on currentGroupBy
+      const groupedFeeds = {};
+      feedList.forEach(feed => {
+        let groupKey;
+        switch (currentGroupBy) {
+          case 'category':
+            groupKey = getGroupName(feed) || 'Other';
+            break;
+          case 'status':
+            groupKey = isActiveFeed(feed) ? 'Active' : 'Inactive';
+            break;
+          default:
+            groupKey = 'All';
+        }
+        
+        if (!groupedFeeds[groupKey]) groupedFeeds[groupKey] = [];
+        groupedFeeds[groupKey].push(feed);
+      });
+
+      let html = '<div style="display: flex; flex-direction: column;">';
+      
+      // Sort groups so Active comes first, Inactive last
+      const sortedGroups = Object.entries(groupedFeeds).sort(([a], [b]) => {
+        if (currentGroupBy === 'status') {
+          if (a === 'Active' && b === 'Inactive') return -1;
+          if (a === 'Inactive' && b === 'Active') return 1;
+        }
+        return a.localeCompare(b);
+      });
+      
+      sortedGroups.forEach(([groupName, groupFeeds]) => {
+        const groupId = `group-${groupName.replace(/\s+/g, '-').toLowerCase()}`;
+        const isInactive = groupName === 'Inactive';
+        
+        // Proper case, not uppercase
+        const displayName = groupName.charAt(0).toUpperCase() + groupName.slice(1).toLowerCase();
+        
+        html += `
+          <div class="group-section ${isInactive ? 'inactive-group' : 'active-group'}">
+            <div class="group-header ${isInactive ? 'inactive' : ''}" onclick="toggleGroup('${groupId}')">
+              <div>
+                <span class="group-arrow">Γû╝</span>
+                ≡ƒôü ${displayName}
+              </div>
+              <span class="group-count">${groupFeeds.length}</span>
+            </div>
+            <div class="group-content" id="${groupId}">
+              <table class="feeds-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Last Post</th>
+                    <th>Channel</th>
+                    <th>Page</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${groupFeeds.map(feed => `
+                    <tr>
+                      <td class="feed-name">${getTitle(feed)}</td>
+                      <td>
+                        <span class="status ${isActiveFeed(feed) ? 'status-active' : 'status-inactive'}">
+                          ${isActiveFeed(feed) ? '≡ƒƒó Active' : '≡ƒö┤ Inactive'}
+                        </span>
+                      </td>
+                      <td class="feed-date">${formatDate(getLastPost(feed))}</td>
+                      <td class="feed-channel">${getChannelName(feed)}</td>
+                      <td><a href="${getPageUrl(feed)}" target="_blank" class="feed-link">≡ƒöù Visit</a></td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      });
+      
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function toggleGroup(groupId) {
+      const content = document.getElementById(groupId);
+      const header = content.previousElementSibling;
+      
+      if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        header.classList.remove('collapsed');
+      } else {
+        content.classList.add('collapsed');
+        header.classList.add('collapsed');
+      }
+    }
+
+    function updateStats() {
+      const activeFeeds = feeds.filter(isActiveFeed);
+
+      document.getElementById('active-feeds').textContent = activeFeeds.length;
+      document.getElementById('total-feeds').textContent = feeds.length;
+      // Show only time, full datetime on hover
+      const elLast = document.getElementById('last-update');
+      if (lastUpdate) {
+        const dt = new Date(lastUpdate);
+        elLast.textContent = dt.toLocaleTimeString();
+        // Full datetime tooltip on value
+        elLast.title = dt.toLocaleString();
+        // Explanatory tooltip on label
+        const label = elLast.nextElementSibling;
+        if (label && label.classList.contains('stat-label')) {
+          // Base explanation plus troubleshooting info
+          label.title = 'hanu-cordbot scans for new posts on a ~hourly basis. It is strictly impossible to speed this up, due to internal limitations of Facebook and RSS feeds.'
+            + '\nFor troubleshooting purposes, the date and time of hanu-cordbot\'s last scan was ' + dt.toLocaleString() + '.';
+        }
+      } else {
+        elLast.textContent = '--';
+        elLast.removeAttribute('title');
+        const label = elLast.nextElementSibling;
+        if (label && label.classList.contains('stat-label')) {
+          label.removeAttribute('title');
+        }
+      }
+      document.getElementById('system-status').textContent = feeds.length > 0 ? '≡ƒƒó Online' : '≡ƒö┤ Offline';
+    }
+
+    // Helper functions
+    function getTitle(feed) {
+      return metadata[feed.url]?.title || feed.title || 'Unknown Feed';
+    }
+
+    function getLastPost(feed) {
+      // Try several possible fields produced by different generators
+      return (
+        (metadata && metadata[feed.url] && (metadata[feed.url].last_post || metadata[feed.url].lastUpdated || metadata[feed.url].last_updated)) ||
+        feed.lastPost || feed.last_post || feed.last_updated || null
+      );
+    }
+
+    function getPageUrl(feed) {
+      // Prefer an explicit page_url from metadata, then feed.pageUrl or feed.page or a facebook_page field
+      return (
+        (metadata && metadata[feed.url] && (metadata[feed.url].page_url || metadata[feed.url].pageUrl)) ||
+        feed.pageUrl || feed.page_url || feed.page || feed.facebook_page || feed.url
+      );
+    }
+
+    function getGroupName(feed) {
+      for (const [groupName, feedList] of Object.entries(groups)) {
+        if (Array.isArray(feedList) && feedList.includes(feed.url)) {
+          return groupName;
+        }
+      }
+      return 'Other';
+    }
+
+    function getChannelName(feed) {
+      // mappings may contain channel id or channel name depending on generator
+      let channelId = (mappings && mappings[feed.url]) || feed.channel || feed.channel_id || (metadata && metadata[feed.url] && metadata[feed.url].channel_id) || null;
+      if (!channelId) return 'Not mapped';
+
+      // If channels array is available, try to resolve id -> real name
+      if (Array.isArray(channels) && channels.length > 0) {
+        const channel = channels.find(ch => String(ch.id) === String(channelId) || ch.name === channelId);
+        if (channel) {
+          const typeEmoji = channel.type === 'forum' ? '≡ƒÆ¼' : (channel.type === 'voice' ? '≡ƒöè' : '≡ƒô¥');
+          return `${typeEmoji} ${channel.name || `Channel-${String(channelId).slice(-4)}`}`;
+        }
+      }
+
+      // If channelId looks like a numeric id, format a friendly fallback; otherwise assume it's already a human name
+      if (/^\d+$/.test(String(channelId))) {
+        return `≡ƒô¥ Channel-${String(channelId).slice(-4)}`;
+      }
+      return `≡ƒô¥ ${channelId}`;
+    }
+
+    function isActiveFeed(feed) {
+      // Enhanced activity detection: mapped to channel OR has post within 14 days
+      const channelId = mappings[feed.url];
+      const hasMappedChannel = !!channelId;
+      
+      const lastPost = getLastPost(feed);
+      const hasRecentPost = lastPost && (Date.now() - new Date(lastPost)) <= (14 * 24 * 60 * 60 * 1000); // 14 days
+      
+      return hasMappedChannel || hasRecentPost;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return 'Never';
+      // Ensure UTC parsing: append 'Z' if missing timezone
+      const iso = /(?:Z|[+\-]\d{2}:\d{2})$/.test(dateStr) ? dateStr : dateStr + 'Z';
+      const date = new Date(iso);
+      const now = new Date();
+      const diffHours = Math.floor((now - date) / (1000 * 60 * 60));
+      
+      if (diffHours < 24) {
+        return diffHours < 1 ? 'Just now' : `${diffHours}h ago`;
+      } else {
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays}d ago`;
+      }
+    }
+
+    // Control functions
+    function setView(view) {
+      currentView = view;
+      document.getElementById('flat-link').classList.toggle('active', view === 'flat');
+      document.getElementById('grouped-link').classList.toggle('active', view === 'grouped');
+      
+      // Show/hide group by section
+      const groupBySection = document.getElementById('group-by-section');
+      if (view === 'grouped') {
+        groupBySection.style.display = 'flex';
+      } else {
+        groupBySection.style.display = 'none';
+      }
+      
+      renderFeeds();
+    }
+
+    function setGroupBy(groupBy) {
+      currentGroupBy = groupBy;
+      document.getElementById('group-category').classList.toggle('active', groupBy === 'category');
+      document.getElementById('group-status').classList.toggle('active', groupBy === 'status');
+      
+      renderFeeds();
+    }
+
+    function setSortBy(sort) {
+      // Toggle sort order if clicking the same sort button
+      if (currentSort === sort) {
+        sortOrder[sort] = sortOrder[sort] === 'asc' ? 'desc' : 'asc';
+      } else {
+        currentSort = sort;
+      }
+      
+      // Update button text with arrows
+      document.getElementById('sort-name').classList.toggle('active', sort === 'name');
+      document.getElementById('sort-date').classList.toggle('active', sort === 'date');
+      document.getElementById('sort-channel').classList.toggle('active', sort === 'channel');
+      
+      // Clear all arrows first
+      ['sort-name', 'sort-date', 'sort-channel'].forEach(id => {
+        const btn = document.getElementById(id);
+        btn.textContent = btn.textContent.split(' ')[0];
+      });
+      
+      // Add arrow to active sort
+      const arrow = sortOrder[currentSort] === 'asc' ? ' Γåæ' : ' Γåô';
+      document.getElementById(`sort-${currentSort}`).textContent += arrow;
+      
+      renderFeeds();
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.getElementById('filter-all').classList.toggle('active', filter === 'all');
+      document.getElementById('filter-active').classList.toggle('active', filter === 'active');
+      document.getElementById('filter-inactive').classList.toggle('active', filter === 'inactive');
+      renderFeeds();
+    }
+
+    // Make functions globally available
+    window.setView = setView;
+    window.setGroupBy = setGroupBy;
+    window.setSortBy = setSortBy;
+    window.setFilter = setFilter;
+    window.loadData = loadData;
+    window.toggleGroup = toggleGroup;
+  </script>
+</body>
+</html>

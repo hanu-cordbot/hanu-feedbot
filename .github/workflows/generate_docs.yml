@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
 
     steps:
       - name: Checkout
@@ -157,7 +159,7 @@ jobs:
           path: docs/data/artifacts
 
       - name: Fetch channel names (CI only)
-        if: ${{ secrets.DISCORD_BOT_TOKEN != '' }}
+        if: ${{ env.DISCORD_BOT_TOKEN != '' }}
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
         run: |
