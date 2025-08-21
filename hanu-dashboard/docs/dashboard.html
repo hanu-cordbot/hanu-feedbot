@@ -979,7 +979,14 @@
       if (isNaN(dt)) return '';
       const now = new Date();
       const diffMinutes = Math.floor((now - dt) / (1000 * 60));
-      
+
+      // If it's the same day, show 24-hour time HH:MM (easier to scan)
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfDtDay = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      if (startOfToday.getTime() === startOfDtDay.getTime()) {
+        return dt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      }
+
       if (diffMinutes < 1) return 'Just now';
       if (diffMinutes < 60) return `${diffMinutes}m ago`;
       if (diffMinutes < 1440) return `${Math.floor(diffMinutes / 60)}h ago`;

@@ -5,8 +5,9 @@
   <title>FeedBot Dashboard</title>
   <style>
     ul.feed-list { list-style:none; padding:0; margin:0; }
-    /* Grid layout only for main feed list (non-grouped) */
-    ul.feed-list:not([data-group]) li { display: grid; grid-template-columns: 30px 250px 100px 1fr 80px 140px 140px; align-items: center; margin-bottom: 5px; column-gap: 10px; }
+  /* Grid layout only for main feed list (non-grouped) */
+  /* Columns: checkbox | title | date | feed/url | action | channel | group */
+  ul.feed-list:not([data-group]) li { display: grid; grid-template-columns: 30px 320px 120px 1fr 80px 220px 120px 120px; align-items: center; margin-bottom: 5px; column-gap: 10px; }
     ul.feed-list li form, ul.feed-list li select, ul.feed-list li a { margin: 0 5px; }
     .utilities button { margin-right: 10px; }
     /* Tree view for grouped feeds */
@@ -43,7 +44,7 @@
     /* Grid layout for grouped feeds */
     ul.feed-list.grouped li {
       display: grid;
-      grid-template-columns: 30px 250px 100px 1fr 80px 140px 140px;
+      grid-template-columns: 30px 320px 120px 1fr 80px 220px 120px 120px;
       align-items: center;
       margin-bottom: 5px;
       column-gap: 10px;
@@ -57,7 +58,7 @@
     ul.feed-list:not([data-group]) li.header-row,
     ul.feed-list:not([data-group]) li:not(.header-row) {
       display: grid;
-      grid-template-columns: 30px 250px 100px 1fr 80px 140px 140px;
+      grid-template-columns: 30px 320px 120px 1fr 80px 220px 120px 120px;
       align-items: center;
       margin-bottom: 5px;
       column-gap: 10px;
@@ -322,21 +323,34 @@
         const url = el.dataset.url;
         const dateStr = meta[url]?.last_post;
         if (dateStr) {
-          let d = new Date(dateStr);
-          d.setHours(d.getHours() + 7); // convert to GMT+7
+          // Parse date and normalize to local time (server timestamps are UTC-ish)
+          const d = new Date(dateStr);
+          if (isNaN(d)) { el.textContent = 'Invalid'; return; }
+          // Convert to local timezone display (add offset if server stored UTC)
+          // Keep original Date object for calculations
           const now = new Date();
+          const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const startOfPostDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
           const diffMs = now - d;
           const diffSec = Math.floor(diffMs / 1000);
           const diffMin = Math.floor(diffSec / 60);
           const diffHrs = Math.floor(diffMin / 60);
-          const diffDays = Math.floor(diffHrs / 24);
           let rel;
-          if (diffSec < 60) rel = `${diffSec}s ago`;
-          else if (diffMin < 60) rel = `${diffMin}m ago`;
-          else if (diffHrs < 24) rel = `${diffHrs}h ago`;
-          else rel = `${diffDays}d ago`;
+          // If the post is from today, display 24-hour time like 14:35
+          if (startOfToday.getTime() === startOfPostDay.getTime()) {
+            rel = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          } else if (diffSec < 60) {
+            rel = `${diffSec}s ago`;
+          } else if (diffMin < 60) {
+            rel = `${diffMin}m ago`;
+          } else if (diffHrs < 24) {
+            rel = `${diffHrs}h ago`;
+          } else {
+            const diffDays = Math.floor(diffHrs / 24);
+            rel = `${diffDays}d ago`;
+          }
           el.textContent = rel;
-          el.title = d.toLocaleString('en-GB', { timeZone: 'Asia/Ho_Chi_Minh' });
+          el.title = d.toLocaleString('en-GB');
         } else {
           el.textContent = 'N/A';
         }
