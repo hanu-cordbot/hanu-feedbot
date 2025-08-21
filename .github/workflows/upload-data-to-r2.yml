@@ -44,6 +44,14 @@ jobs:
           # Trim slashes
           PREFIX=$(echo "$PREFIX" | sed 's#^/*##; s#/*$##')
 
+          # If a root-level feed_map.json was generated and not checked into docs/data,
+          # copy it so the uploader will include the authoritative mapping.
+          if [ -f feed_map.json ] && [ ! -f docs/data/feed_map.json ]; then
+            mkdir -p docs/data
+            cp feed_map.json docs/data/feed_map.json || true
+            echo "Copied root feed_map.json -> docs/data/feed_map.json for upload"
+          fi
+
           for f in docs/data/*.json; do
             [ -f "$f" ] || continue
             key="$PREFIX/$(basename "$f")"
