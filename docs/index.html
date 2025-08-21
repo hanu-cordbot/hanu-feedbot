@@ -252,6 +252,33 @@
   groups = data.groups || data.stats?.groups || {};
   mappings = data.mappings || data.map || data.stats?.mappings || {};
   channels = data.channels || data.channel_list || data.stats?.channels || [];
+
+  // Additionally, try to fetch R2-backed artifacts directly from the same API proxy.
+  // The Cloudflare worker maps bare paths like /feed_map.json and /channels.json to R2 keys
+  // (e.g. dashboard/data/feed_map.json). Merge them in if present so channel resolution works.
+  try {
+    const mapResp = await fetch(`${API_BASE}/feed_map.json`);
+    if (mapResp.ok) {
+      const mapJson = await mapResp.json().catch(() => null);
+      if (mapJson && typeof mapJson === 'object') {
+        // If the feed_map contains nested shapes, try to find the mapping object
+        const candidate = mapJson.map || mapJson.mappings || mapJson || {};
+        mappings = Object.assign({}, mappings, candidate);
+      }
+    }
+  } catch (e) { console.debug('feed_map.json fetch failed', e); }
+
+  try {
+    const chResp = await fetch(`${API_BASE}/channels.json`);
+    if (chResp.ok) {
+      const chJson = await chResp.json().catch(() => null);
+      if (chJson) {
+        if (Array.isArray(chJson)) channels = chJson;
+        else if (Array.isArray(chJson.channels)) channels = chJson.channels;
+        else if (Array.isArray(chJson.channel_list)) channels = chJson.channel_list;
+      }
+    }
+  } catch (e) { console.debug('channels.json fetch failed', e); }
   // last update may be reported in multiple places depending on generator
   lastUpdate = data.last_update || data.lastUpdated || data.last_updated ||
          (data.stats && (data.stats.last_updated || data.stats.lastUpdated)) ||
