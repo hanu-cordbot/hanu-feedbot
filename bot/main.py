@@ -482,8 +482,36 @@ async def process_entry_in_forum(client, entry, forum_channel):
         thread = await forum_channel.create_thread(name=title, content=first_chunk)
 
         # Post remaining chunks (skip first) into the thread
-        for chunk in chunks[1:]:
-            await thread.send(chunk)
+        posted_via = None
+        try:
+            for chunk in chunks[1:]:
+                await thread.send(chunk)
+            posted_via = 'direct'
+        except AttributeError:
+            # Handle ThreadWithMessage which may not expose send(); try replying to starter message
+            try:
+                if hasattr(thread, 'message') and thread.message is not None and hasattr(thread.message, 'reply'):
+                    for chunk in chunks[1:]:
+                        await thread.message.reply(chunk)
+                    posted_via = 'starter_message_reply'
+            except Exception:
+                posted_via = None
+
+            # Try resolving channel by id via client.get_channel
+            if not posted_via and hasattr(thread, 'id'):
+                try:
+                    resolved = client.get_channel(thread.id)
+                    if resolved and hasattr(resolved, 'send'):
+                        for chunk in chunks[1:]:
+                            await resolved.send(chunk)
+                        posted_via = 'resolved_channel'
+                except Exception:
+                    posted_via = None
+
+        if posted_via:
+            print(f"✅ Posted remaining chunks via: {posted_via}")
+        else:
+            print(f"⚠️ Could not post remaining chunks for forum thread '{title}'; skipping remaining content")
 
         print(f"✅ Created forum thread: {title}")
         return
