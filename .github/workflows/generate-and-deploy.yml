@@ -61,22 +61,29 @@ jobs:
           endpoint = os.getenv('R2_ENDPOINT')
           if not bucket or not access or not secret:
             print('R2 credentials not present; skipping fetch of feed_map.json')
+            os.makedirs('dashboard/data', exist_ok=True)
+            if not os.path.exists('dashboard/data/feed_map.json'):
+              open('dashboard/data/feed_map.json','w').write('{}')
+              print('Wrote empty dashboard/data/feed_map.json')
             sys.exit(0)
           try:
             import boto3
             s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
-            for key in ['docs/data/feed_map.json', 'feed_map.json']:
+            os.makedirs('dashboard/data', exist_ok=True)
+            # Try dashboard/data/feed_map.json first, fallback to root
+            for key in ['dashboard/data/feed_map.json', 'feed_map.json']:
               try:
-                s3.download_file(bucket, key, os.path.basename(key))
+                s3.download_file(bucket, key, 'dashboard/data/feed_map.json')
                 print('Downloaded', key)
                 break
               except Exception as e:
                 print('Could not download', key, '-', e)
           except Exception as e:
             print('boto3 not available or download failed:', e)
-            if not os.path.exists('feed_map.json'):
-              open('feed_map.json','w').write('{}')
-              print('Wrote empty feed_map.json')
+            os.makedirs('dashboard/data', exist_ok=True)
+            if not os.path.exists('dashboard/data/feed_map.json'):
+              open('dashboard/data/feed_map.json','w').write('{}')
+              print('Wrote empty dashboard/data/feed_map.json')
           PY
 
       - name: Fetch channel names (CI only; prefer Discord API)
@@ -137,7 +144,8 @@ jobs:
           # Ensure feed_map.json and channels.json exist to avoid generator failures
           python - <<'PY'
           import os, json
-          for fn, default in [('feed_map.json', {}), ('channels.json', [])]:
+          os.makedirs('dashboard/data', exist_ok=True)
+          for fn, default in [('dashboard/data/feed_map.json', {}), ('channels.json', [])]:
               if not os.path.exists(fn):
                   open(fn, 'w', encoding='utf-8').write(json.dumps(default, indent=2))
           PY

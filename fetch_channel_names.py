@@ -19,7 +19,7 @@ from urllib.error import HTTPError, URLError
 DISCORD_API = "https://discord.com/api/v10/channels/"
 TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 
-def load_feed_map(path='feed_map.json'):
+def load_feed_map(path='dashboard/data/feed_map.json'):
     if not os.path.exists(path):
         return {}
     try:
@@ -79,7 +79,7 @@ if __name__ == '__main__':
         print('DISCORD_BOT_TOKEN not set; exiting (no changes).')
         sys.exit(0)
 
-    feed_map = load_feed_map('feed_map.json')
+    feed_map = load_feed_map('dashboard/data/feed_map.json')
     candidates = set()
     for v in feed_map.values():
         if isinstance(v, list):

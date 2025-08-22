@@ -132,10 +132,11 @@ jobs:
 
           if not bucket or not access or not secret:
             print('\n⚠️ Missing required R2 credentials — will not attempt download.\n')
-            # Create an empty feed_map.json so downstream steps see a file rather than fail silently
-            if not os.path.exists('feed_map.json'):
-              open('feed_map.json', 'w').write('{}')
-              print('📝 Created default empty feed_map.json')
+            # Create default feed_map.json and dashboard structure
+            os.makedirs('dashboard/data', exist_ok=True)
+            if not os.path.exists('dashboard/data/feed_map.json'):
+              open('dashboard/data/feed_map.json', 'w').write('{}')
+              print('📝 Created default empty dashboard/data/feed_map.json')
             sys.exit(0)
 
           try:
@@ -146,11 +147,25 @@ jobs:
 
           try:
             s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
-            s3.download_file(bucket, 'feed_map.json', 'feed_map.json')
-            print('✅ Downloaded feed_map.json from R2')
+            # Try dashboard/data/feed_map.json first (preferred), fallback to root
+            os.makedirs('dashboard/data', exist_ok=True)
+            try:
+              s3.download_file(bucket, 'dashboard/data/feed_map.json', 'dashboard/data/feed_map.json')
+              print('✅ Downloaded dashboard/data/feed_map.json from R2')
+            except Exception as e:
+              print('⚠️ Could not download dashboard/data/feed_map.json:', e)
+              # Fallback to root feed_map.json
+              try:
+                s3.download_file(bucket, 'feed_map.json', 'dashboard/data/feed_map.json')
+                print('✅ Downloaded feed_map.json from R2 (fallback)')
+              except Exception as e2:
+                print('❌ Could not download feed_map.json either:', e2)
+                open('dashboard/data/feed_map.json', 'w').write('{}')
+                print('📝 Created default empty dashboard/data/feed_map.json')
+                
             # print a small sample for debugging
             import json
-            with open('feed_map.json','r',encoding='utf-8') as f:
+            with open('dashboard/data/feed_map.json','r',encoding='utf-8') as f:
               try:
                 m = json.load(f)
                 print(f"🔎 feed_map.json contains {len(m)} entries; sample keys:")
@@ -169,10 +184,11 @@ jobs:
                 print('  -', k)
             except Exception as e2:
               print('⚠️ Could not list bucket contents:', repr(e2))
-            # Ensure feed_map.json exists so bot doesn't crash later
-            if not os.path.exists('feed_map.json'):
-              open('feed_map.json', 'w').write('{}')
-              print('📝 Created default empty feed_map.json')
+            # Ensure dashboard/data/feed_map.json exists so bot doesn't crash later
+            os.makedirs('dashboard/data', exist_ok=True)
+            if not os.path.exists('dashboard/data/feed_map.json'):
+              open('dashboard/data/feed_map.json', 'w').write('{}')
+              print('📝 Created default empty dashboard/data/feed_map.json')
             # exit non-zero so run shows failure if desired
             # sys.exit(3)
           PY
@@ -298,9 +314,9 @@ jobs:
           # Add state files. If SEEN_R2_BUCKET is configured, skip adding seen.json (we persist it to R2)
           if [ -n "${{ env.SEEN_R2_BUCKET || secrets.SEEN_R2_BUCKET }}" ]; then
             echo "SEEN_R2_BUCKET is set; skipping seen.json commit (persisting to R2)"
-            git add details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json || true
+            git add details_threads.json avatar_cache.json feed_meta.json dashboard/data/feed_map.json channels.json groups.json || true
           else
-            git add --force seen.json details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json || true
+            git add --force seen.json details_threads.json avatar_cache.json feed_meta.json dashboard/data/feed_map.json channels.json groups.json || true
           fi
           
           # Commit with timestamp

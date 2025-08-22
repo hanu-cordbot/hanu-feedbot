@@ -42,7 +42,7 @@ def generate_stats():
     # Load existing data
     seen_data = load_json_file('seen.json', {})
     feed_meta = load_json_file('feed_meta.json', {})
-    feed_map = load_json_file('feed_map.json', {})
+    feed_map = load_json_file('dashboard/data/feed_map.json', {})
     channels = load_json_file('channels.json', [])
     
     # Load feeds list
@@ -180,7 +180,7 @@ def generate_feeds_data(stats=None):
     print("📡 Generating feeds data...")
     
     feed_meta = load_json_file('feed_meta.json', {})
-    feed_map = load_json_file('feed_map.json', {})
+    feed_map = load_json_file('dashboard/data/feed_map.json', {})
     
     feeds_data = {
         'last_updated': datetime.now(timezone.utc).isoformat(),
@@ -295,9 +295,9 @@ def main():
         # Ensure the authoritative feed_map is published into docs/data so it gets uploaded
         # to R2 under the dashboard prefix (dashboard/data/feed_map.json).
         try:
-            feed_map_root = load_json_file('feed_map.json', {})
+            feed_map_root = load_json_file('dashboard/data/feed_map.json', {})
             # Enrich the feed_map for dashboard consumption with channel name/type
-            # without changing the root feed_map.json (which other components may rely on).
+            # without changing the root dashboard/data/feed_map.json (which other components may rely on).
             channels = load_json_file('channels.json', [])
             # Build lookup by id
             channels_by_id = {str(ch.get('id')): {'id': str(ch.get('id')), 'name': ch.get('name'), 'type': ch.get('type')} for ch in channels if ch.get('id')}

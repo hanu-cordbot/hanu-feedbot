@@ -482,8 +482,25 @@ async def process_feeds_once(client: discord.Client):
 
     # Load mappings and thread map
     try:
-        with open(os.path.join(BASE_DIR, 'feed_map.json'), 'r') as f: 
-            user_map = json.load(f)
+        # Try dashboard/data/feed_map.json first (preferred), fallback to root
+        dashboard_path = os.path.join(BASE_DIR, 'dashboard', 'data', 'feed_map.json')
+        root_path = os.path.join(BASE_DIR, 'feed_map.json')
+        
+        if os.path.exists(dashboard_path):
+            with open(dashboard_path, 'r') as f:
+                raw_map = json.load(f)
+            # Handle both formats: {"url": "channel_id"} or {"url": {"id": "channel_id", ...}}
+            user_map = {}
+            for url, value in raw_map.items():
+                if isinstance(value, dict):
+                    user_map[url] = value.get('id', '')
+                else:
+                    user_map[url] = str(value)
+        elif os.path.exists(root_path):
+            with open(root_path, 'r') as f:
+                user_map = json.load(f)
+        else:
+            user_map = {}
     except Exception:
         user_map = {}
     # Debug: surface how many mappings we loaded and a small sample
