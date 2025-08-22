@@ -493,22 +493,31 @@ async def process_feeds_once(client: discord.Client):
             user_map = {}
             for url, value in raw_map.items():
                 if isinstance(value, dict):
-                    user_map[url] = value.get('id', '')
+                    channel_id = value.get('id', '')
+                    if channel_id:
+                        user_map[url] = str(channel_id)
                 else:
                     user_map[url] = str(value)
+            print(f"🔧 Processed dashboard/data/feed_map.json: {len(raw_map)} entries -> {len(user_map)} valid mappings")
         elif os.path.exists(root_path):
             with open(root_path, 'r') as f:
                 user_map = json.load(f)
+            print(f"🔧 Used fallback root feed_map.json: {len(user_map)} mappings")
         else:
             user_map = {}
-    except Exception:
+            print("🔧 No feed_map.json found, using empty mappings")
+    except Exception as e:
         user_map = {}
+        print(f"🔧 Error loading feed_map: {e}")
     # Debug: surface how many mappings we loaded and a small sample
     try:
         print(f"🔎 Loaded feed_map.json with {len(user_map)} mappings")
         if user_map:
             sample_keys = list(user_map.keys())[:10]
             print(f"🔎 Sample feed_map keys: {sample_keys}")
+            # Also show the first few channel IDs for debugging
+            sample_values = {k: user_map[k] for k in sample_keys[:3]}
+            print(f"🔎 Sample mappings: {sample_values}")
     except Exception:
         pass
     try:

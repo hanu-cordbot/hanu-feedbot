@@ -10,7 +10,18 @@ if Path("/data").exists():
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
 
-FEED_LIST = Path(__file__).resolve().parent.parent / "feeds.txt" # Default: read feeds from local file
+# Prefer dashboard/data structure, fallback to root
+def _get_data_path(filename):
+    """Get path for data files, preferring dashboard/data/ structure"""
+    dashboard_path = BASE_DIR / "dashboard" / "data" / filename
+    root_path = BASE_DIR / filename
+    
+    # If dashboard version exists, use it; otherwise use root (for backward compatibility)
+    if dashboard_path.exists():
+        return dashboard_path
+    return root_path
+
+FEED_LIST = _get_data_path("feeds.txt")  # Try dashboard/data/feeds.txt first
 
 # Optional: if FEEDS_R2_BUCKET is configured, attempt to download feeds.txt from R2 at startup
 def _maybe_fetch_feeds_from_r2():
@@ -28,10 +39,18 @@ def _maybe_fetch_feeds_from_r2():
         # Lazy-import boto3 to avoid requiring it unless configured
         import boto3
         s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret, endpoint_url=endpoint)
-        target = FEED_LIST
+        target = _get_data_path("feeds.txt")
         target.parent.mkdir(parents=True, exist_ok=True)
-        with open(target, 'wb') as f:
-            s3.download_fileobj(bucket, 'feeds.txt', f)
+        # Try dashboard/data/feeds.txt first, fallback to feeds.txt
+        for key in ['dashboard/data/feeds.txt', 'feeds.txt']:
+            try:
+                with open(target, 'wb') as f:
+                    s3.download_fileobj(bucket, key, f)
+                print(f'Downloaded {key} from R2')
+                break
+            except Exception as e:
+                print(f'Could not download {key} from R2: {e}')
+                continue
     except Exception as e:
         # Surface download error to CI logs so we can debug missing feeds.txt
         try:
@@ -42,7 +61,7 @@ def _maybe_fetch_feeds_from_r2():
 
 # Try to fetch feeds from R2 on import
 _maybe_fetch_feeds_from_r2()
-SEEN_DB   = BASE_DIR / "seen.json"          # This will now be /data/seen.json on Railway
+SEEN_DB   = _get_data_path("seen.json")  # Try dashboard/data/seen.json first
 
 # Optional R2/S3 bucket for persisting runtime state (seen.json)
 SEEN_R2_BUCKET = os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('R2_BUCKET')
