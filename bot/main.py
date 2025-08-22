@@ -587,6 +587,10 @@ async def process_feeds_once(client: discord.Client):
                 e['target_channel'] = int(cid)  # numeric id
             except Exception:
                 e['target_channel'] = cid
+            try:
+                print(f"🔗 Matched feed mapping: {raw_feed} -> {e['target_channel']}")
+            except Exception:
+                pass
             new_posts.append(e)
         else:
             if raw_feed and len(unmatched_examples) < 10:
