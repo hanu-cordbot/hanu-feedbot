@@ -524,16 +524,69 @@ async def process_feeds_once(client: discord.Client):
                 continue
         
         # Check if this feed has a channel mapping
-        # Try a couple of normalized fallbacks to avoid accidental mismatch (trailing slashes/whitespace)
+        # Try multiple normalized fallbacks to avoid accidental mismatch (scheme, www, query, trailing slash)
         raw_feed = e.get('feed')
         cid = None
-        try:
-            cid = user_map.get(raw_feed) or user_map.get(str(raw_feed).strip()) or user_map.get(str(raw_feed).rstrip('/'))
-        except Exception:
-            cid = user_map.get(raw_feed)
+        def _lookup_map(m, key):
+            v = m.get(key)
+            # feed_map may store either a simple channel id string or an enriched dict
+            if isinstance(v, dict):
+                return v.get('channel') or v.get('id') or None
+            return v
+
+        if raw_feed:
+            import urllib.parse
+            s = str(raw_feed).strip()
+            candidates = []
+            candidates.append(s)
+            candidates.append(s.rstrip('/'))
+
+            # remove scheme
+            no_scheme = re.sub(r'^https?://', '', s, flags=re.I)
+            candidates.append(no_scheme)
+            candidates.append(no_scheme.rstrip('/'))
+
+            # remove www
+            no_www = re.sub(r'^www\.', '', no_scheme, flags=re.I)
+            candidates.append(no_www)
+            candidates.append(no_www.rstrip('/'))
+
+            # remove query and fragment
+            p = urllib.parse.urlparse(s)
+            no_q = urllib.parse.urlunparse((p.scheme, p.netloc, p.path.rstrip('/'), '', '', ''))
+            candidates.append(no_q)
+            candidates.append(no_q.rstrip('/'))
+
+            # host + path
+            hostpath = (p.netloc + p.path).rstrip('/')
+            candidates.append(hostpath)
+
+            # de-duplicate preserving order
+            seenc = set()
+            uniq = []
+            for c in candidates:
+                if not c:
+                    continue
+                if c in seenc:
+                    continue
+                seenc.add(c)
+                uniq.append(c)
+
+            for key in uniq:
+                try:
+                    maybe = _lookup_map(user_map, key)
+                except Exception:
+                    maybe = None
+                if maybe:
+                    cid = maybe
+                    break
+
         if cid:
             # Only add entries that have explicit channel mappings
-            e['target_channel'] = int(cid)  # Store the target channel for later processing
+            try:
+                e['target_channel'] = int(cid)  # numeric id
+            except Exception:
+                e['target_channel'] = cid
             new_posts.append(e)
         else:
             if raw_feed and len(unmatched_examples) < 10:
