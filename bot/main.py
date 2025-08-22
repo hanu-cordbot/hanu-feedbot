@@ -606,7 +606,27 @@ async def process_feeds_once(client: discord.Client):
 
     if unmatched_examples:
         try:
-            print(f"⚠️ Sample unmatched feeds (first {len(unmatched_examples)}): {list(unmatched_examples)}")
+            examples = list(unmatched_examples)[:6]
+            print(f"⚠️ Sample unmatched feeds (first {len(examples)}): {examples}")
+            # Debug: show normalized lookup candidates and whether they appear in feed_map
+            for raw in examples:
+                try:
+                    import urllib.parse
+                    s = str(raw).strip()
+                    p = urllib.parse.urlparse(s)
+                    candidates = [s, s.rstrip('/'), re.sub(r'^https?://', '', s, flags=re.I), re.sub(r'^https?://', '', s, flags=re.I).rstrip('/'), re.sub(r'^www\.', '', re.sub(r'^https?://', '', s, flags=re.I), flags=re.I), urllib.parse.urlunparse((p.scheme, p.netloc, p.path.rstrip('/'), '', '', '')), (p.netloc + p.path).rstrip('/')]
+                    # de-dup
+                    seen_c = set(); uniq = []
+                    for c in candidates:
+                        if not c or c in seen_c: continue
+                        seen_c.add(c); uniq.append(c)
+                    print(f"   Debug mapping attempt for: {raw}")
+                    for c in uniq:
+                        present = c in user_map
+                        val = user_map.get(c)
+                        print(f"     - candidate: {c} -> present={present} val={repr(val) if present else 'N/A'}")
+                except Exception as e:
+                    print('   Debug mapping failed for', raw, e)
         except Exception:
             pass
 
