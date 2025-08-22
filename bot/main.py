@@ -111,6 +111,7 @@ async def download_bytes(url: str) -> bytes:
 
 def load_seen_guids():
     """Loads the set of processed post IDs from the state file."""
+    print(f"🔍 Loading seen guids from: {SEEN_FILE}")
     # If R2 is configured, try to download seen.json from R2 first
     try:
         client = r2_client()
@@ -126,21 +127,26 @@ def load_seen_guids():
                 if head == b'\x1f\x8b':
                     with gzip.GzipFile(fileobj=buf, mode='rb') as gz:
                         data = gz.read().decode('utf-8')
-                        return set(json.loads(data))
+                        seen = set(json.loads(data))
+                        print(f"🔁 Loaded {len(seen)} guids from R2")
+                        return seen
                 else:
-                    return set(json.load(buf))
+                    seen = set(json.load(buf))
+                    print(f"🔁 Loaded {len(seen)} guids from R2 (plain)")
+                    return seen
             except Exception as e:
                 print(f"⚠️ Could not fetch seen.json from R2: {e}")
         # Fallback to local file
-        with open(SEEN_FILE, 'r') as f:
-            return set(json.load(f))
+        if os.path.exists(SEEN_FILE):
+            with open(SEEN_FILE, 'r') as f:
+                seen = set(json.load(f))
+                print(f"📂 Loaded {len(seen)} guids from local {SEEN_FILE}")
+                return seen
+        else:
+            print(f"{SEEN_FILE} does not exist locally; initializing empty seen set")
+            return set()
     except (FileNotFoundError, json.JSONDecodeError):
         print(f"'{SEEN_FILE}' not found or invalid. Initializing a new one.")
-        try:
-            with open(SEEN_FILE, 'w') as f:
-                json.dump([], f)
-        except Exception:
-            pass
         return set()
 
 def save_seen_guids(guids):
