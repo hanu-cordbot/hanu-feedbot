@@ -472,14 +472,17 @@ async def process_entry_in_forum(client, entry, forum_channel):
     title = entry.get('title', 'No Title')[:100]  # Forum thread titles are limited
 
     try:
-        # Create thread in forum
-        print(f"🧵 Creating forum thread for: {title}")
-        thread = await forum_channel.create_thread(name=title)
-
-        # Post content to the thread
+        # Build the post body first; forum thread creation requires a non-empty initial message
         body = await build_full_body(entry)
-        for idx in range(0, len(body), 2000):
-            chunk = body[idx:idx+2000]
+        chunks = [body[i:i+2000] for i in range(0, len(body), 2000)] if body else [" "]
+        first_chunk = chunks[0] if chunks else " "
+
+        print(f"🧵 Creating forum thread for: {title} (initial chunk length={len(first_chunk)})")
+        # Provide the initial message when creating the thread to avoid empty message error
+        thread = await forum_channel.create_thread(name=title, content=first_chunk)
+
+        # Post remaining chunks (skip first) into the thread
+        for chunk in chunks[1:]:
             await thread.send(chunk)
 
         print(f"✅ Created forum thread: {title}")
@@ -488,18 +491,7 @@ async def process_entry_in_forum(client, entry, forum_channel):
         print(f"❌ Failed to create/send forum thread for '{title}' in channel {getattr(forum_channel, 'id', 'unknown')}: {e}")
         import traceback
         traceback.print_exc()
-
-    # Fallback: try to post via webhook (this will create a thread via webhook for forums)
-    try:
-        from bot.dispatcher import push
-        print(f"🔁 Attempting webhook fallback for forum post: {title}")
-        # Use dispatcher.push to create thread via webhook if thread creation fails
-        await push(client, forum_channel, entry, await build_full_body(entry), entry.get('tldr', ''), entry.get('published', ''))
-        print(f"✅ Webhook fallback succeeded for forum post: {title}")
-    except Exception as e:
-        print(f"❌ Webhook fallback failed for forum post '{title}': {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Skipping forum post for '{title}' due to above error")
 
 async def process_feeds_once(client: discord.Client):
     """Scans feeds and processes new entries per-channel summary."""
