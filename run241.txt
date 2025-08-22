@@ -1,0 +1,926 @@
+﻿run-feed-bot	Set up job	∩╗┐2025-08-22T02:31:50.5894515Z Current runner version: '2.328.0'
+run-feed-bot	Set up job	2025-08-22T02:31:50.5919919Z ##[group]Runner Image Provisioner
+run-feed-bot	Set up job	2025-08-22T02:31:50.5920962Z Hosted Compute Agent
+run-feed-bot	Set up job	2025-08-22T02:31:50.5921635Z Version: 20250821.380
+run-feed-bot	Set up job	2025-08-22T02:31:50.5922430Z Commit: 438d12cb4fe092871db9867344e3bc0bc5319035
+run-feed-bot	Set up job	2025-08-22T02:31:50.5923290Z Build Date: 2025-08-21T20:49:43Z
+run-feed-bot	Set up job	2025-08-22T02:31:50.5924315Z ##[endgroup]
+run-feed-bot	Set up job	2025-08-22T02:31:50.5925038Z ##[group]Operating System
+run-feed-bot	Set up job	2025-08-22T02:31:50.5925741Z Ubuntu
+run-feed-bot	Set up job	2025-08-22T02:31:50.5926363Z 24.04.2
+run-feed-bot	Set up job	2025-08-22T02:31:50.5927037Z LTS
+run-feed-bot	Set up job	2025-08-22T02:31:50.5927707Z ##[endgroup]
+run-feed-bot	Set up job	2025-08-22T02:31:50.5928375Z ##[group]Runner Image
+run-feed-bot	Set up job	2025-08-22T02:31:50.5929036Z Image: ubuntu-24.04
+run-feed-bot	Set up job	2025-08-22T02:31:50.5929813Z Version: 20250818.1.0
+run-feed-bot	Set up job	2025-08-22T02:31:50.5930943Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250818.1/images/ubuntu/Ubuntu2404-Readme.md
+run-feed-bot	Set up job	2025-08-22T02:31:50.5932595Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250818.1
+run-feed-bot	Set up job	2025-08-22T02:31:50.5934228Z ##[endgroup]
+run-feed-bot	Set up job	2025-08-22T02:31:50.5935563Z ##[group]GITHUB_TOKEN Permissions
+run-feed-bot	Set up job	2025-08-22T02:31:50.5937813Z Contents: write
+run-feed-bot	Set up job	2025-08-22T02:31:50.5938541Z Metadata: read
+run-feed-bot	Set up job	2025-08-22T02:31:50.5939320Z ##[endgroup]
+run-feed-bot	Set up job	2025-08-22T02:31:50.5941859Z Secret source: Actions
+run-feed-bot	Set up job	2025-08-22T02:31:50.5943099Z Prepare workflow directory
+run-feed-bot	Set up job	2025-08-22T02:31:50.6271950Z Prepare all required actions
+run-feed-bot	Set up job	2025-08-22T02:31:50.6310535Z Getting action download info
+run-feed-bot	Set up job	2025-08-22T02:31:50.9384148Z Download action repository 'actions/checkout@v4' (SHA:08eba0b27e820071cde6df949e0beb9ba4906955)
+run-feed-bot	Set up job	2025-08-22T02:31:51.0094295Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+run-feed-bot	Set up job	2025-08-22T02:31:51.1695141Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f4***07fa02)
+run-feed-bot	Set up job	2025-08-22T02:31:51.4128736Z Complete job name: run-feed-bot
+run-feed-bot	Checkout repository	∩╗┐2025-08-22T02:31:51.4885778Z ##[group]Run actions/checkout@v4
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4886735Z with:
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4887386Z   token: ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4887887Z   ref: main
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4888398Z   persist-credentials: ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4888951Z   fetch-depth: 0
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4889484Z   repository: hanu-cordbot/hanu-feedbot
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4890112Z   ssh-strict: ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4890601Z   ssh-user: git
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4891099Z   clean: ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4891619Z   sparse-checkout-cone-mode: ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4892192Z   fetch-tags: false
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4892706Z   show-progress: ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4893197Z   lfs: false
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4894031Z   submodules: false
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4894590Z   set-safe-directory: ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.4895448Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6023906Z Syncing repository: hanu-cordbot/hanu-feedbot
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6026508Z ##[group]Getting Git version info
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6027397Z Working directory is '/home/runner/work/hanu-feedbot/hanu-feedbot'
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6028712Z [command]/usr/bin/git version
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6088903Z git version 2.51.0
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6130986Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6149875Z Temporarily overriding HOME='/home/runner/work/_temp/03117855-db69-45a3-b1c2-aa8507046ff0' before making global git config changes
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6151669Z Adding repository directory to the temporary git global config as a safe directory
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6158460Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/hanu-feedbot/hanu-feedbot
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6206727Z Deleting the contents of '/home/runner/work/hanu-feedbot/hanu-feedbot'
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6211534Z ##[group]Initializing the repository
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6216086Z [command]/usr/bin/git init /home/runner/work/hanu-feedbot/hanu-feedbot
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6275369Z hint: Using 'master' as the name for the initial branch. This default branch name
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6278819Z hint: is subject to change. To configure the initial branch name to use in all
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6280596Z hint: of your new repositories, which will suppress this warning, call:
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6282358Z hint:
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6283566Z hint: 	git config --global init.defaultBranch <name>
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6284803Z hint:
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6285904Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6287623Z hint: 'development'. The just-created branch can be renamed via this command:
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6289047Z hint:
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6289907Z hint: 	git branch -m <name>
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6290882Z hint:
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6292103Z hint: Disable this message with "git config set advice.defaultBranchName false"
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6294281Z Initialized empty Git repository in /home/runner/work/hanu-feedbot/hanu-feedbot/.git/
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6297821Z [command]/usr/bin/git remote add origin https://github.com/hanu-cordbot/hanu-feedbot
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6325548Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6327219Z ##[group]Disabling automatic garbage collection
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6329019Z [command]/usr/bin/git config --local gc.auto 0
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6361368Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6362934Z ##[group]Setting up auth
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6368718Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6402383Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6687556Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6721427Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6953655Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6993494Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.6994681Z ##[group]Fetching the repository
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.7017912Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9693510Z From https://github.com/hanu-cordbot/hanu-feedbot
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9695463Z  * [new branch]      ci/clean-workflows  -> origin/ci/clean-workflows
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9696526Z  * [new branch]      ci/fallback-feeds   -> origin/ci/fallback-feeds
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9697446Z  * [new branch]      dev                 -> origin/dev
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9698339Z  * [new branch]      docs/modular-plan   -> origin/docs/modular-plan
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9699363Z  * [new branch]      gh-pages            -> origin/gh-pages
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9700432Z  * [new branch]      main                -> origin/main
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9701367Z  * [new branch]      work/add-dispatch   -> origin/work/add-dispatch
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9702513Z  * [new branch]      work/add-test-seen-workflow -> origin/work/add-test-seen-workflow
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9703929Z  * [new tag]         backup-before-prune -> backup-before-prune
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9806849Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9809075Z ##[group]Determining the checkout info
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9810698Z [command]/usr/bin/git branch --list --remote origin/main
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9812208Z   origin/main
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9815721Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9817065Z [command]/usr/bin/git sparse-checkout disable
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9820936Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9851190Z ##[group]Checking out the ref
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9854644Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9974453Z Switched to a new branch 'main'
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9976935Z branch 'main' set up to track 'origin/main'.
+run-feed-bot	Checkout repository	2025-08-22T02:31:51.9985519Z ##[endgroup]
+run-feed-bot	Checkout repository	2025-08-22T02:31:52.0022494Z [command]/usr/bin/git log -1 --format=%H
+run-feed-bot	Checkout repository	2025-08-22T02:31:52.0044557Z 4d2458fa0b01019b3b3b16c7fd1570bd6a7fdc38
+run-feed-bot	Set up Python 3.11	∩╗┐2025-08-22T02:31:52.0299917Z ##[group]Run actions/setup-python@v5
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0300750Z with:
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0301288Z   python-version: 3.11
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0301890Z   cache: pip
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0302427Z   check-latest: false
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0303209Z   token: ***
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0304035Z   update-environment: ***
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0304698Z   allow-prereleases: false
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0305349Z   freethreaded: false
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.0305925Z ##[endgroup]
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.2034626Z ##[group]Installed versions
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.2685408Z Successfully set up CPython (3.11.13)
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.2688354Z ##[endgroup]
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:52.3700597Z [command]/opt/hostedtoolcache/Python/3.11.13/x64/bin/pip cache dir
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:55.9790764Z /home/runner/.cache/pip
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:56.1287740Z Cache hit for: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.13-pip-4350fede7d97eaa1aab096290117a2ac8d49ddcf3243afc20efdc5c6d6a3b022
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:56.6124371Z Received 72785075 of 72785075 (100.0%), 162.2 MBs/sec
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:56.6126160Z Cache Size: ~69 MB (72785075 B)
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:56.6193707Z [command]/usr/bin/tar -xf /home/runner/work/_temp/6045fe8c-c8e7-46f2-a325-e57b30f88a8f/cache.tzst -P -C /home/runner/work/hanu-feedbot/hanu-feedbot --use-compress-program unzstd
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:56.7615323Z Cache restored successfully
+run-feed-bot	Set up Python 3.11	2025-08-22T02:31:56.7768182Z Cache restored from key: setup-python-Linux-x64-24.04-Ubuntu-python-3.11.13-pip-4350fede7d97eaa1aab096290117a2ac8d49ddcf3243afc20efdc5c6d6a3b022
+run-feed-bot	Optional fetch cookies from R2	∩╗┐2025-08-22T02:31:56.7940286Z ##[group]Run set -e
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7940738Z [***;1mset -e[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7941084Z [***;1mif [ -z "${NETSCAPE_COOKIES_KEY}" ]; then[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7941544Z [***;1m  echo "NETSCAPE_COOKIES_KEY not set; skipping cookies fetch"[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7941953Z [***;1m  exit 0[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7942199Z [***;1mfi[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7942622Z [***;1mif [ -z "${R2_BUCKET}" ] || [ -z "${R2_ACCESS_KEY_ID}" ] || [ -z "${R2_SECRET_ACCESS_KEY}" ] || [ -z "${R2_ENDPOINT}" ]; then[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7943196Z [***;1m  echo "R2 credentials missing; skipping cookies fetch"[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7943811Z [***;1m  exit 0[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7944064Z [***;1mfi[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7944363Z [***;1mpython -m pip install --upgrade pip[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7944752Z [***;1m# Ensure boto3 is available for a simple download[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7945166Z [***;1mif ! python -c "import boto3" >/dev/null 2>&1; then[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7945546Z [***;1m  python -m pip install boto3[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7945883Z [***;1mfi[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7946113Z [***;1mpython - <<'PY'[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7946388Z [***;1mimport os[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7946634Z [***;1mimport boto3[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7946930Z [***;1mbucket = os.environ.get('R2_BUCKET')[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7947288Z [***;1mkey = os.environ.get('NETSCAPE_COOKIES_KEY')[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7947658Z [***;1mendpoint = os.environ.get('R2_ENDPOINT')[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7948043Z [***;1maccess = os.environ.get('R2_ACCESS_KEY_ID')[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7948439Z [***;1msecret = os.environ.get('R2_SECRET_ACCESS_KEY')[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7948806Z [***;1mtry:[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7949253Z [***;1m    client = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7949814Z [***;1m    client.download_file(bucket, key, 'cookies.txt')[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7950194Z [***;1m    print('Downloaded cookies.txt from R2')[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7950546Z [***;1mexcept Exception as e:[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7950871Z [***;1m    print('Could not download cookies:', e)[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.7951182Z [***;1mPY[0m
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8022651Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8022997Z env:
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8023314Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8024036Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8024805Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8025228Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8025661Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8026076Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8026478Z   R2_BUCKET: ***
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8026770Z   R2_ACCESS_KEY_ID: ***
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8027192Z   R2_SECRET_ACCESS_KEY: ***
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8027658Z   R2_ENDPOINT: ***
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8027969Z   NETSCAPE_COOKIES_KEY: ***
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:56.8028245Z ##[endgroup]
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:58.2330140Z Requirement already satisfied: pip in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (25.2)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:59.5660254Z Collecting boto3
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:31:59.6357791Z   Downloading boto3-1.40.15-py3-none-any.whl.metadata (6.7 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0257221Z Collecting botocore<1.41.0,>=1.40.15 (from boto3)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0347873Z   Downloading botocore-1.40.15-py3-none-any.whl.metadata (5.7 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0526572Z Collecting jmespath<2.0.0,>=0.7.1 (from boto3)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0542522Z   Using cached jmespath-1.0.1-py3-none-any.whl.metadata (7.6 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0747975Z Collecting s3transfer<0.14.0,>=0.13.0 (from boto3)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0764103Z   Using cached s3transfer-0.13.1-py3-none-any.whl.metadata (1.7 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0943065Z Collecting python-dateutil<3.0.0,>=2.1 (from botocore<1.41.0,>=1.40.15->boto3)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.0957501Z   Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.1283910Z Collecting urllib3!=2.2.0,<3,>=1.25.4 (from botocore<1.41.0,>=1.40.15->boto3)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.1298891Z   Using cached urllib3-2.5.0-py3-none-any.whl.metadata (6.5 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.1478060Z Collecting six>=1.5 (from python-dateutil<3.0.0,>=2.1->botocore<1.41.0,>=1.40.15->boto3)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.1491891Z   Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.3150321Z Downloading boto3-1.40.15-py3-none-any.whl (140 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.3373914Z Downloading botocore-1.40.15-py3-none-any.whl (14.0 MB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.4060248Z    ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü 14.0/14.0 MB 225.9 MB/s  0:00:00
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.4074549Z Using cached jmespath-1.0.1-py3-none-any.whl (20 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.4088157Z Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.4102777Z Using cached s3transfer-0.13.1-py3-none-any.whl (85 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.4116235Z Using cached urllib3-2.5.0-py3-none-any.whl (129 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.4129822Z Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:00.4689642Z Installing collected packages: urllib3, six, jmespath, python-dateutil, botocore, s3transfer, boto3
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:01.2365126Z 
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:01.2379383Z Successfully installed boto3-1.40.15 botocore-1.40.15 jmespath-1.0.1 python-dateutil-2.9.0.post0 s3transfer-0.13.1 six-1.17.0 urllib3-2.5.0
+run-feed-bot	Optional fetch cookies from R2	2025-08-22T02:32:02.6663967Z Downloaded cookies.txt from R2
+run-feed-bot	Validate R2 configuration (fast)	∩╗┐2025-08-22T02:32:02.7152353Z ##[group]Run python - <<'PY'
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7152748Z [***;1mpython - <<'PY'[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7153032Z [***;1mimport os, sys[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7153630Z [***;1m# If any R2 bucket is configured, ensure credentials are present[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7154224Z [***;1mbucket = os.getenv('R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('SEEN_R2_BUCKET')[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7154782Z [***;1maccess = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7155272Z [***;1msecret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7155689Z [***;1mendpoint = os.getenv('R2_ENDPOINT')[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7156028Z [***;1mif bucket and (not access or not secret):[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7156625Z [***;1m    print('Γ¥î R2 bucket configured but R2 credentials missing. Set R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY in repo secrets.')[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7157375Z [***;1m    sys.exit(1)[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7157814Z [***;1mprint('Γ£à R2 configuration check passed (bucket presence and credentials validated)')[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7158299Z [***;1mPY[0m
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7200719Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7200993Z env:
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7201295Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7201764Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7202209Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7202604Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7203010Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7203720Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7204070Z ##[endgroup]
+run-feed-bot	Validate R2 configuration (fast)	2025-08-22T02:32:02.7352495Z Γ£à R2 configuration check passed (bucket presence and credentials validated)
+run-feed-bot	Install dependencies	∩╗┐2025-08-22T02:32:02.7400403Z ##[group]Run python -m pip install --upgrade pip
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7400841Z [***;1mpython -m pip install --upgrade pip[0m
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7401196Z [***;1mpip install -r requirements.txt[0m
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7441590Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7441870Z env:
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7442163Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7442620Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7443064Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7443735Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7444138Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7444542Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Install dependencies	2025-08-22T02:32:02.7444878Z ##[endgroup]
+run-feed-bot	Install dependencies	2025-08-22T02:32:03.5495963Z Requirement already satisfied: pip in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (25.2)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.5392240Z Collecting feedparser (from -r requirements.txt (line 1))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.5408402Z   Using cached feedparser-6.0.11-py3-none-any.whl.metadata (2.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.5788884Z Collecting requests (from -r requirements.txt (line 2))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.6232527Z   Downloading requests-2.32.5-py3-none-any.whl.metadata (4.9 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.6464283Z Collecting python-dotenv (from -r requirements.txt (line 3))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.6478863Z   Using cached python_dotenv-1.1.1-py3-none-any.whl.metadata (24 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.6640142Z Collecting google-generativeai>=0.8.5 (from -r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.6655932Z   Using cached google_generativeai-0.8.5-py3-none-any.whl.metadata (3.9 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.6874064Z Collecting discord.py (from -r requirements.txt (line 5))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.6949003Z   Downloading discord_py-2.6.0-py3-none-any.whl.metadata (7.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.7610425Z Collecting pendulum (from -r requirements.txt (line 6))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.7626539Z   Using cached pendulum-3.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.8 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.8420598Z Collecting yt-dlp (from -r requirements.txt (line 7))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.8516993Z   Downloading yt_dlp-2025.8.20-py3-none-any.whl.metadata (175 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.8999500Z Collecting beautifulsoup4 (from -r requirements.txt (line 8))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.9013879Z   Using cached beautifulsoup4-4.13.4-py3-none-any.whl.metadata (3.8 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.9218150Z Collecting Flask (from -r requirements.txt (line 9))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.9291256Z   Downloading flask-3.1.2-py3-none-any.whl.metadata (3.2 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.9505394Z Collecting gunicorn (from -r requirements.txt (line 10))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.9518791Z   Using cached gunicorn-23.0.0-py3-none-any.whl.metadata (4.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.9863162Z Collecting celery (from -r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:04.9878025Z   Using cached celery-5.5.3-py3-none-any.whl.metadata (22 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.0381071Z Collecting redis (from -r requirements.txt (line 12))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.0395773Z   Using cached redis-6.4.0-py3-none-any.whl.metadata (10 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.0591424Z Collecting Flask-Cors (from -r requirements.txt (line 13))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.0605272Z   Using cached flask_cors-6.0.1-py3-none-any.whl.metadata (5.3 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.5359531Z Collecting aiohttp (from -r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.5374387Z   Using cached aiohttp-3.12.15-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (7.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.5403232Z Requirement already satisfied: boto3 in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (from -r requirements.txt (line 15)) (1.40.15)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.5784461Z Collecting pytest (from -r requirements.txt (line 16))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.5799969Z   Using cached pytest-8.4.1-py3-none-any.whl.metadata (7.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.7302034Z Collecting moto (from -r requirements.txt (line 17))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.7317617Z   Using cached moto-5.1.10-py3-none-any.whl.metadata (12 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.7724134Z Collecting sgmllib3k (from feedparser->-r requirements.txt (line 1))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.7724784Z   Using cached sgmllib3k-1.0.0-py3-none-any.whl
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.8811029Z Collecting charset_normalizer<4,>=2 (from requests->-r requirements.txt (line 2))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.8827437Z   Using cached charset_normalizer-3.4.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (*** kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9012788Z Collecting idna<4,>=2.5 (from requests->-r requirements.txt (line 2))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9028086Z   Using cached idna-3.10-py3-none-any.whl.metadata (10 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9053600Z Requirement already satisfied: urllib3<3,>=1.21.1 in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (from requests->-r requirements.txt (line 2)) (2.5.0)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9259055Z Collecting certifi>=2017.4.17 (from requests->-r requirements.txt (line 2))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9274601Z   Using cached certifi-2025.8.3-py3-none-any.whl.metadata (2.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9466536Z Collecting google-ai-generativelanguage==0.6.15 (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9480263Z   Using cached google_ai_generativelanguage-0.6.15-py3-none-any.whl.metadata (5.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9844242Z Collecting google-api-core (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:05.9859384Z   Using cached google_api_core-2.25.1-py3-none-any.whl.metadata (3.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.0422701Z Collecting google-api-python-client (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.0438514Z   Using cached google_api_python_client-2.179.0-py3-none-any.whl.metadata (7.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.0822333Z Collecting google-auth>=2.15.0 (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.0838067Z   Using cached google_auth-2.40.3-py2.py3-none-any.whl.metadata (6.2 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.2545309Z Collecting protobuf (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.2560119Z   Using cached protobuf-6.32.0-cp39-abi3-manylinux2014_x86_64.whl.metadata (593 bytes)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.3699979Z Collecting pydantic (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.3714758Z   Using cached pydantic-2.11.7-py3-none-any.whl.metadata (67 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.4197170Z Collecting tqdm (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.4211362Z   Using cached tqdm-4.67.1-py3-none-any.whl.metadata (57 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.4683690Z Collecting typing-extensions (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.4697335Z   Using cached typing_extensions-4.14.1-py3-none-any.whl.metadata (3.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.6319715Z Collecting proto-plus<2.0.0dev,>=1.22.3 (from google-ai-generativelanguage==0.6.15->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.6350887Z   Using cached proto_plus-1.26.1-py3-none-any.whl.metadata (2.2 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.6896104Z Collecting protobuf (from google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.6912317Z   Using cached protobuf-5.29.5-cp38-abi3-manylinux2014_x86_64.whl.metadata (592 bytes)
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.7160147Z Collecting googleapis-common-protos<2.0.0,>=1.56.2 (from google-api-core->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:06.7175346Z   Using cached googleapis_common_protos-1.70.0-py3-none-any.whl.metadata (9.3 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.3459603Z Collecting grpcio<2.0.0,>=1.33.2 (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-ai-generativelanguage==0.6.15->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.3474242Z   Using cached grpcio-1.74.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (3.8 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.3974309Z Collecting grpcio-status<2.0.0,>=1.33.2 (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-ai-generativelanguage==0.6.15->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.3988257Z   Using cached grpcio_status-1.74.0-py3-none-any.whl.metadata (1.1 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.4335897Z Collecting cachetools<6.0,>=2.0.0 (from google-auth>=2.15.0->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.4350693Z   Using cached cachetools-5.5.2-py3-none-any.whl.metadata (5.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.4574572Z Collecting pyasn1-modules>=0.2.1 (from google-auth>=2.15.0->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.4590001Z   Using cached pyasn1_modules-0.4.2-py3-none-any.whl.metadata (3.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.4805176Z Collecting rsa<5,>=3.1.4 (from google-auth>=2.15.0->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.4821801Z   Using cached rsa-4.9.1-py3-none-any.whl.metadata (5.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.5476891Z INFO: pip is looking at multiple versions of grpcio-status to determine which version is compatible with other requirements. This could take a while.
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.5483724Z Collecting grpcio-status<2.0.0,>=1.33.2 (from google-api-core[grpc]!=2.0.*,!=2.1.*,!=2.10.*,!=2.2.*,!=2.3.*,!=2.4.*,!=2.5.*,!=2.6.*,!=2.7.*,!=2.8.*,!=2.9.*,<3.0.0dev,>=1.34.1->google-ai-generativelanguage==0.6.15->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.5499732Z   Using cached grpcio_status-1.73.1-py3-none-any.whl.metadata (1.1 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.5906069Z   Using cached grpcio_status-1.73.0-py3-none-any.whl.metadata (1.1 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.5952907Z   Using cached grpcio_status-1.72.2-py3-none-any.whl.metadata (1.1 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.5992681Z   Using cached grpcio_status-1.72.1-py3-none-any.whl.metadata (1.1 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.6031365Z   Using cached grpcio_status-1.71.2-py3-none-any.whl.metadata (1.1 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.7491223Z Collecting pyasn1>=0.1.3 (from rsa<5,>=3.1.4->google-auth>=2.15.0->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.7506914Z   Using cached pyasn1-0.6.1-py3-none-any.whl.metadata (8.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.7850688Z Collecting aiohappyeyeballs>=2.5.0 (from aiohttp->-r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.7866279Z   Using cached aiohappyeyeballs-2.6.1-py3-none-any.whl.metadata (5.9 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.8006991Z Collecting aiosignal>=1.4.0 (from aiohttp->-r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.8021203Z   Using cached aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.8197640Z Collecting attrs>=17.3.0 (from aiohttp->-r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.8212398Z   Using cached attrs-25.3.0-py3-none-any.whl.metadata (10 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.8920005Z Collecting frozenlist>=1.1.1 (from aiohttp->-r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:07.8935450Z   Using cached frozenlist-1.7.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (18 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.1147692Z Collecting multidict<7.0,>=4.5 (from aiohttp->-r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.1162462Z   Using cached multidict-6.6.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (5.3 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.1626053Z Collecting propcache>=0.2.0 (from aiohttp->-r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.1640748Z   Using cached propcache-0.3.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (12 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.4667029Z Collecting yarl<2.0,>=1.17.0 (from aiohttp->-r requirements.txt (line 14))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.4682984Z   Using cached yarl-1.20.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (73 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.4903589Z Requirement already satisfied: python-dateutil>=2.6 in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (from pendulum->-r requirements.txt (line 6)) (2.9.0.post0)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5064024Z Collecting tzdata>=2020.1 (from pendulum->-r requirements.txt (line 6))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5078386Z   Using cached tzdata-2025.2-py2.py3-none-any.whl.metadata (1.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5298145Z Collecting soupsieve>1.2 (from beautifulsoup4->-r requirements.txt (line 8))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5312114Z   Using cached soupsieve-2.7-py3-none-any.whl.metadata (4.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5508436Z Collecting blinker>=1.9.0 (from Flask->-r requirements.txt (line 9))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5521992Z   Using cached blinker-1.9.0-py3-none-any.whl.metadata (1.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5705044Z Collecting click>=8.1.3 (from Flask->-r requirements.txt (line 9))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5718769Z   Using cached click-8.2.1-py3-none-any.whl.metadata (2.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5852290Z Collecting itsdangerous>=2.2.0 (from Flask->-r requirements.txt (line 9))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.5866131Z   Using cached itsdangerous-2.2.0-py3-none-any.whl.metadata (1.9 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.6035889Z Collecting jinja2>=3.1.2 (from Flask->-r requirements.txt (line 9))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.6049606Z   Using cached jinja2-3.1.6-py3-none-any.whl.metadata (2.9 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.6578821Z Collecting markupsafe>=2.1.1 (from Flask->-r requirements.txt (line 9))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.6594649Z   Using cached MarkupSafe-3.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (4.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.6833177Z Collecting werkzeug>=3.1.0 (from Flask->-r requirements.txt (line 9))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.6848769Z   Using cached werkzeug-3.1.3-py3-none-any.whl.metadata (3.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7052386Z Collecting packaging (from gunicorn->-r requirements.txt (line 10))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7069015Z   Using cached packaging-25.0-py3-none-any.whl.metadata (3.3 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7310703Z Collecting billiard<5.0,>=4.2.1 (from celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7327566Z   Using cached billiard-4.2.1-py3-none-any.whl.metadata (4.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7626180Z Collecting kombu<5.6,>=5.5.2 (from celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7642898Z   Using cached kombu-5.5.4-py3-none-any.whl.metadata (3.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7837955Z Collecting vine<6.0,>=5.1.0 (from celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.7852721Z   Using cached vine-5.1.0-py3-none-any.whl.metadata (2.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8121455Z Collecting click-didyoumean>=0.3.0 (from celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8136533Z   Using cached click_didyoumean-0.3.1-py3-none-any.whl.metadata (3.9 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8281354Z Collecting click-repl>=0.2.0 (from celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8296106Z   Using cached click_repl-0.3.0-py3-none-any.whl.metadata (3.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8433262Z Collecting click-plugins>=1.1.1 (from celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8448974Z   Using cached click_plugins-1.1.1.2-py2.py3-none-any.whl.metadata (6.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8704945Z Collecting amqp<6.0.0,>=5.1.1 (from kombu<5.6,>=5.5.2->celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8718993Z   Using cached amqp-5.3.1-py3-none-any.whl.metadata (8.9 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8948674Z Requirement already satisfied: botocore<1.41.0,>=1.40.15 in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (from boto3->-r requirements.txt (line 15)) (1.40.15)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8954932Z Requirement already satisfied: jmespath<2.0.0,>=0.7.1 in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (from boto3->-r requirements.txt (line 15)) (1.0.1)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.8961205Z Requirement already satisfied: s3transfer<0.14.0,>=0.13.0 in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (from boto3->-r requirements.txt (line 15)) (0.13.1)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.9005879Z Requirement already satisfied: six>=1.5 in /opt/hostedtoolcache/Python/3.11.13/x64/lib/python3.11/site-packages (from python-dateutil>=2.6->pendulum->-r requirements.txt (line 6)) (1.17.0)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.9148687Z Collecting iniconfig>=1 (from pytest->-r requirements.txt (line 16))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.9163820Z   Using cached iniconfig-2.1.0-py3-none-any.whl.metadata (2.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.9359667Z Collecting pluggy<2,>=1.5 (from pytest->-r requirements.txt (line 16))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.9374590Z   Using cached pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.9604675Z Collecting pygments>=2.7.2 (from pytest->-r requirements.txt (line 16))
+run-feed-bot	Install dependencies	2025-08-22T02:32:08.9619994Z   Using cached pygments-2.19.2-py3-none-any.whl.metadata (2.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.1376856Z Collecting cryptography>=35.0.0 (from moto->-r requirements.txt (line 17))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.1391949Z   Using cached cryptography-45.0.6-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (5.7 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.1680833Z Collecting xmltodict (from moto->-r requirements.txt (line 17))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.1694413Z   Using cached xmltodict-0.14.2-py2.py3-none-any.whl.metadata (8.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.1982015Z Collecting responses!=0.25.5,>=0.15.0 (from moto->-r requirements.txt (line 17))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.1997873Z   Using cached responses-0.25.8-py3-none-any.whl.metadata (47 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.2667455Z Collecting prompt-toolkit>=3.0.*** (from click-repl>=0.2.0->celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.2682762Z   Using cached prompt_toolkit-3.0.51-py3-none-any.whl.metadata (6.4 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.4535324Z Collecting cffi>=1.14 (from cryptography>=35.0.0->moto->-r requirements.txt (line 17))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.4551382Z   Using cached cffi-1.17.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.4701876Z Collecting pycparser (from cffi>=1.14->cryptography>=35.0.0->moto->-r requirements.txt (line 17))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.4715702Z   Using cached pycparser-2.22-py3-none-any.whl.metadata (943 bytes)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.4982931Z Collecting wcwidth (from prompt-toolkit>=3.0.***->click-repl>=0.2.0->celery->-r requirements.txt (line 11))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.4997878Z   Using cached wcwidth-0.2.13-py2.py3-none-any.whl.metadata (14 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.5584914Z Collecting pyyaml (from responses!=0.25.5,>=0.15.0->moto->-r requirements.txt (line 17))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.5602091Z   Using cached PyYAML-6.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (2.1 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.5859444Z Collecting httplib2<1.0.0,>=0.19.0 (from google-api-python-client->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.5873019Z   Using cached httplib2-0.22.0-py3-none-any.whl.metadata (2.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.6256946Z Collecting google-auth-httplib2<1.0.0,>=0.2.0 (from google-api-python-client->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.6270093Z   Using cached google_auth_httplib2-0.2.0-py2.py3-none-any.whl.metadata (2.2 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.6402135Z Collecting uritemplate<5,>=3.0.1 (from google-api-python-client->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.6415747Z   Using cached uritemplate-4.2.0-py3-none-any.whl.metadata (2.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.6824087Z Collecting pyparsing!=3.0.0,!=3.0.1,!=3.0.2,!=3.0.3,<4,>=2.4.2 (from httplib2<1.0.0,>=0.19.0->google-api-python-client->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.6838910Z   Using cached pyparsing-3.2.3-py3-none-any.whl.metadata (5.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.7072089Z Collecting annotated-types>=0.6.0 (from pydantic->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:09.7085868Z   Using cached annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.3956902Z Collecting pydantic-core==2.33.2 (from pydantic->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.3972494Z   Using cached pydantic_core-2.33.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.8 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4127009Z Collecting typing-inspection>=0.4.0 (from pydantic->google-generativeai>=0.8.5->-r requirements.txt (line 4))
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4140232Z   Using cached typing_inspection-0.4.1-py3-none-any.whl.metadata (2.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4416007Z Using cached feedparser-6.0.11-py3-none-any.whl (81 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4513110Z Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4550157Z Using cached charset_normalizer-3.4.3-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (150 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4563945Z Using cached idna-3.10-py3-none-any.whl (70 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4577614Z Using cached python_dotenv-1.1.1-py3-none-any.whl (20 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4590629Z Using cached google_generativeai-0.8.5-py3-none-any.whl (155 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4604789Z Using cached google_ai_generativelanguage-0.6.15-py3-none-any.whl (1.3 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4627840Z Using cached google_api_core-2.25.1-py3-none-any.whl (160 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4641650Z Using cached google_auth-2.40.3-py2.py3-none-any.whl (216 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4655823Z Using cached cachetools-5.5.2-py3-none-any.whl (10 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4669034Z Using cached googleapis_common_protos-1.70.0-py3-none-any.whl (294 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4684179Z Using cached grpcio-1.74.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (6.2 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4743303Z Using cached grpcio_status-1.71.2-py3-none-any.whl (14 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4756494Z Using cached proto_plus-1.26.1-py3-none-any.whl (50 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4769992Z Using cached protobuf-5.29.5-cp38-abi3-manylinux2014_x86_64.whl (319 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4785150Z Using cached rsa-4.9.1-py3-none-any.whl (34 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.4862423Z Downloading discord_py-2.6.0-py3-none-any.whl (1.2 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5052607Z    ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü 1.2/1.2 MB 82.7 MB/s  0:00:00
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5067666Z Using cached aiohttp-3.12.15-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (1.7 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5094401Z Using cached multidict-6.6.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (246 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5109453Z Using cached yarl-1.20.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (348 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5125214Z Using cached pendulum-3.1.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (353 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5244417Z Downloading yt_dlp-2025.8.20-py3-none-any.whl (3.3 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5481200Z    ΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü 3.3/3.3 MB 143.0 MB/s  0:00:00
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5496708Z Using cached beautifulsoup4-4.13.4-py3-none-any.whl (187 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5572519Z Downloading flask-3.1.2-py3-none-any.whl (103 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5608229Z Using cached gunicorn-23.0.0-py3-none-any.whl (85 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5621827Z Using cached celery-5.5.3-py3-none-any.whl (438 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5638183Z Using cached billiard-4.2.1-py3-none-any.whl (86 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5652360Z Using cached click-8.2.1-py3-none-any.whl (102 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5666253Z Using cached kombu-5.5.4-py3-none-any.whl (210 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5680248Z Using cached vine-5.1.0-py3-none-any.whl (9.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5693147Z Using cached amqp-5.3.1-py3-none-any.whl (50 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5706871Z Using cached redis-6.4.0-py3-none-any.whl (279 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5721669Z Using cached flask_cors-6.0.1-py3-none-any.whl (13 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5735039Z Using cached pytest-8.4.1-py3-none-any.whl (***5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5750514Z Using cached pluggy-1.6.0-py3-none-any.whl (20 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5763740Z Using cached moto-5.1.10-py3-none-any.whl (5.2 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5814536Z Using cached aiohappyeyeballs-2.6.1-py3-none-any.whl (15 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5827535Z Using cached aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5840376Z Using cached attrs-25.3.0-py3-none-any.whl (63 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5853765Z Using cached blinker-1.9.0-py3-none-any.whl (8.5 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5867091Z Using cached certifi-2025.8.3-py3-none-any.whl (161 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5880854Z Using cached click_didyoumean-0.3.1-py3-none-any.whl (3.6 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5893848Z Using cached click_plugins-1.1.1.2-py2.py3-none-any.whl (11 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5906768Z Using cached click_repl-0.3.0-py3-none-any.whl (10 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5919972Z Using cached cryptography-45.0.6-cp311-abi3-manylinux_2_34_x86_64.whl (4.5 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5966761Z Using cached cffi-1.17.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (467 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5983631Z Using cached frozenlist-1.7.0-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl (235 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.5998163Z Using cached iniconfig-2.1.0-py3-none-any.whl (6.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6011330Z Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6024263Z Using cached jinja2-3.1.6-py3-none-any.whl (134 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6038501Z Using cached MarkupSafe-3.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (23 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6051443Z Using cached packaging-25.0-py3-none-any.whl (66 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6065088Z Using cached prompt_toolkit-3.0.51-py3-none-any.whl (387 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6081017Z Using cached propcache-0.3.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (213 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6095337Z Using cached pyasn1-0.6.1-py3-none-any.whl (83 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6109009Z Using cached pyasn1_modules-0.4.2-py3-none-any.whl (181 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6123062Z Using cached pygments-2.19.2-py3-none-any.whl (1.2 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6144879Z Using cached responses-0.25.8-py3-none-any.whl (34 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6158153Z Using cached soupsieve-2.7-py3-none-any.whl (*** kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6171227Z Using cached typing_extensions-4.14.1-py3-none-any.whl (43 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6184608Z Using cached tzdata-2025.2-py2.py3-none-any.whl (347 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6200357Z Using cached werkzeug-3.1.3-py3-none-any.whl (224 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6215190Z Using cached google_api_python_client-2.179.0-py3-none-any.whl (14.0 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6327214Z Using cached google_auth_httplib2-0.2.0-py2.py3-none-any.whl (9.3 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6339894Z Using cached httplib2-0.22.0-py3-none-any.whl (96 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6353755Z Using cached pyparsing-3.2.3-py3-none-any.whl (111 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6367576Z Using cached uritemplate-4.2.0-py3-none-any.whl (11 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6380731Z Using cached pycparser-2.22-py3-none-any.whl (117 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6394611Z Using cached pydantic-2.11.7-py3-none-any.whl (444 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6410957Z Using cached pydantic_core-2.33.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.0 MB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6438379Z Using cached annotated_types-0.7.0-py3-none-any.whl (13 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6451792Z Using cached typing_inspection-0.4.1-py3-none-any.whl (14 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6465411Z Using cached PyYAML-6.0.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (762 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6483539Z Using cached tqdm-4.67.1-py3-none-any.whl (78 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6497080Z Using cached wcwidth-0.2.13-py2.py3-none-any.whl (34 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.6510302Z Using cached xmltodict-0.14.2-py2.py3-none-any.whl (10.0 kB)
+run-feed-bot	Install dependencies	2025-08-22T02:32:10.8861166Z Installing collected packages: wcwidth, sgmllib3k, yt-dlp, xmltodict, vine, uritemplate, tzdata, typing-extensions, tqdm, soupsieve, redis, pyyaml, python-dotenv, pyparsing, pygments, pycparser, pyasn1, protobuf, propcache, prompt-toolkit, pluggy, packaging, multidict, markupsafe, itsdangerous, iniconfig, idna, grpcio, frozenlist, feedparser, click, charset_normalizer, certifi, cachetools, blinker, billiard, attrs, annotated-types, aiohappyeyeballs, yarl, werkzeug, typing-inspection, rsa, requests, pytest, pydantic-core, pyasn1-modules, proto-plus, pendulum, jinja2, httplib2, gunicorn, googleapis-common-protos, click-repl, click-plugins, click-didyoumean, cffi, beautifulsoup4, amqp, aiosignal, responses, pydantic, kombu, grpcio-status, google-auth, Flask, cryptography, aiohttp, google-auth-httplib2, google-api-core, Flask-Cors, discord.py, celery, moto, google-api-python-client, google-ai-generativelanguage, google-generativeai
+run-feed-bot	Install dependencies	2025-08-22T02:32:21.1505000Z 
+run-feed-bot	Install dependencies	2025-08-22T02:32:21.1548207Z Successfully installed Flask-3.1.2 Flask-Cors-6.0.1 aiohappyeyeballs-2.6.1 aiohttp-3.12.15 aiosignal-1.4.0 amqp-5.3.1 annotated-types-0.7.0 attrs-25.3.0 beautifulsoup4-4.13.4 billiard-4.2.1 blinker-1.9.0 cachetools-5.5.2 celery-5.5.3 certifi-2025.8.3 cffi-1.17.1 charset_normalizer-3.4.3 click-8.2.1 click-didyoumean-0.3.1 click-plugins-1.1.1.2 click-repl-0.3.0 cryptography-45.0.6 discord.py-2.6.0 feedparser-6.0.11 frozenlist-1.7.0 google-ai-generativelanguage-0.6.15 google-api-core-2.25.1 google-api-python-client-2.179.0 google-auth-2.40.3 google-auth-httplib2-0.2.0 google-generativeai-0.8.5 googleapis-common-protos-1.70.0 grpcio-1.74.0 grpcio-status-1.71.2 gunicorn-23.0.0 httplib2-0.22.0 idna-3.10 iniconfig-2.1.0 itsdangerous-2.2.0 jinja2-3.1.6 kombu-5.5.4 markupsafe-3.0.2 moto-5.1.10 multidict-6.6.4 packaging-25.0 pendulum-3.1.0 pluggy-1.6.0 prompt-toolkit-3.0.51 propcache-0.3.2 proto-plus-1.26.1 protobuf-5.29.5 pyasn1-0.6.1 pyasn1-modules-0.4.2 pycparser-2.22 pydantic-2.11.7 pydantic-core-2.33.2 pygments-2.19.2 pyparsing-3.2.3 pytest-8.4.1 python-dotenv-1.1.1 pyyaml-6.0.2 redis-6.4.0 requests-2.32.5 responses-0.25.8 rsa-4.9.1 sgmllib3k-1.0.0 soupsieve-2.7 tqdm-4.67.1 typing-extensions-4.14.1 typing-inspection-0.4.1 tzdata-2025.2 uritemplate-4.2.0 vine-5.1.0 wcwidth-0.2.13 werkzeug-3.1.3 xmltodict-0.14.2 yarl-1.20.1 yt-dlp-2025.8.20
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	∩╗┐2025-08-22T02:32:21.9399038Z ##[group]Run python3 - << 'PY'
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9399466Z [***;1mpython3 - << 'PY'[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9399752Z [***;1mimport os, sys, traceback[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9400051Z [***;1m[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9400285Z [***;1mdef present(name):[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9400578Z [***;1m  return bool(os.getenv(name))[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9400869Z [***;1m[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9401082Z [***;1menvs = [[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9401336Z [***;1m  ('R2_BUCKET', 'R2_BUCKET'),[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9401655Z [***;1m  ('SEEN_R2_BUCKET', 'SEEN_R2_BUCKET'),[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9401995Z [***;1m  ('R2_ACCESS_KEY_ID', 'R2_ACCESS_KEY_ID'),[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9402353Z [***;1m  ('R2_SECRET_ACCESS_KEY', 'R2_SECRET_ACCESS_KEY'),[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9402692Z [***;1m  ('R2_ENDPOINT', 'R2_ENDPOINT'),[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9402982Z [***;1m][0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9403190Z [***;1m[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9403763Z [***;1mprint('≡ƒöì R2 env presence:')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9404071Z [***;1mfor k, _ in envs:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9404439Z [***;1m  print(f'  {k}:', 'SET' if present(k) else 'MISSING')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9404778Z [***;1m[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9405400Z [***;1mbucket = os.getenv('R2_BUCKET') or os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9405957Z [***;1maccess = os.getenv('R2_ACCESS_KEY_ID') or os.getenv('R2_ACCESS_KEY')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9406435Z [***;1msecret = os.getenv('R2_SECRET_ACCESS_KEY') or os.getenv('R2_SECRET')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9406849Z [***;1mendpoint = os.getenv('R2_ENDPOINT')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9407140Z [***;1m[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9407404Z [***;1mif not bucket or not access or not secret:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9407930Z [***;1m  print('\nΓÜá∩╕Å Missing required R2 credentials ΓÇö will not attempt download.\n')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9408513Z [***;1m  # Create an empty feed_map.json so downstream steps see a file rather than fail silently[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9408996Z [***;1m  if not os.path.exists('feed_map.json'):[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9409360Z [***;1m    open('feed_map.json', 'w').write('{}')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9409716Z [***;1m    print('≡ƒô¥ Created default empty feed_map.json')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9410053Z [***;1m  sys.exit(0)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9410294Z [***;1m[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9410503Z [***;1mtry:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9410729Z [***;1m  import boto3[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9410987Z [***;1mexcept Exception as e:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9411305Z [***;1m  print('Γ¥î boto3 not available in runner:', e)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9411639Z [***;1m  sys.exit(2)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9411877Z [***;1m[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9412089Z [***;1mtry:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9412506Z [***;1m  s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9413062Z [***;1m  s3.download_file(bucket, 'feed_map.json', 'feed_map.json')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9413679Z [***;1m  print('Γ£à Downloaded feed_map.json from R2')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9414047Z [***;1m  # print a small sample for debugging[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9414354Z [***;1m  import json[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9414670Z [***;1m  with open('feed_map.json','r',encoding='utf-8') as f:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9415017Z [***;1m    try:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9415257Z [***;1m      m = json.load(f)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9415631Z [***;1m      print(f"≡ƒöÄ feed_map.json contains {len(m)} entries; sample keys:")[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9416035Z [***;1m      for k in list(m.keys())[:10]:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9416339Z [***;1m        print('  -', k)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9416623Z [***;1m    except Exception as e:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9416960Z [***;1m      print('ΓÜá∩╕Å Could not parse feed_map.json:', e)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9417307Z [***;1mexcept Exception as e:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9417640Z [***;1m  print('Γ¥î Failed to download feed_map.json:', repr(e))[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9417987Z [***;1m  try:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9418249Z [***;1m    # Try to list objects for diagnostics[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9418807Z [***;1m    resp = s3.list_objects_v2(Bucket=bucket, Prefix='')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9419207Z [***;1m    keys = [o['Key'] for o in resp.get('Contents', [])][:20][0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9419595Z [***;1m    print('≡ƒôª Bucket sample keys (first 20):')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9419919Z [***;1m    for k in keys:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9420182Z [***;1m      print('  -', k)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9420461Z [***;1m  except Exception as e2:[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9420804Z [***;1m    print('ΓÜá∩╕Å Could not list bucket contents:', repr(e2))[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9421219Z [***;1m  # Ensure feed_map.json exists so bot doesn't crash later[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9421602Z [***;1m  if not os.path.exists('feed_map.json'):[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9421961Z [***;1m    open('feed_map.json', 'w').write('{}')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9422357Z [***;1m    print('≡ƒô¥ Created default empty feed_map.json')[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9422736Z [***;1m  # exit non-zero so run shows failure if desired[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9423072Z [***;1m  # sys.exit(3)[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9423516Z [***;1mPY[0m
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9464888Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9465319Z env:
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9465621Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9466083Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9466528Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9466933Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9467334Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9467734Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9468099Z   R2_BUCKET: ***
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9468357Z   SEEN_R2_BUCKET: ***
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9468660Z   R2_ACCESS_KEY_ID: ***
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9469067Z   R2_SECRET_ACCESS_KEY: ***
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9469511Z   R2_ENDPOINT: ***
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:21.9469758Z ##[endgroup]
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7696026Z ≡ƒöì R2 env presence:
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7696410Z   R2_BUCKET: SET
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7696737Z   SEEN_R2_BUCKET: SET
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7697039Z   R2_ACCESS_KEY_ID: SET
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7697337Z   R2_SECRET_ACCESS_KEY: SET
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7697642Z   R2_ENDPOINT: SET
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7698047Z Γ£à Downloaded feed_map.json from R2
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7698487Z ≡ƒöÄ feed_map.json contains 2 entries; sample keys:
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7698975Z   - https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss
+run-feed-bot	Fetch feed_map.json from R2 (if configured) ΓÇö verbose	2025-08-22T02:32:22.7699500Z   - https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss
+run-feed-bot	Validate environment variables	∩╗┐2025-08-22T02:32:22.8240287Z ##[group]Run python -c "
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8240649Z [***;1mpython -c "[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8240903Z [***;1mimport os[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8241149Z [***;1mrequired = [[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8241419Z [***;1m    'DISCORD_BOT_TOKEN', [0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8241708Z [***;1m    'GEMINI_API_KEY'[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8241963Z [***;1m][0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8242254Z [***;1mmissing = [k for k in required if not os.getenv(k)][0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8242612Z [***;1mif missing:[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8243000Z [***;1m    print(f'Γ¥î Missing required secrets: {missing}')[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8243646Z [***;1m    print('Please configure these secrets in your repository settings.')[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8244053Z [***;1m    exit(1)[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8244280Z [***;1m[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8244623Z [***;1mprint('Γ£à All required environment variables present (values hidden)')[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8245150Z [***;1mprint(f'ΓÅ░ Max age: {os.getenv(\"MAX_AGE_HOURS\", \"***\")} hours')[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8245546Z [***;1m"[0m
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8286478Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8286747Z env:
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8287042Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8287497Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8287942Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8288330Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8288735Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8289135Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8289688Z   DISCORD_BOT_TOKEN: ***
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8290002Z   GEMINI_API_KEY: ***
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8290244Z   MAX_AGE_HOURS: ***
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8290475Z ##[endgroup]
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8485460Z Γ£à All required environment variables present (values hidden)
+run-feed-bot	Validate environment variables	2025-08-22T02:32:22.8486110Z ΓÅ░ Max age: *** hours
+run-feed-bot	Remove stale lock if force run	∩╗┐2025-08-22T02:32:22.8547476Z ##[group]Run rm -f bot.lock
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8547833Z [***;1mrm -f bot.lock[0m
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8548176Z [***;1mecho "≡ƒöô Removed stale lock file (force run enabled)"[0m
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8589818Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8590096Z env:
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8590393Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8590848Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8591513Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8591926Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8592323Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8592723Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8593066Z ##[endgroup]
+run-feed-bot	Remove stale lock if force run	2025-08-22T02:32:22.8669202Z ≡ƒöô Removed stale lock file (force run enabled)
+run-feed-bot	Run HANU Feed Bot	∩╗┐2025-08-22T02:32:22.8734158Z ##[group]Run echo "≡ƒñû Starting HANU Feed Bot..."
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8734626Z [***;1mecho "≡ƒñû Starting HANU Feed Bot..."[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8734970Z [***;1mecho "≡ƒôà Run time: $(date)"[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8735319Z [***;1mecho "ΓÜÖ∩╕Å Max age: *** hours"[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8735658Z [***;1mecho "==============================================="[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8735986Z [***;1m[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8736320Z [***;1m# Run the bot (ensure env vars are provided via repository secrets)[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8736751Z [***;1mpython cron_worker.py[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8737039Z [***;1m[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8737304Z [***;1mecho "==============================================="[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8737654Z [***;1mecho "Γ£à Bot execution completed"[0m
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8778078Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8778349Z env:
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8778643Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8779098Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8779584Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8779980Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8780370Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8780760Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8781338Z   DISCORD_BOT_TOKEN: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8782043Z   DISCORD_WEBHOOK_URL: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8782381Z   GEMINI_API_KEY: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8782643Z   R2_BUCKET: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8782903Z   R2_ACCOUNT_ID: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8783174Z   R2_ACCESS_KEY_ID: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8783870Z   R2_SECRET_ACCESS_KEY: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8784147Z   R2_REGION: auto
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8784544Z   R2_ENDPOINT: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8784984Z   R2_PUBLIC_BASE: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8785235Z   R2_MAX_BYTES: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8785480Z   SEEN_R2_BUCKET: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8785722Z   MAX_AGE_HOURS: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8785960Z   FALLBACK_ENABLED: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8786204Z   JOB_ENDPOINT: /job
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8786444Z   YT_DLP_COOKIES: cookies.txt
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8786722Z   ADMIN_PASS: ***
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8786947Z ##[endgroup]
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8847806Z ≡ƒñû Starting HANU Feed Bot...
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8860553Z ≡ƒôà Run time: Fri Aug 22 02:32:22 UTC 2025
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8861155Z ΓÜÖ∩╕Å Max age: *** hours
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:32:22.8861487Z ===============================================
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0448639Z Initializing configuration...
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0449457Z ΓÜá∩╕Å  CHANNEL_ID not set; TARGET_CHANNEL_ID will be None.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0449972Z Running locally, using current directory for storage.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0450540Z './avatar_cache.json' not found or invalid. Initializing a new one.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0451071Z Γ£à Configuration loaded.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0451459Z ≡ƒñû Starting standalone bot job...
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0451868Z Logged in as hanucordbot-dev#3486 to perform job.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0452553Z ΓÜá∩╕Å Could not fetch seen.json from R2: An error occurred (404) when calling the HeadObject operation: Not Found
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0453119Z './seen.json' not found or invalid. Initializing a new one.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0453781Z ≡ƒöÄ Loaded feed_map.json with 2 mappings
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0454566Z ≡ƒöÄ Sample feed_map keys: ['https://fetchrss.com/feed/aGmvSyM0BTCCaGmvVgJzjigV.rss', 'https://fetchrss.com/feed/aGoclBsZKU5yaGocpnnq9JNS.rss']
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0455604Z Parsed 225 entries from 45 feeds
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0455989Z ≡ƒôè Scanned 225 entries, found 0 with channel mappings
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0457849Z ΓÜá∩╕Å Sample unmatched feeds (first 6): ['https://fetchrss.com/feed/aGpILhAhnvNyaGpIQEjDu2zz.rss', 'https://fetchrss.com/feed/aGpFxl20AQeTaGpF0CcVlUAS.rss', 'https://fetchrss.com/feed/aGpBre9XzXyCaGpBtT6s1qaT.rss', 'https://fetchrss.com/feed/aGodmsgm16DSaGodtXnq9JNT.rss', 'https://fetchrss.com/feed/aGo9FuBbGUZSaGo9Iv075iU0.rss', 'https://fetchrss.com/feed/aGpHLnElUTOEaGpHOScVlUAT.rss']
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0462052Z No new entries this cycle. Persisted seen.json.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0462607Z Job complete. Logging out.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0463193Z Γ£à Bot job completed successfully
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0464042Z ΓÅ│ Waiting for pending uploads to complete...
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0464706Z ≡ƒöî Discord client closed after job.
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0465261Z ≡ƒº╣ Cleaning up 0 temporary files...
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.0465808Z ≡ƒÅü Bot job finished with exit code 0
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.2287959Z ===============================================
+run-feed-bot	Run HANU Feed Bot	2025-08-22T02:33:01.2288606Z Γ£à Bot execution completed
+run-feed-bot	Check bot execution status	∩╗┐2025-08-22T02:33:01.2326933Z ##[group]Run if [ "success" = "success" ]; then
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2327370Z [***;1mif [ "success" = "success" ]; then[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2327703Z [***;1m  echo "Γ£à Bot ran successfully"[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2327994Z [***;1m  [0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2328262Z [***;1m  # Check state files and report statistics[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2328605Z [***;1m  if [ -f "seen.json" ]; then[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2328977Z [***;1m    SEEN_COUNT=$(jq length seen.json 2>/dev/null || echo "0")[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2329382Z [***;1m    echo "≡ƒôè Total seen entries: $SEEN_COUNT"[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2329689Z [***;1m  fi[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2329907Z [***;1m  [0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2330160Z [***;1m  if [ -f "details_threads.json" ]; then[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2330585Z [***;1m    THREADS_COUNT=$(jq length details_threads.json 2>/dev/null || echo "0")[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2331053Z [***;1m    echo "≡ƒô¥ Active threads: $THREADS_COUNT"[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2331362Z [***;1m  fi[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2331620Z [***;1m  [0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2331899Z [***;1m  echo "≡ƒÄ» Bot execution completed successfully"[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2332220Z [***;1melse[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2332460Z [***;1m  echo "Γ¥î Bot execution failed"[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2332800Z [***;1m  echo "Check the logs above for error details"[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2333119Z [***;1m  exit 1[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2333603Z [***;1mfi[0m
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2373190Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2373563Z env:
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2373868Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2374328Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2374781Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2375179Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2375599Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2375992Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2376334Z ##[endgroup]
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2433487Z Γ£à Bot ran successfully
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2471387Z ≡ƒôè Total seen entries: 10
+run-feed-bot	Check bot execution status	2025-08-22T02:33:01.2471962Z ≡ƒÄ» Bot execution completed successfully
+run-feed-bot	Check for state changes	∩╗┐2025-08-22T02:33:01.2495181Z ##[group]Run echo "=== Git Status ==="
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2495556Z [***;1mecho "=== Git Status ==="[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2495895Z [***;1mgit status --porcelain[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2496181Z [***;1m[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2496482Z [***;1mif git diff --quiet && git diff --staged --quiet; then[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2496878Z [***;1m  echo "STATE_CHANGED=false" >> $GITHUB_ENV[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2497227Z [***;1m  echo "≡ƒô¥ No state changes detected"[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2497526Z [***;1melse[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2497821Z [***;1m  echo "STATE_CHANGED=***" >> $GITHUB_ENV[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2498350Z [***;1m  echo "≡ƒô¥ State changes detected:"[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2498665Z [***;1m  git diff --name-only[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2498930Z [***;1mfi[0m
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2536201Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2536471Z env:
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2536764Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2537222Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2537716Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2538110Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2538514Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2538911Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2539239Z ##[endgroup]
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2595734Z === Git Status ===
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2652009Z  M feeds.txt
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2676731Z ≡ƒô¥ State changes detected:
+run-feed-bot	Check for state changes	2025-08-22T02:33:01.2692589Z feeds.txt
+run-feed-bot	Commit and push state changes	∩╗┐2025-08-22T02:33:01.2726798Z ##[group]Run git config --local user.email "action@github.com"
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2727337Z [***;1mgit config --local user.email "action@github.com"[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2727736Z [***;1mgit config --local user.name "HANU Feed Bot"[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2728107Z [***;1m[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2728528Z [***;1m# Add state files. If SEEN_R2_BUCKET is configured, skip adding seen.json (we persist it to R2)[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2729039Z [***;1mif [ -n "***" ]; then[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2729445Z [***;1m  echo "SEEN_R2_BUCKET is set; skipping seen.json commit (persisting to R2)"[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2730106Z [***;1m  git add details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json || ***[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2730617Z [***;1melse[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2731128Z [***;1m  git add --force seen.json details_threads.json avatar_cache.json feed_meta.json feed_map.json channels.json groups.json || ***[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2731688Z [***;1mfi[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2731933Z [***;1m[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2732167Z [***;1m# Commit with timestamp[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2732503Z [***;1mTIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S UTC')[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2733002Z [***;1mgit commit -m "≡ƒñû Update bot state - $TIMESTAMP [skip ci]" || echo "No changes to commit"[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2733635Z [***;1m[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2733905Z [***;1m# Push changes (use GH_BOT_PAT if provided)[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2734375Z [***;1mif [ -n "***" ]; then[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2734691Z [***;1m  echo "Using GH_BOT_PAT for push"[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2735359Z [***;1m  git remote set-url origin https://***@github.com/hanu-cordbot/hanu-feedbot.git[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2735787Z [***;1mfi[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2736122Z [***;1mgit push origin main || echo "ΓÜá∩╕Å Push failed or nothing to push"[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2736594Z [***;1mecho "Γ£à State changes committed and pushed (or no changes)"[0m
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2776479Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2776783Z env:
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2777079Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2777542Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2777982Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2778395Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2778804Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2779207Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2779568Z   STATE_CHANGED: ***
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2779806Z ##[endgroup]
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2872550Z SEEN_R2_BUCKET is set; skipping seen.json commit (persisting to R2)
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2886653Z fatal: pathspec 'details_threads.json' did not match any files
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2929244Z On branch main
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2929659Z Your branch is up to date with 'origin/main'.
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2930122Z 
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2930249Z Changes not staged for commit:
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2930596Z   (use "git add <file>..." to update what will be committed)
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2931047Z   (use "git restore <file>..." to discard changes in working directory)
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2931420Z 	modified:   feeds.txt
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2931571Z 
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2931886Z no changes added to commit (use "git add" and/or "git commit -a")
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2932510Z No changes to commit
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.2932914Z Using GH_BOT_PAT for push
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.4828519Z Everything up-to-date
+run-feed-bot	Commit and push state changes	2025-08-22T02:33:01.4873805Z Γ£à State changes committed and pushed (or no changes)
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	∩╗┐2025-08-22T02:33:01.4907928Z ##[group]Run set -e
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4908287Z [***;1mset -e[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4908605Z [***;1mgit config --local user.email "action@github.com"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4909014Z [***;1mgit config --local user.name "HANU Feed Bot"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4909348Z [***;1mSTATUS="success"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4909680Z [***;1mTIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4910162Z [***;1mRUN_URL="https://github.com/hanu-cordbot/hanu-feedbot/actions/runs/17144400122"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4910717Z [***;1mecho "# CI last run status" > docs/devops/last-ci-status.md[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4911162Z [***;1mecho "Run: $RUN_URL" >> docs/devops/last-ci-status.md[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4911612Z [***;1mecho "Timestamp: $TIMESTAMP" >> docs/devops/last-ci-status.md[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4912069Z [***;1mecho "Outcome: $STATUS" >> docs/devops/last-ci-status.md[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4912538Z [***;1mecho "State changed: ***" >> docs/devops/last-ci-status.md[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4912956Z [***;1mgit add docs/devops/last-ci-status.md[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4913620Z [***;1mgit commit -m "ci: update last CI status - run 17144400122" || echo "No changes to commit"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4914187Z [***;1m# Use GH_BOT_PAT only if provided; don't attempt to push with an empty secret[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4914744Z [***;1mif [ -n "***" ]; then[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4915079Z [***;1m  echo "Using GH_BOT_PAT to push CI status"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4915725Z [***;1m  git remote set-url origin https://***@github.com/hanu-cordbot/hanu-feedbot.git[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4916245Z [***;1m  git push origin main || echo "ΓÜá∩╕Å Failed to push CI status"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4916605Z [***;1melse[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4916911Z [***;1m  echo "GH_BOT_PAT not set; skipping push of CI status"[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4917253Z [***;1mfi[0m
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4957045Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4957411Z env:
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4957706Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4958187Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4958627Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4959027Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4959446Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4959856Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4960219Z   STATE_CHANGED: ***
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.4960464Z ##[endgroup]
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.5138894Z [main a3e246c] ci: update last CI status - run 17144400122
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.5139418Z  1 file changed, 2 insertions(+), 2 deletions(-)
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:01.5141970Z Using GH_BOT_PAT to push CI status
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:02.0402943Z To https://github.com/hanu-cordbot/hanu-feedbot.git
+run-feed-bot	Persist CI status to repo (docs/devops/last-ci-status.md)	2025-08-22T02:33:02.0403707Z    4d2458f..a3e246c  main -> main
+run-feed-bot	Upload execution logs	∩╗┐2025-08-22T02:33:02.0542177Z ##[group]Run actions/upload-artifact@v4
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0542721Z with:
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0543105Z   name: bot-execution-logs-241
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0544013Z   path: seen.json
+run-feed-bot	Upload execution logs	details_threads.json
+run-feed-bot	Upload execution logs	avatar_cache.json
+run-feed-bot	Upload execution logs	feed_meta.json
+run-feed-bot	Upload execution logs	bot.lock
+run-feed-bot	Upload execution logs	
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0544745Z   retention-days: 7
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0545154Z   if-no-files-found: ignore
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0545907Z   compression-level: 6
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0546332Z   overwrite: false
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0546748Z   include-hidden-files: false
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0547204Z env:
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0547700Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0548534Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0549363Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0550113Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0550832Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0551604Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0552254Z   STATE_CHANGED: ***
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.0552693Z ##[endgroup]
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.2902696Z Multiple search paths detected. Calculating the least common ancestor of all paths
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.2916370Z The least common ancestor is /home/runner/work/hanu-feedbot/hanu-feedbot. This will be the root directory of the artifact
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.2917551Z With the provided path, there will be 3 files uploaded
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.2918554Z Artifact name is valid!
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.2919086Z Root directory input is valid!
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.4086818Z Beginning upload of artifact content to blob storage
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.4821862Z Uploaded bytes 4095
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.5015974Z Finished uploading artifact content to blob storage!
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.5019775Z SHA256 digest of uploaded artifact zip is 786fb35a00***f9f88847ec27d616adee2997bb2eee38e2c075cb3e3c6cb54d39
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.5021600Z Finalizing artifact upload
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.5782961Z Artifact bot-execution-logs-241.zip successfully finalized. Artifact ID 3824721727
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.5784437Z Artifact bot-execution-logs-241 has been successfully uploaded! Final size is 4095 bytes. Artifact ID is 3824721727
+run-feed-bot	Upload execution logs	2025-08-22T02:33:02.5793141Z Artifact download URL: https://github.com/hanu-cordbot/hanu-feedbot/actions/runs/17144400122/artifacts/3824721727
+run-feed-bot	Cleanup	∩╗┐2025-08-22T02:33:02.5908098Z ##[group]Run # Clean up lock file
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5908482Z [***;1m# Clean up lock file[0m
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5908780Z [***;1mrm -f bot.lock[0m
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5909069Z [***;1mecho "≡ƒº╣ Cleanup completed"[0m
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5950499Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5950793Z env:
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5951095Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5951600Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5952057Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5952463Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5952879Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5953292Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5953913Z   STATE_CHANGED: ***
+run-feed-bot	Cleanup	2025-08-22T02:33:02.5954168Z ##[endgroup]
+run-feed-bot	Cleanup	2025-08-22T02:33:02.6028543Z ≡ƒº╣ Cleanup completed
+run-feed-bot	Report execution summary	∩╗┐2025-08-22T02:33:02.6068501Z ##[group]Run echo "==============================================="
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6069305Z [***;1mecho "==============================================="[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6069972Z [***;1mecho "≡ƒÄ» HANU Feed Bot Execution Summary"[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6070635Z [***;1mecho "==============================================="[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6071272Z [***;1mecho "≡ƒôà Execution time: $(date)"[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6071828Z [***;1mecho "≡ƒöä Workflow run: #241"[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6072362Z [***;1mecho "ΓÜÖ∩╕Å Status: success"[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6072939Z [***;1mecho "≡ƒô¥ State changed: ***"[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6073753Z [***;1mecho "==============================================="[0m
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6130510Z shell: /usr/bin/bash -e {0}
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6130995Z env:
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6131500Z   pythonLocation: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6132434Z   PKG_CONFIG_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib/pkgconfig
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6133775Z   Python_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6134487Z   Python2_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6135213Z   Python3_ROOT_DIR: /opt/hostedtoolcache/Python/3.11.13/x64
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6135944Z   LD_LIBRARY_PATH: /opt/hostedtoolcache/Python/3.11.13/x64/lib
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6136593Z   STATE_CHANGED: ***
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6137020Z ##[endgroup]
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6216803Z ===============================================
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6217692Z ≡ƒÄ» HANU Feed Bot Execution Summary
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6218240Z ===============================================
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6230230Z ≡ƒôà Execution time: Fri Aug 22 02:33:02 UTC 2025
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6230941Z ≡ƒöä Workflow run: #241
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6231488Z ΓÜÖ∩╕Å Status: success
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6232262Z ≡ƒô¥ State changed: ***
+run-feed-bot	Report execution summary	2025-08-22T02:33:02.6232794Z ===============================================
+run-feed-bot	Post Set up Python 3.11	∩╗┐2025-08-22T02:33:02.6291095Z Post job cleanup.
+run-feed-bot	Post Set up Python 3.11	2025-08-22T02:33:02.7797611Z Cache hit occurred on the primary key setup-python-Linux-x64-24.04-Ubuntu-python-3.11.13-pip-4350fede7d97eaa1aab096290117a2ac8d49ddcf3243afc20efdc5c6d6a3b022, not saving cache.
+run-feed-bot	Post Checkout repository	∩╗┐2025-08-22T02:33:02.7924477Z Post job cleanup.
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.8890793Z [command]/usr/bin/git version
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.8932022Z git version 2.51.0
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.8978211Z Temporarily overriding HOME='/home/runner/work/_temp/9d8f9465-7c10-4ba2-aeec-9687e14a971b' before making global git config changes
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.8979822Z Adding repository directory to the temporary git global config as a safe directory
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.8992486Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/hanu-feedbot/hanu-feedbot
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.9034078Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.9071201Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.9325059Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.9347679Z http.https://github.com/.extraheader
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.9361494Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+run-feed-bot	Post Checkout repository	2025-08-22T02:33:02.9392774Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+run-feed-bot	Complete job	∩╗┐2025-08-22T02:33:02.9721716Z Cleaning up orphan processes

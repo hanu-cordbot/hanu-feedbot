@@ -524,73 +524,16 @@ async def process_feeds_once(client: discord.Client):
                 continue
         
         # Check if this feed has a channel mapping
-        # Try multiple normalized fallbacks to avoid accidental mismatch (scheme, www, query, trailing slash)
+        # Try a couple of normalized fallbacks to avoid accidental mismatch (trailing slashes/whitespace)
         raw_feed = e.get('feed')
         cid = None
-        def _lookup_map(m, key):
-            v = m.get(key)
-            # feed_map may store either a simple channel id string or an enriched dict
-            if isinstance(v, dict):
-                return v.get('channel') or v.get('id') or None
-            return v
-
-        if raw_feed:
-            import urllib.parse
-            s = str(raw_feed).strip()
-            candidates = []
-            candidates.append(s)
-            candidates.append(s.rstrip('/'))
-
-            # remove scheme
-            no_scheme = re.sub(r'^https?://', '', s, flags=re.I)
-            candidates.append(no_scheme)
-            candidates.append(no_scheme.rstrip('/'))
-
-            # remove www
-            no_www = re.sub(r'^www\.', '', no_scheme, flags=re.I)
-            candidates.append(no_www)
-            candidates.append(no_www.rstrip('/'))
-
-            # remove query and fragment
-            p = urllib.parse.urlparse(s)
-            no_q = urllib.parse.urlunparse((p.scheme, p.netloc, p.path.rstrip('/'), '', '', ''))
-            candidates.append(no_q)
-            candidates.append(no_q.rstrip('/'))
-
-            # host + path
-            hostpath = (p.netloc + p.path).rstrip('/')
-            candidates.append(hostpath)
-
-            # de-duplicate preserving order
-            seenc = set()
-            uniq = []
-            for c in candidates:
-                if not c:
-                    continue
-                if c in seenc:
-                    continue
-                seenc.add(c)
-                uniq.append(c)
-
-            for key in uniq:
-                try:
-                    maybe = _lookup_map(user_map, key)
-                except Exception:
-                    maybe = None
-                if maybe:
-                    cid = maybe
-                    break
-
+        try:
+            cid = user_map.get(raw_feed) or user_map.get(str(raw_feed).strip()) or user_map.get(str(raw_feed).rstrip('/'))
+        except Exception:
+            cid = user_map.get(raw_feed)
         if cid:
             # Only add entries that have explicit channel mappings
-            try:
-                e['target_channel'] = int(cid)  # numeric id
-            except Exception:
-                e['target_channel'] = cid
-            try:
-                print(f"🔗 Matched feed mapping: {raw_feed} -> {e['target_channel']}")
-            except Exception:
-                pass
+            e['target_channel'] = int(cid)  # Store the target channel for later processing
             new_posts.append(e)
         else:
             if raw_feed and len(unmatched_examples) < 10:
@@ -610,27 +553,7 @@ async def process_feeds_once(client: discord.Client):
 
     if unmatched_examples:
         try:
-            examples = list(unmatched_examples)[:6]
-            print(f"⚠️ Sample unmatched feeds (first {len(examples)}): {examples}")
-            # Debug: show normalized lookup candidates and whether they appear in feed_map
-            for raw in examples:
-                try:
-                    import urllib.parse
-                    s = str(raw).strip()
-                    p = urllib.parse.urlparse(s)
-                    candidates = [s, s.rstrip('/'), re.sub(r'^https?://', '', s, flags=re.I), re.sub(r'^https?://', '', s, flags=re.I).rstrip('/'), re.sub(r'^www\.', '', re.sub(r'^https?://', '', s, flags=re.I), flags=re.I), urllib.parse.urlunparse((p.scheme, p.netloc, p.path.rstrip('/'), '', '', '')), (p.netloc + p.path).rstrip('/')]
-                    # de-dup
-                    seen_c = set(); uniq = []
-                    for c in candidates:
-                        if not c or c in seen_c: continue
-                        seen_c.add(c); uniq.append(c)
-                    print(f"   Debug mapping attempt for: {raw}")
-                    for c in uniq:
-                        present = c in user_map
-                        val = user_map.get(c)
-                        print(f"     - candidate: {c} -> present={present} val={repr(val) if present else 'N/A'}")
-                except Exception as e:
-                    print('   Debug mapping failed for', raw, e)
+            print(f"⚠️ Sample unmatched feeds (first {len(unmatched_examples)}): {list(unmatched_examples)}")
         except Exception:
             pass
 
