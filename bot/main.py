@@ -467,20 +467,39 @@ async def process_entry_in_thread(entry, thread, summary):
     if last_msg:
         await update_daily_summary_message(summary, entry, last_msg)
 
-async def process_entry_in_forum(entry, forum_channel):
+async def process_entry_in_forum(client, entry, forum_channel):
     """Process a single entry in a forum channel by creating a new thread"""
     title = entry.get('title', 'No Title')[:100]  # Forum thread titles are limited
-    
-    # Create thread in forum
-    thread = await forum_channel.create_thread(name=title)
-    
-    # Post content to the thread
-    body = await build_full_body(entry)
-    for idx in range(0, len(body), 2000):
-        chunk = body[idx:idx+2000]
-        await thread.send(chunk)
-    
-    print(f"✅ Created forum thread: {title}")
+
+    try:
+        # Create thread in forum
+        print(f"🧵 Creating forum thread for: {title}")
+        thread = await forum_channel.create_thread(name=title)
+
+        # Post content to the thread
+        body = await build_full_body(entry)
+        for idx in range(0, len(body), 2000):
+            chunk = body[idx:idx+2000]
+            await thread.send(chunk)
+
+        print(f"✅ Created forum thread: {title}")
+        return
+    except Exception as e:
+        print(f"❌ Failed to create/send forum thread for '{title}' in channel {getattr(forum_channel, 'id', 'unknown')}: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Fallback: try to post via webhook (this will create a thread via webhook for forums)
+    try:
+        from bot.dispatcher import push
+        print(f"🔁 Attempting webhook fallback for forum post: {title}")
+        # Use dispatcher.push to create thread via webhook if thread creation fails
+        await push(client, forum_channel, entry, await build_full_body(entry), entry.get('tldr', ''), entry.get('published', ''))
+        print(f"✅ Webhook fallback succeeded for forum post: {title}")
+    except Exception as e:
+        print(f"❌ Webhook fallback failed for forum post '{title}': {e}")
+        import traceback
+        traceback.print_exc()
 
 async def process_feeds_once(client: discord.Client):
     """Scans feeds and processes new entries per-channel summary."""
@@ -670,7 +689,7 @@ async def process_feeds_once(client: discord.Client):
             # Forum channel - create separate thread for each entry
             print(f"Processing {len(entries)} entries for forum channel: {ch.name}")
             for e in entries:
-                await process_entry_in_forum(e, ch)
+                await process_entry_in_forum(client, e, ch)
                 # Mark as seen and save
                 seen.add(e['guid'])
                 save_seen_guids(seen)
