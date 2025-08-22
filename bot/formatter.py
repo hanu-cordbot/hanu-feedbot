@@ -88,6 +88,9 @@ Your Process:
 4. Only focus on the subject. Exclude the author. For example, it should be 'ac cho e hỏi đầu năm có phải ktra sức khoẻ nữa ko ạ 😭', not 'Hanu Confessions: ac cho e hỏi đầu năm có phải ktra sức khoẻ nữa ko ạ 😭 '.
 5. Don't focus on who's asking and who's being asked. Only focus on the general problem: Use "mn bt chỗ nào học tiếng pháp oke ko ạ?", and not "Các bn học ngôn ngữ pháp hanu ơi các bn bt chỗ nào học tiếng pháp oke ko ạ?".
 6. You can also vary in expression by using symbols like . ! ? or ... or no symbol at all.
+
+For posts that start with tags or stuff like "[TAG]":
+- Ignore the tags and put the title as something that summarizes the main content of the entire post.
 Return only the title as a single line.
 """
 
