@@ -543,37 +543,58 @@ async def process_feeds_once(client: discord.Client):
     mapped_feed_count = 0
     for e in iter_entries():
         scanned_count += 1
-        
+
         # Skip if already seen
-        if e['guid'] in seen: 
+        if e['guid'] in seen:
             seen_count += 1
             continue
-        
-        # Age check (skip in test mode if FORCE_IGNORE_AGE is set)
-        force_ignore_age = os.getenv('FORCE_IGNORE_AGE', 'false').lower() == 'true'
-        if not force_ignore_age:
-            published_date = e.get('published')
-            if published_date is None:
-                # If no published date, treat as current time (fresh entry)
-                age = 0
-            else:
-                age = (now - published_date).total_seconds() / 3600  # Convert to hours
-            if age > MAX_AGE_HOURS: 
-                age_filtered_count += 1
-                continue
-        
-        # Check if this feed has a channel mapping
-        # Try a couple of normalized fallbacks to avoid accidental mismatch (trailing slashes/whitespace)
+
+        # Determine feed URL and whether it is mapped up-front so we can
+        # optionally bypass age filtering for mapped feeds.
         raw_feed = e.get('feed')
         cid = None
         try:
             cid = user_map.get(raw_feed) or user_map.get(str(raw_feed).strip()) or user_map.get(str(raw_feed).rstrip('/'))
         except Exception:
             cid = user_map.get(raw_feed)
-        if cid:
+        is_mapped_feed = bool(cid)
+
+        # Age check (skip in test mode if FORCE_IGNORE_AGE is set).
+        # Mapped feeds bypass the age check so newly mapped feeds get delivered
+        # even if their entries are older than MAX_AGE_HOURS.
+        force_ignore_age = os.getenv('FORCE_IGNORE_AGE', 'false').lower() == 'true'
+        if not force_ignore_age and not is_mapped_feed:
+            published_date = e.get('published')
+            if published_date is None:
+                # If no published date, treat as current time (fresh entry)
+                age = 0
+            else:
+                age = (now - published_date).total_seconds() / 3600  # Convert to hours
+            if age > MAX_AGE_HOURS:
+                age_filtered_count += 1
+                continue
+        
+        # Use mapping determined earlier (to avoid duplicate lookups)
+        if is_mapped_feed and cid:
             # Only add entries that have explicit channel mappings
-            e['target_channel'] = int(cid)  # Store the target channel for later processing
+            try:
+                e['target_channel'] = int(str(cid))  # Store the target channel for later processing
+            except Exception:
+                # Last resort: skip if cid is malformed
+                print(f"❌ Invalid channel id for feed {raw_feed}: {cid}")
+                continue
             new_posts.append(e)
+            mapped_feed_count += 1
+            # If the entry was older than MAX_AGE_HOURS but the feed is mapped,
+            # indicate we bypassed the age filter so maintainers can see why.
+            try:
+                published_date = e.get('published')
+                if published_date is not None:
+                    age = (now - published_date).total_seconds() / 3600
+                    if age > MAX_AGE_HOURS:
+                        print(f"⚠️ Bypassed age filter for mapped feed {raw_feed} (age={age:.1f}h)")
+            except Exception:
+                pass
             print(f"✅ Matched entry: {e.get('title', 'No title')[:50]} from {raw_feed} -> {cid}")
         else:
             if raw_feed and len(unmatched_examples) < 10:
