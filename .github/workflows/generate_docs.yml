@@ -143,11 +143,7 @@ jobs:
             print('No feed_map.json available locally or in R2 under dashboard/data/feed_map.json')
           PY
 
-      # Skip feed_map preview artifact upload - not needed
-      # - name: Upload feed_map preview artifact
-        uses: actions/upload-artifact@v4
-        with:
-      # Skip feed_map preview - not needed
+  # Skip feed_map preview artifact upload - not needed
       
       - name: Collect full mapping files for artifact
         run: |
