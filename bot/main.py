@@ -69,7 +69,9 @@ else:
     BASE_DIR = "."
     print("Running locally, using current directory for storage.")
 
-SEEN_FILE = os.path.join(BASE_DIR, "seen.json")
+# Import migrated config paths
+from bot.config import SEEN_DB
+SEEN_FILE = str(SEEN_DB)  # Use migrated dashboard/data/seen.json path
 DETAILS_FILE = os.path.join(BASE_DIR, "details_thread_id.json")
 DETAILS_MAP_FILE = os.path.join(BASE_DIR, 'details_threads.json')
 
@@ -529,12 +531,16 @@ async def process_feeds_once(client: discord.Client):
     # Collect new entries - scan ALL feeds but only process those with channel mappings
     new_posts = []
     scanned_count = 0
+    seen_count = 0
+    age_filtered_count = 0
     unmatched_examples = set()
+    mapped_feed_count = 0
     for e in iter_entries():
         scanned_count += 1
         
         # Skip if already seen
         if e['guid'] in seen: 
+            seen_count += 1
             continue
         
         # Age check (skip in test mode if FORCE_IGNORE_AGE is set)
@@ -547,6 +553,7 @@ async def process_feeds_once(client: discord.Client):
             else:
                 age = (now - published_date).total_seconds() / 3600  # Convert to hours
             if age > MAX_AGE_HOURS: 
+                age_filtered_count += 1
                 continue
         
         # Check if this feed has a channel mapping
@@ -561,6 +568,7 @@ async def process_feeds_once(client: discord.Client):
             # Only add entries that have explicit channel mappings
             e['target_channel'] = int(cid)  # Store the target channel for later processing
             new_posts.append(e)
+            print(f"✅ Matched entry: {e.get('title', 'No title')[:50]} from {raw_feed} -> {cid}")
         else:
             if raw_feed and len(unmatched_examples) < 10:
                 unmatched_examples.add(raw_feed)
@@ -576,6 +584,7 @@ async def process_feeds_once(client: discord.Client):
             break
     
     print(f"📊 Scanned {scanned_count} entries, found {len(new_posts)} with channel mappings")
+    print(f"📋 Breakdown: {seen_count} already seen, {age_filtered_count} filtered by age, {mapped_feed_count} from mapped feeds")
 
     if unmatched_examples:
         try:
