@@ -189,8 +189,33 @@ class HanuAPI {
   // ===== FEED MANAGEMENT =====
 
   async getFeeds() {
-    // Use smart loading for feeds data
-    return this.loadDataSmart('/api/public/feeds', 'feeds.json');
+    // Use stats data instead of separate feeds.json (stats.json contains better feed health info)
+    const statsData = await this.loadDataSmart('/api/stats', 'stats.json');
+    if (statsData && statsData.stats && statsData.stats.feed_health) {
+      const feeds = Object.values(statsData.stats.feed_health).map(feed => ({
+        url: feed.url,
+        title: feed.title || 'Unknown Feed',
+        description: feed.description || '',
+        entry_count: feed.entry_count || 0,
+        last_post: feed.last_post,
+        last_updated: feed.last_updated,
+        has_metadata: feed.has_metadata || false,
+        channel: feed.channel,
+        page_url: feed.page_url,
+        status: feed.status || 'unknown'
+      }));
+      return {
+        last_updated: statsData.stats.last_updated,
+        feeds: feeds,
+        total_feeds: statsData.stats.total_feeds
+      };
+    }
+    // Fallback to empty structure
+    return {
+      last_updated: new Date().toISOString(),
+      feeds: [],
+      total_feeds: 0
+    };
   }
 
   async getStats() {

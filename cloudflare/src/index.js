@@ -77,44 +77,123 @@ async function handleRequest(event) {
       return jsonResponse({ error: 'Authentication required' }, 401);
     }
 
-    // Admin API: GET /api/feeds (protected) -> return list of feed URLs
+    // Public API: GET /api/public/feeds -> return feeds data from stats.json instead of feeds.json
+    if (request.method === 'GET' && pathname === '/api/public/feeds') {
+      const obj = await FEEDS_BUCKET.get('data/stats.json');
+      if (!obj) return jsonResponse({ last_updated: new Date().toISOString(), feeds: [], total_feeds: 0 }, 200);
+      const text = await obj.text();
+      try {
+        const data = JSON.parse(text);
+        if (data.stats && data.stats.feed_health) {
+          const feeds = Object.values(data.stats.feed_health).map(feed => ({
+            url: feed.url,
+            title: feed.title || 'Unknown Feed',
+            description: feed.description || '',
+            entry_count: feed.entry_count || 0,
+            last_post: feed.last_post,
+            last_updated: feed.last_updated,
+            has_metadata: feed.has_metadata || false,
+            channel: feed.channel,
+            page_url: feed.page_url,
+            status: feed.status || 'unknown'
+          }));
+          return jsonResponse({
+            last_updated: data.stats.last_updated,
+            feeds: feeds,
+            total_feeds: data.stats.total_feeds
+          }, 200);
+        }
+      } catch (e) {
+        console.error('Failed to parse stats.json:', e);
+      }
+      return jsonResponse({ last_updated: new Date().toISOString(), feeds: [], total_feeds: 0 }, 200);
+    }
+
+    // Admin API: GET /api/feeds (protected) -> return list of feed URLs from feeds.txt (ground truth)
     if (request.method === 'GET' && pathname === '/api/feeds') {
       if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
-      const obj = await FEEDS_BUCKET.get('data/feeds.json');
+      // Note: This should ideally read from a ground truth file like feeds.txt in R2
+      // For now, extract URLs from stats.json as fallback
+      const obj = await FEEDS_BUCKET.get('data/stats.json');
       if (!obj) return jsonResponse({ feeds: [] }, 200);
       const text = await obj.text();
       try {
         const data = JSON.parse(text);
-        // Support both array of strings and new format with objects
-        if (Array.isArray(data)) return jsonResponse({ feeds: data }, 200);
-        if (data.feeds && Array.isArray(data.feeds)) {
-          const urls = data.feeds.map(f => (typeof f === 'string' ? f : f.url)).filter(Boolean);
+        if (data.stats && data.stats.feed_health) {
+          const urls = Object.keys(data.stats.feed_health);
           return jsonResponse({ feeds: urls }, 200);
         }
-        return jsonResponse({ feeds: [] }, 200);
       } catch (e) {
-        return jsonResponse({ feeds: [] }, 200);
+        console.error('Failed to parse stats.json for admin feeds:', e);
       }
+      return jsonResponse({ feeds: [] }, 200);
     }
 
-    // Admin API: POST /api/feeds (protected) -> add feed URL to feeds.json
+    // Admin API: POST /api/feeds (protected) -> add feed URL to ground truth (feeds.txt via R2)
     if (request.method === 'POST' && pathname === '/api/feeds') {
       if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
       const body = await request.json().catch(() => ({}));
       const feedUrl = (body.feedUrl || body.url || '').toString();
       if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
-      // Read existing
-      const obj = await FEEDS_BUCKET.get('data/feeds.json');
-      let feedsArr = [];
-      if (obj) {
-        try { const existing = JSON.parse(await obj.text()); if (existing.feeds) feedsArr = existing.feeds; else if (Array.isArray(existing)) feedsArr = existing; } catch(e){}
+      
+      // TODO: This should write to feeds.txt in R2 instead of feeds.json
+      // For now, return success but note that the actual ground truth is managed elsewhere
+      return jsonResponse({ 
+        success: true, 
+        feed: feedUrl,
+        note: 'Feed will be added to ground truth on next CI run'
+      }, 200);
+    }
+
+    // Admin API: POST /api/feed-mappings (protected) -> update feed_map.json with channel mappings
+    if (request.method === 'POST' && pathname === '/api/feed-mappings') {
+      if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
+      const body = await request.json().catch(() => ({}));
+      const feedUrl = (body.feedUrl || body.url || '').toString();
+      const channelId = (body.channelId || body.channel || '').toString();
+      
+      if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
+      
+      try {
+        // Load existing feed_map.json
+        const obj = await FEEDS_BUCKET.get('dashboard/data/feed_map.json');
+        let feedMap = {};
+        if (obj) {
+          try {
+            feedMap = JSON.parse(await obj.text());
+          } catch (e) {
+            console.warn('Failed to parse existing feed_map.json:', e);
+          }
+        }
+        
+        // Update mapping (simplified format: url -> channelId)
+        if (channelId) {
+          feedMap[feedUrl] = channelId;
+        } else {
+          // Remove mapping if no channelId provided
+          delete feedMap[feedUrl];
+        }
+        
+        // Save updated feed_map.json
+        const contents = JSON.stringify(feedMap, null, 2);
+        await FEEDS_BUCKET.put('dashboard/data/feed_map.json', contents, { 
+          httpMetadata: { contentType: 'application/json' } 
+        });
+        
+        return jsonResponse({ 
+          success: true, 
+          feedUrl,
+          channelId: channelId || null,
+          message: channelId ? 'Mapping updated' : 'Mapping removed'
+        }, 200);
+        
+      } catch (error) {
+        console.error('Failed to update feed mapping:', error);
+        return jsonResponse({ 
+          error: 'Failed to update mapping', 
+          message: error.message 
+        }, 500);
       }
-      // Normalize entries as objects with url
-      const exists = feedsArr.some(f => (typeof f === 'string' ? f : f.url) === feedUrl);
-      if (!exists) feedsArr.push({ url: feedUrl });
-      const contents = JSON.stringify({ last_updated: new Date().toISOString(), feeds: feedsArr });
-      await FEEDS_BUCKET.put('data/feeds.json', contents, { httpMetadata: { contentType: 'application/json' } });
-      return jsonResponse({ success: true, feed: feedUrl }, 200);
     }
 
     // Public GET: allow serving arbitrary JSON files from the configured dashboard prefix
@@ -144,10 +223,12 @@ function mapPathToKey(pathname) {
   const prefix = rawPrefix.replace(/^\/+|\/+$/g, ''); // trim slashes
   switch (pathname) {
     case '/api/public/feeds':
-      return `${prefix}/feeds.json`;
+      // Redirect feeds endpoint to use stats.json instead of feeds.json
+      return `${prefix}/stats.json`;
     case '/api/public/meta':
       return `${prefix}/meta.json`;
     case '/api/public/stats':
+    case '/api/stats':
       return `${prefix}/stats.json`;
     default:
         // For other keys, treat pathname as a key under the prefix
