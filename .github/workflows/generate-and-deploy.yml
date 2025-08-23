@@ -141,11 +141,12 @@ jobs:
 
       - name: Generate dashboard data
         run: |
-          # Ensure feed_map.json and channels.json exist to avoid generator failures
+          # Ensure channels.json exists to avoid generator failures
+          # NOTE: Do NOT overwrite dashboard/data/feed_map.json as it should persist from R2 download
           python - <<'PY'
           import os, json
           os.makedirs('dashboard/data', exist_ok=True)
-          for fn, default in [('dashboard/data/feed_map.json', {}), ('channels.json', [])]:
+          for fn, default in [('channels.json', [])]:
               if not os.path.exists(fn):
                   open(fn, 'w', encoding='utf-8').write(json.dumps(default, indent=2))
           PY
@@ -178,6 +179,12 @@ jobs:
 
           PREFIX="dashboard/data"
           PREFIX=$(echo "$PREFIX" | sed 's#^/*##; s#/*$##')
+
+          # Upload authoritative feed_map.json to preserve user mappings
+          if [ -f "dashboard/data/feed_map.json" ]; then
+            echo "Uploading dashboard/data/feed_map.json -> s3://$BUCKET/dashboard/data/feed_map.json"
+            aws --endpoint-url "$R2_ENDPOINT" s3 cp "dashboard/data/feed_map.json" "s3://$BUCKET/dashboard/data/feed_map.json" --acl public-read || echo "Upload failed for dashboard/data/feed_map.json"
+          fi
 
           mkdir -p docs/data
           for f in docs/data/*.json; do

@@ -162,10 +162,11 @@ jobs:
 
       - name: Generate dashboard data
         run: |
-          # Ensure feed_map.json and channels.json exist to avoid generator failures
+          # Ensure channels.json exists to avoid generator failures  
+          # NOTE: Do NOT overwrite feed_map.json as it should persist from R2 download
           python - <<'PY'
           import os, json
-          for fn, default in [('feed_map.json', {}), ('channels.json', [])]:
+          for fn, default in [('channels.json', [])]:
               if not os.path.exists(fn):
                   open(fn, 'w', encoding='utf-8').write(json.dumps(default, indent=2))
           PY
