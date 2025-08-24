@@ -59,7 +59,8 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
         )
 
         # Generate public URL
-        # Prefer runtime environment variable if available
+        # Require an explicit public base URL to be set in the runtime environment.
+        # No fallback allowed because cloudflarestorage URLs don't embed reliably in Discord.
         if r2_public_env:
             public_url = f"{r2_public_env.rstrip('/')}/{filename}"
             print(f"ℹ️ Using R2_PUBLIC_URL from environment: {r2_public_env}")
@@ -67,9 +68,9 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
             public_url = f"{R2_PUBLIC_URL.rstrip('/')}/{filename}"
             print(f"ℹ️ Using R2_PUBLIC_URL from module config: {R2_PUBLIC_URL}")
         else:
-            # No public base configured — fall back to cloudflarestorage URL but warn
-            public_url = f"https://{R2_VIDEO_BUCKET}.r2.cloudflarestorage.com/{filename}"
-            print("⚠️ R2_PUBLIC_URL is not set; using cloudflarestorage fallback which may not be publicly accessible")
+            # Refuse to generate a cloudflarestorage fallback URL
+            print('ERROR: R2_PUBLIC_URL is not set in the runtime environment; refusing to return a fallback cloudflarestorage URL.')
+            return None
 
         print(f"✅ Video uploaded to R2: {public_url}")
         return public_url
