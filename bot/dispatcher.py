@@ -162,12 +162,8 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
                             r2_url = await upload_video_to_r2_async(video_data, post_title)
                             
                             if r2_url:
-                                # Create embed message for R2 video
-                                video_message = create_video_embed_message(
-                                    r2_url, 
-                                    post_title, 
-                                    facebook_url
-                                )
+                                # Create embed message for R2 video (no original post link)
+                                video_message = create_video_embed_message(r2_url, post_title)
                                 video_links.append(video_message)
                                 video_processed = True
                             else:
@@ -522,11 +518,7 @@ async def process_special_posts(client, config):
                     r2_url = await upload_video_to_r2_async(video_data, post['title'])
                     
                     if r2_url:
-                        video_message = create_video_embed_message(
-                            r2_url, 
-                            post['title'], 
-                            post['url']
-                        )
+                        video_message = create_video_embed_message(r2_url, post['title'])
                         message = await channel.send(f"🌟 {video_message}")
                         print(f"✅ Special post sent to Discord via R2")
                     else:

@@ -80,16 +80,15 @@ async def upload_video_to_r2_async(video_data: bytes, post_title: str) -> Option
     return await asyncio.to_thread(upload_video_to_r2, video_data, post_title)
 
 def create_video_embed_message(video_url: str, post_title: str, post_url: str = None) -> str:
-    """Create a Discord message with embedded video from R2"""
-    # Discord will auto-embed videos with direct links
+    """Create a Discord message with embedded video from R2.
+
+    Simplified format: title + direct video URL. Do not include Original Post link
+    (the dispatcher already posts the post URL in the body when relevant).
+    """
     message_parts = [
         f"🎥 **{post_title}**",
-        video_url
+        video_url,
     ]
-    
-    if post_url:
-        message_parts.append(f"📱 [Original Post]({post_url})")
-    
     return "\n".join(message_parts)
 
 def get_video_size_limit() -> int:
@@ -131,3 +130,22 @@ def cleanup_old_videos(days_old: int = 30) -> None:
             
     except Exception as e:
         print(f"⚠️ Error during video cleanup: {e}")
+
+
+# --- Startup debug (masked) to help confirm which public URL will be used ---
+def _mask_url(u: Optional[str]) -> str:
+    if not u:
+        return "(not set)"
+    try:
+        # keep scheme and first/last fragments
+        if len(u) <= 40:
+            return u
+        return u[:28] + '...' + u[-10:]
+    except Exception:
+        return '(invalid)'
+
+try:
+    masked = _mask_url(R2_PUBLIC_URL)
+    print(f"🔎 R2_PUBLIC_URL (masked): {masked}")
+except Exception:
+    pass
