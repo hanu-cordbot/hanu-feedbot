@@ -255,7 +255,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_REGION: ${{ secrets.R2_REGION || 'auto' }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_PUBLIC_BASE: ${{ secrets.R2_PUBLIC_BASE }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           R2_MAX_BYTES: ${{ secrets.R2_MAX_BYTES || '5000000000' }}
           SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
           
