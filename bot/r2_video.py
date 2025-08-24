@@ -41,13 +41,14 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
     if not client:
         print("❌ R2 client not available")
         return None
-    
     try:
         # Generate unique filename
         filename = generate_video_filename(post_title)
-        
+
+        # Determine public base URL at call time (so runtime env is respected)
+        r2_public_env = os.getenv('R2_PUBLIC_URL')
         print(f"📤 Uploading video to R2: {filename} ({len(video_data)/1024/1024:.2f}MB)")
-        
+
         # Upload to R2
         client.put_object(
             Bucket=R2_VIDEO_BUCKET,
@@ -56,19 +57,22 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
             ContentType='video/mp4',
             ACL='public-read'  # Make publicly accessible
         )
-        
+
         # Generate public URL
-        if R2_PUBLIC_URL:
-            # Use the configured public base URL exactly as provided
+        # Prefer runtime environment variable if available
+        if r2_public_env:
+            public_url = f"{r2_public_env.rstrip('/')}/{filename}"
+            print(f"ℹ️ Using R2_PUBLIC_URL from environment: {r2_public_env}")
+        elif R2_PUBLIC_URL:
             public_url = f"{R2_PUBLIC_URL.rstrip('/')}/{filename}"
+            print(f"ℹ️ Using R2_PUBLIC_URL from module config: {R2_PUBLIC_URL}")
         else:
             # No public base configured — fall back to cloudflarestorage URL but warn
             public_url = f"https://{R2_VIDEO_BUCKET}.r2.cloudflarestorage.com/{filename}"
             print("⚠️ R2_PUBLIC_URL is not set; using cloudflarestorage fallback which may not be publicly accessible")
-            
+
         print(f"✅ Video uploaded to R2: {public_url}")
         return public_url
-        
     except Exception as e:
         print(f"❌ Failed to upload video to R2: {e}")
         import traceback
@@ -130,6 +134,20 @@ def cleanup_old_videos(days_old: int = 30) -> None:
             
     except Exception as e:
         print(f"⚠️ Error during video cleanup: {e}")
+
+
+def build_public_url_for_key(key: str) -> str:
+    """Return the public URL that would be used for a given object key.
+
+    Useful for runtime testing without performing an upload.
+    """
+    # Prefer runtime env
+    r2_public_env = os.getenv('R2_PUBLIC_URL')
+    if r2_public_env:
+        return f"{r2_public_env.rstrip('/')}/{key}"
+    if R2_PUBLIC_URL:
+        return f"{R2_PUBLIC_URL.rstrip('/')}/{key}"
+    return f"https://{R2_VIDEO_BUCKET}.r2.cloudflarestorage.com/{key}"
 
 
 # --- Startup debug (masked) to help confirm which public URL will be used ---
