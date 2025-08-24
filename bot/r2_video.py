@@ -59,12 +59,12 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
         
         # Generate public URL
         if R2_PUBLIC_URL:
-            # Use custom domain if configured
+            # Use the configured public base URL exactly as provided
             public_url = f"{R2_PUBLIC_URL.rstrip('/')}/{filename}"
         else:
-            # Generate standard R2 URL (this may not work without custom domain)
-            # You'll need to configure R2_PUBLIC_URL for this to work properly
+            # No public base configured — fall back to cloudflarestorage URL but warn
             public_url = f"https://{R2_VIDEO_BUCKET}.r2.cloudflarestorage.com/{filename}"
+            print("⚠️ R2_PUBLIC_URL is not set; using cloudflarestorage fallback which may not be publicly accessible")
             
         print(f"✅ Video uploaded to R2: {public_url}")
         return public_url
