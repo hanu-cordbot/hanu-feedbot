@@ -90,8 +90,17 @@ from bot.dispatcher import (
 from bot.avatar_cache import maybe_update, avatar_for
 from bot.config import SEEN_R2_BUCKET, r2_client
 from bot.facebook_downloader import download_video_ytdlp, normalize_url
+from bot.r2_video import (
+    upload_video_to_r2_async,
+    create_video_embed_message,
+    should_use_r2_storage,
+    get_video_size_limit
+)
 
 print("✅ Configuration loaded.")
+
+# Discord file size limit
+DISCORD_LIMIT = get_video_size_limit()  # 8MB
 
 # --- HELPER FUNCTIONS ---
 def get_http_session():
@@ -324,24 +333,37 @@ async def process_media(entry, channel):
                 # Check if file is too large for Discord
                 if file_size > DISCORD_LIMIT:
                     print(f"⚠️ Video too large for Discord ({file_size/1024/1024:.2f}MB > {DISCORD_LIMIT/1024/1024}MB)")
-                    print(f"📤 Uploading to Catbox instead...")
-                    
-                    # Import upload function from dispatcher
-                    from bot.dispatcher import upload_to_catbox
                     
                     # Read file data
                     with open(file_path, 'rb') as f:
                         file_data = f.read()
                     
-                    # Upload to Catbox
-                    catbox_url = upload_to_catbox(file_data)
-                    if catbox_url:
-                        print(f"✅ Uploaded to Catbox: {catbox_url}")
-                        # Send as a message instead of file attachment
-                        await channel.send(f"Video from post: {target_url}\n{catbox_url}")
-                        video_processed = True
+                    if should_use_r2_storage(file_size):
+                        print(f"📤 Uploading to R2...")
+                        
+                        # Try R2 first
+                        post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
+                        r2_url = await upload_video_to_r2_async(file_data, post_title)
+                        
+                        if r2_url:
+                            print(f"✅ Uploaded to R2: {r2_url}")
+                            # Send as a formatted embed message
+                            video_message = create_video_embed_message(r2_url, post_title, target_url)
+                            await channel.send(video_message)
+                            video_processed = True
+                        else:
+                            # Fallback to Catbox if R2 fails
+                            print(f"📤 R2 failed, falling back to Catbox...")
+                            from bot.dispatcher import upload_to_catbox
+                            catbox_url = upload_to_catbox(file_data)
+                            if catbox_url:
+                                print(f"✅ Uploaded to Catbox: {catbox_url}")
+                                await channel.send(f"Video from post: {target_url}\n{catbox_url}")
+                                video_processed = True
+                            else:
+                                print("❌ Failed to upload to both R2 and Catbox")
                     else:
-                        print("❌ Failed to upload to Catbox")
+                        print(f"📤 Video too large even for external storage")
                 else:
                     # Small enough for Discord, send directly
                     print(f"📤 Video small enough for Discord ({file_size/1024/1024:.2f}MB)")
@@ -364,12 +386,25 @@ async def process_media(entry, channel):
                         
                         # Check if too large for Discord
                         if file_size > DISCORD_LIMIT:
-                            from bot.dispatcher import upload_to_catbox
                             with open(file_path, 'rb') as f:
                                 file_data = f.read()
-                            catbox_url = upload_to_catbox(file_data)
-                            if catbox_url:
-                                video_processed = True
+                            
+                            if should_use_r2_storage(file_size):
+                                # Try R2 first
+                                post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
+                                r2_url = await upload_video_to_r2_async(file_data, post_title)
+                                
+                                if r2_url:
+                                    video_message = create_video_embed_message(r2_url, post_title, post_url)
+                                    await channel.send(video_message)
+                                    video_processed = True
+                                else:
+                                    # Fallback to Catbox
+                                    from bot.dispatcher import upload_to_catbox
+                                    catbox_url = upload_to_catbox(file_data)
+                                    if catbox_url:
+                                        await channel.send(f"Video from post: {post_url}\n{catbox_url}")
+                                        video_processed = True
                         else:
                             media_files.append(discord.File(file_path, filename="facebook_video.mp4"))
                             video_processed = True
@@ -404,13 +439,25 @@ async def process_media(entry, channel):
                                 
                                 # Check if too large for Discord
                                 if file_size > DISCORD_LIMIT:
-                                    from bot.dispatcher import upload_to_catbox
                                     with open(file_path, 'rb') as f:
                                         file_data = f.read()
-                                    catbox_url = upload_to_catbox(file_data)
-                                    if catbox_url:
-                                        await channel.send(f"Video from media URL: {video_norm}\n{catbox_url}")
-                                        video_processed = True
+                                    
+                                    if should_use_r2_storage(file_size):
+                                        # Try R2 first
+                                        post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
+                                        r2_url = await upload_video_to_r2_async(file_data, post_title)
+                                        
+                                        if r2_url:
+                                            video_message = create_video_embed_message(r2_url, post_title, video_norm)
+                                            await channel.send(video_message)
+                                            video_processed = True
+                                        else:
+                                            # Fallback to Catbox
+                                            from bot.dispatcher import upload_to_catbox
+                                            catbox_url = upload_to_catbox(file_data)
+                                            if catbox_url:
+                                                await channel.send(f"Video from media URL: {video_norm}\n{catbox_url}")
+                                                video_processed = True
                                 else:
                                     media_files.append(discord.File(file_path, filename=os.path.basename(file_path)))
                                     video_processed = True

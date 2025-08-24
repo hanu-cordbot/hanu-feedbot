@@ -20,6 +20,12 @@ from bot.facebook_downloader import (
 )
 from bot.gemini_client import call_gemini
 from bot.formatter import build_prompt, split_reply
+from bot.r2_video import (
+    upload_video_to_r2_async,
+    create_video_embed_message,
+    should_use_r2_storage,
+    get_video_size_limit
+)
 import redis
 import json
 from typing import Any, Optional
@@ -34,7 +40,7 @@ redis_client = DummyRedisClient()
 WH_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
 FACEBOOK_REACTIONS = ["👍", "❤️", "😆", "😲", "😢", "😡"]
-DISCORD_LIMIT = 8 * 1024 * 1024  # 8MB Discord file limit
+DISCORD_LIMIT = get_video_size_limit()  # Use centralized limit from r2_video
 CATBOX_LIMIT = 200 * 1024 * 1024  # 200MB Catbox limit
 
 def _chunker(seq, size):
@@ -118,7 +124,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     webhook = discord.Webhook.from_url(webhook_url, client=client)
     username = entry["page_name"].strip()
     avatar = avatar_for(entry)
-    files_to_upload, catbox_video_links = [], []
+    files_to_upload, video_links = [], []  # Renamed for clarity: includes both R2 and Catbox links
 
     # --- Media Processing Logic ---
     # First check for our known target post ID anywhere in the entry
@@ -145,20 +151,38 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
                     if file_size < DISCORD_LIMIT:
                         files_to_upload.append(discord.File(video_path, filename="facebook_video.mp4"))
                         video_processed = True
-                    else:
-                        print(f"⚠️ Video too large for Discord ({file_size/1024/1024:.2f}MB)")
-                        # Handle large files with Catbox
+                    elif should_use_r2_storage(file_size):
+                        print(f"📤 Video too large for Discord, uploading to R2...")
+                        # Upload to R2 instead of Catbox for better reliability
                         try:
                             with open(video_path, 'rb') as f:
                                 video_data = f.read()
-                            catbox_url = await upload_to_catbox_async(video_data)
-                            if catbox_url:
-                                catbox_video_links.append(catbox_url)
+                            
+                            post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
+                            r2_url = await upload_video_to_r2_async(video_data, post_title)
+                            
+                            if r2_url:
+                                # Create embed message for R2 video
+                                video_message = create_video_embed_message(
+                                    r2_url, 
+                                    post_title, 
+                                    facebook_url
+                                )
+                                video_links.append(video_message)
                                 video_processed = True
                             else:
-                                print("❌ Failed to upload large video to Catbox")
+                                # Fallback to Catbox if R2 fails
+                                print("⚠️ R2 upload failed, falling back to Catbox...")
+                                catbox_url = await upload_to_catbox_async(video_data)
+                                if catbox_url:
+                                    video_links.append(catbox_url)
+                                    video_processed = True
+                                else:
+                                    print("❌ Both R2 and Catbox upload failed")
                         except Exception as e:
-                            print(f"❌ Error uploading to Catbox: {e}")
+                            print(f"❌ Error uploading large video: {e}")
+                    else:
+                        print(f"⚠️ Video too large even for external storage")
                 else:
                     print("⚠️ No video found in post or download failed")
         except Exception as e:
@@ -214,8 +238,8 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             thread_title = f"{username[:50]}-{date_only}"
             
         # Create thread with first media or body if no media
-        if catbox_video_links:
-            content_first = catbox_video_links[0]
+        if video_links:
+            content_first = video_links[0]
             send_kwargs = {"content": content_first, "username": username, "avatar_url": avatar, "thread_name": thread_title, "wait": True}
         elif files_to_upload:
             first_files = [files_to_upload.pop(0)]
@@ -232,7 +256,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             await webhook.send(content=page_description, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=False)
             
         # Post remaining media
-        for link in catbox_video_links[1:]:
+        for link in video_links[1:]:
             await webhook.send(content=link, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=True)
             
         # Post remaining files
@@ -240,7 +264,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             await webhook.send(files=chunk_files, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=True)
             
         # If first send was media/files, now post body
-        if catbox_video_links or files_to_upload:
+        if video_links or files_to_upload:
             for chunk in _split_message(body):
                 await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=False)
                 
@@ -250,59 +274,38 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             
         return posted_message
         
-    # Existing threads or text channels
-    # Text channels: send body only
-    # Text channels or new threads: send body in chunks to respect 2000-char limit
-    if isinstance(target, discord.TextChannel) or (isinstance(target, discord.Thread) and thread_id is None):
-        last_msg = None
-        for chunk in _split_message(body):
-            send_kwargs = {"content": chunk, "username": username, "avatar_url": avatar, "wait": False}
-            last_msg = await webhook.send(**send_kwargs)
-            
-        # For a new thread via Thread object, set thread_id
-        if isinstance(target, discord.Thread) and thread_id is None:
-            thread_id = target.id
-            
-        posted_message = last_msg
-        
+    # Handle existing threads or text channels
+    if isinstance(target, discord.TextChannel):
+        # Plain text channel: send everything directly
+        pass  # Continue to unified sending logic below
     elif isinstance(target, discord.Thread):
-        # Existing thread: send into it in chunks
-        assert thread_id is not None, "Thread ID is required for existing thread"
-        tid: int = thread_id  # type: ignore
-        last_msg = None
-        
-        for chunk in _split_message(body):
-            send_kwargs = {"content": chunk, "username": username, "avatar_url": avatar, "thread": discord.Object(id=tid), "wait": False}
-            last_msg = await webhook.send(**send_kwargs)
-            
-        posted_message = last_msg
+        # Existing thread: ensure thread_id is set
+        if thread_id is None:
+            thread_id = target.id
 
-    if catbox_video_links:
-        # Prepare to send first media; for forums, create thread if not yet created
-        send_kwargs = {"content": catbox_video_links[0], "username": username, "avatar_url": avatar, "wait": True}
-        
-        if isinstance(target, discord.ForumChannel) and thread_id is None:
-            date_only = post_time.split('T')[0]
-            send_kwargs["thread_name"] = f"{username[:50]}-{date_only}"
-        elif thread_id is not None:
-            send_kwargs["thread"] = discord.Object(id=int(thread_id))
+    # Unified sending logic for text channels and existing threads
+    # Send video links first
+    if video_links:
+        for i, video_link in enumerate(video_links):
+            send_kwargs = {"content": video_link, "username": username, "avatar_url": avatar, "wait": True}
             
-        msg = await webhook.send(**send_kwargs)
-        last_media_msg_id = msg.id
-        posted_message = msg
+            if thread_id is not None:
+                send_kwargs["thread"] = discord.Object(id=int(thread_id))
+                
+            msg = await webhook.send(**send_kwargs)
+            last_media_msg_id = msg.id
+            posted_message = msg
+            
+            # Queue reaction job
+            job = {"channel_id": thread_id if thread_id else target.id, "message_id": msg.id, "reactions": FACEBOOK_REACTIONS}
+            redis_client.rpush("reaction_queue", json.dumps(job))
         
-        # Queue reaction job
-        job = {"channel_id": thread_id if thread_id else target.id, "message_id": msg.id, "reactions": FACEBOOK_REACTIONS}
-        redis_client.rpush("reaction_queue", json.dumps(job))
-        
+    # Send file attachments
     if files_to_upload:
         for chunk_files in _chunker(files_to_upload, 10):
             send_kwargs = {"files": chunk_files, "username": username, "avatar_url": avatar, "wait": True}
             
-            if isinstance(target, discord.ForumChannel) and thread_id is None:
-                date_only = post_time.split('T')[0]
-                send_kwargs["thread_name"] = f"{username[:50]}-{date_only}"
-            elif thread_id is not None:
+            if thread_id is not None:
                 send_kwargs["thread"] = discord.Object(id=int(thread_id))
                 
             msg = await webhook.send(**send_kwargs)
@@ -312,18 +315,20 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             job = {"channel_id": thread_id if thread_id else target.id, "message_id": msg.id, "reactions": FACEBOOK_REACTIONS}
             redis_client.rpush("reaction_queue", json.dumps(job))
 
+    # Send body text
     if body.strip():
         for chunk in _split_message(body):
             send_kwargs = {"content": chunk, "username": username, "avatar_url": avatar, "wait": True}
             
-            if isinstance(target, discord.ForumChannel) and thread_id is None:
-                date_only = post_time.split('T')[0]
-                send_kwargs["thread_name"] = f"{username[:50]}-{date_only}"
-            elif thread_id is not None:
+            if thread_id is not None:
                 send_kwargs["thread"] = discord.Object(id=int(thread_id))
                 
             msg = await webhook.send(**send_kwargs)
             last_content_msg_id = msg.id
+            posted_message = msg
+            
+            job = {"channel_id": thread_id if thread_id else target.id, "message_id": msg.id, "reactions": FACEBOOK_REACTIONS}
+            redis_client.rpush("reaction_queue", json.dumps(job))
             posted_message = msg
             
             job = {"channel_id": thread_id if thread_id else target.id, "message_id": msg.id, "reactions": FACEBOOK_REACTIONS}
@@ -502,24 +507,41 @@ async def process_special_posts(client, config):
                 print(f"✅ Special post video downloaded: {file_size/1024/1024:.2f}MB")
                 
                 # Create message with video attachment
+                message = None
                 if file_size < DISCORD_LIMIT:
                     message = await channel.send(
                         f"🌟 **{post['title']}**\n{post['url']}", 
                         file=discord.File(video_path, filename="facebook_video.mp4")
                     )
                     print(f"✅ Special post sent to Discord")
-                else:
-                    # For large videos, upload to Catbox
+                elif should_use_r2_storage(file_size):
+                    # For large videos, upload to R2 first, fallback to Catbox
                     with open(video_path, 'rb') as f:
                         video_data = f.read()
-                    catbox_url = await upload_to_catbox_async(video_data)
                     
-                    if catbox_url:
-                        message = await channel.send(f"🌟 **{post['title']}**\n{post['url']}\n{catbox_url}")
-                        print(f"✅ Special post sent to Discord via Catbox")
+                    r2_url = await upload_video_to_r2_async(video_data, post['title'])
+                    
+                    if r2_url:
+                        video_message = create_video_embed_message(
+                            r2_url, 
+                            post['title'], 
+                            post['url']
+                        )
+                        message = await channel.send(f"🌟 {video_message}")
+                        print(f"✅ Special post sent to Discord via R2")
                     else:
-                        print(f"❌ Failed to upload large video to Catbox")
-                        continue
+                        # Fallback to Catbox
+                        catbox_url = await upload_to_catbox_async(video_data)
+                        
+                        if catbox_url:
+                            message = await channel.send(f"🌟 **{post['title']}**\n{post['url']}\n{catbox_url}")
+                            print(f"✅ Special post sent to Discord via Catbox")
+                        else:
+                            print(f"❌ Failed to upload large video to both R2 and Catbox")
+                            continue
+                
+                if not message:
+                    continue
                 
                 # Mark as processed
                 mark_special_post_seen(post["id"])

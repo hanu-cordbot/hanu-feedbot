@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""
+R2 Video Uploader for HANU Feed Bot
+Handles uploading large videos (>8MB) to R2 bucket instead of Catbox
+"""
+import os
+import io
+import asyncio
+import hashlib
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Tuple
+from bot.config import r2_client, SEEN_R2_BUCKET
+
+# R2 video storage configuration
+R2_VIDEO_BUCKET = os.getenv('R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or SEEN_R2_BUCKET
+R2_PUBLIC_URL = os.getenv('R2_PUBLIC_URL')  # e.g., "https://pub-xxxxx.r2.dev"
+
+def generate_video_filename(post_title: str, extension: str = "mp4") -> str:
+    """Generate a unique filename for video storage"""
+    # Clean post title for filename
+    clean_title = "".join(c for c in post_title if c.isalnum() or c in (' ', '-', '_')).strip()
+    clean_title = clean_title.replace(' ', '_')[:50]  # Limit length
+    
+    # Add date for organization
+    date_str = datetime.now().strftime('%Y%m%d')
+    
+    # Add hash for uniqueness
+    hash_obj = hashlib.md5(f"{post_title}{datetime.now().isoformat()}".encode())
+    hash_suffix = hash_obj.hexdigest()[:8]
+    
+    return f"videos/{date_str}_{clean_title}_{hash_suffix}.{extension}"
+
+def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
+    """Upload video to R2 bucket and return public URL"""
+    if not R2_VIDEO_BUCKET:
+        print("❌ R2 bucket not configured for video upload")
+        return None
+        
+    client = r2_client()
+    if not client:
+        print("❌ R2 client not available")
+        return None
+    
+    try:
+        # Generate unique filename
+        filename = generate_video_filename(post_title)
+        
+        print(f"📤 Uploading video to R2: {filename} ({len(video_data)/1024/1024:.2f}MB)")
+        
+        # Upload to R2
+        client.put_object(
+            Bucket=R2_VIDEO_BUCKET,
+            Key=filename,
+            Body=video_data,
+            ContentType='video/mp4',
+            ACL='public-read'  # Make publicly accessible
+        )
+        
+        # Generate public URL
+        if R2_PUBLIC_URL:
+            # Use custom domain if configured
+            public_url = f"{R2_PUBLIC_URL.rstrip('/')}/{filename}"
+        else:
+            # Generate standard R2 URL (this may not work without custom domain)
+            # You'll need to configure R2_PUBLIC_URL for this to work properly
+            public_url = f"https://{R2_VIDEO_BUCKET}.r2.cloudflarestorage.com/{filename}"
+            
+        print(f"✅ Video uploaded to R2: {public_url}")
+        return public_url
+        
+    except Exception as e:
+        print(f"❌ Failed to upload video to R2: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+async def upload_video_to_r2_async(video_data: bytes, post_title: str) -> Optional[str]:
+    """Async wrapper for R2 video upload"""
+    return await asyncio.to_thread(upload_video_to_r2, video_data, post_title)
+
+def create_video_embed_message(video_url: str, post_title: str, post_url: str = None) -> str:
+    """Create a Discord message with embedded video from R2"""
+    # Discord will auto-embed videos with direct links
+    message_parts = [
+        f"🎥 **{post_title}**",
+        video_url
+    ]
+    
+    if post_url:
+        message_parts.append(f"📱 [Original Post]({post_url})")
+    
+    return "\n".join(message_parts)
+
+def get_video_size_limit() -> int:
+    """Get the size limit for direct Discord uploads (8MB)"""
+    return 8 * 1024 * 1024  # 8MB in bytes
+
+def should_use_r2_storage(file_size: int) -> bool:
+    """Determine if a video should be stored in R2 instead of direct upload"""
+    return file_size > get_video_size_limit()
+
+# Backup cleanup function for large videos
+def cleanup_old_videos(days_old: int = 30) -> None:
+    """Clean up old videos from R2 bucket (optional maintenance function)"""
+    if not R2_VIDEO_BUCKET:
+        return
+        
+    client = r2_client()
+    if not client:
+        return
+        
+    try:
+        from datetime import datetime, timedelta
+        cutoff_date = datetime.now() - timedelta(days=days_old)
+        
+        # List objects in videos/ folder
+        response = client.list_objects_v2(Bucket=R2_VIDEO_BUCKET, Prefix='videos/')
+        
+        if 'Contents' not in response:
+            return
+            
+        deleted_count = 0
+        for obj in response['Contents']:
+            if obj['LastModified'].replace(tzinfo=None) < cutoff_date:
+                client.delete_object(Bucket=R2_VIDEO_BUCKET, Key=obj['Key'])
+                deleted_count += 1
+                
+        if deleted_count > 0:
+            print(f"🧹 Cleaned up {deleted_count} old videos from R2")
+            
+    except Exception as e:
+        print(f"⚠️ Error during video cleanup: {e}")
