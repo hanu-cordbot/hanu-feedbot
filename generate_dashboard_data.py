@@ -49,7 +49,7 @@ def generate_stats():
             break
     feed_meta = load_json_file('feed_meta.json', {})
     feed_map = load_json_file('dashboard/data/feed_map.json', {})
-    channels = load_json_file('channels.json', [])
+    channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
     
     # Load feeds list
     feeds = []
@@ -164,7 +164,7 @@ def generate_stats():
                 channel_id = feed_map.get(feed_url)  # Now just a string ID
                 if channel_id:
                     # Load channels data for enrichment
-                    channels = load_json_file('channels.json', [])
+                    channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
                     channel_info = next((ch for ch in channels if str(ch.get('id')) == str(channel_id)), None)
                     
                     if channel_info:
@@ -201,7 +201,7 @@ def generate_meta_data():
     """Generate metadata for the dashboard"""
     print("🔍 Generating meta data...")
     
-    channels = load_json_file('channels.json', [])
+    channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
     groups = load_json_file('groups.json', {})
     system_prompt = load_json_file('system_prompt.json', {})
     
@@ -247,7 +247,7 @@ def main():
             feed_map_root = load_json_file('dashboard/data/feed_map.json', {})
             # Enrich the feed_map for dashboard consumption with channel name/type
             # without changing the root dashboard/data/feed_map.json (which other components may rely on).
-            channels = load_json_file('channels.json', [])
+            channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
             # Build lookup by id
             channels_by_id = {str(ch.get('id')): {'id': str(ch.get('id')), 'name': ch.get('name'), 'type': ch.get('type')} for ch in channels if ch.get('id')}
 

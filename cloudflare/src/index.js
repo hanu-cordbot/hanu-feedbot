@@ -297,6 +297,43 @@ async function handleRequest(event) {
         return jsonResponse({ success: true }, 200);
       }
     }
+
+    // Admin API: POST /api/channels/fetch-name (protected)
+    if (request.method === 'POST' && pathname === '/api/channels/fetch-name') {
+      if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
+      const body = await request.json().catch(() => ({}));
+      const channelId = (body.channelId || body.id || '').toString();
+      if (!channelId) return jsonResponse({ error: 'channelId required' }, 400);
+      if (typeof DISCORD_BOT_TOKEN === 'undefined' || !DISCORD_BOT_TOKEN) {
+        return jsonResponse({ success: false, error: 'DISCORD_BOT_TOKEN not set' }, 500);
+      }
+      const resp = await fetch(`https://discord.com/api/v10/channels/${channelId}`, {
+        headers: { 'Authorization': `Bot ${DISCORD_BOT_TOKEN}` }
+      });
+      if (!resp.ok) return jsonResponse({ success: false, error: `Discord API ${resp.status}` }, resp.status);
+      const info = await resp.json();
+      const name = info.name || channelId;
+      const type = (function mapDiscordChannelType(t){
+        switch (t) {
+          case 0: return 'text';
+          case 2: return 'voice';
+          case 4: return 'category';
+          case 5: return 'announcement';
+          case 13: return 'stage';
+          case 15: return 'forum';
+          case 10: case 11: case 12: return 'thread';
+          default: return 'text';
+        }
+      })(info.type);
+      const key = 'dashboard/data/channels.json';
+      const obj = await FEEDS_BUCKET.get(key);
+      const channels = obj ? JSON.parse(await obj.text()) : [];
+      const idx = channels.findIndex(ch => String(ch.id) === channelId);
+      const next = { id: channelId, name, type };
+      if (idx >= 0) channels[idx] = { ...channels[idx], ...next }; else channels.push(next);
+      await FEEDS_BUCKET.put(key, JSON.stringify(channels, null, 2), { httpMetadata: { contentType: 'application/json' } });
+      return jsonResponse({ success: true, channel: next }, 200);
+    }
     // Examples: GET /feed_map.json -> dashboard/data/feed_map.json
     if (request.method === 'GET') {
       const key = mapPathToKey(pathname);
