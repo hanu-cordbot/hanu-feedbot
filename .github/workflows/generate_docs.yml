@@ -204,7 +204,13 @@ jobs:
 
           for f in docs/data/*.json; do
             [ -f "$f" ] || continue
-            key="$PREFIX/$(basename "$f")"
+            base=$(basename "$f")
+            # Never overwrite feed_map.json from docs/data; mapping is authoritative under dashboard/data
+            if [ "$base" = "feed_map.json" ]; then
+              echo "Skipping upload of docs/data/feed_map.json"
+              continue
+            fi
+            key="$PREFIX/$base"
             echo "Uploading $f -> s3://$BUCKET/$key (endpoint: $R2_ENDPOINT)"
             aws --endpoint-url "$R2_ENDPOINT" s3 cp "$f" "s3://$BUCKET/$key" --acl public-read
             echo "Uploaded $f"

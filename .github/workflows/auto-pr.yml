@@ -1,0 +1,31 @@
+name: Auto PR on branch push
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Create PR if not exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          if [ "$BRANCH" = "main" ]; then echo "Skipping main"; exit 0; fi
+          # If a PR already exists, do nothing
+          if gh pr view "$BRANCH" >/dev/null 2>&1; then
+            echo "PR already exists for $BRANCH"
+            exit 0
+          fi
+          # Create PR using the first commit title/body
+          gh pr create --base main --head "$BRANCH" --fill || true
+
