@@ -147,7 +147,18 @@ def load_seen_guids():
             try:
                 import io, gzip
                 buf = io.BytesIO()
-                client.download_fileobj(SEEN_R2_BUCKET, 'seen.json', buf)
+                # Prefer dashboard/data/seen.json, fallback to legacy seen.json
+                last_err = None
+                for key in ('dashboard/data/seen.json', 'seen.json'):
+                    try:
+                        buf.seek(0); buf.truncate(0)
+                        client.download_fileobj(SEEN_R2_BUCKET, key, buf)
+                        break
+                    except Exception as ex:
+                        last_err = ex
+                        continue
+                else:
+                    raise last_err or Exception('seen.json not found in R2')
                 buf.seek(0)
                 # Try to detect gzip by magic header
                 head = buf.read(2)
@@ -208,12 +219,12 @@ def save_seen_guids(guids):
             # Write plain JSON bytes (no gzip)
             buf.write(json.dumps(list(guids)[-500:]).encode('utf-8'))
             buf.seek(0)
-            # Upload plain JSON content as seen.json
+            # Upload plain JSON content under dashboard/data/seen.json (canonical)
             try:
-                client.upload_fileobj(buf, SEEN_R2_BUCKET, 'seen.json')
+                client.upload_fileobj(buf, SEEN_R2_BUCKET, 'dashboard/data/seen.json')
             except TypeError:
                 # Fallback if client.upload_fileobj signature differs
-                client.put_object(Bucket=SEEN_R2_BUCKET, Key='seen.json', Body=buf.getvalue())
+                client.put_object(Bucket=SEEN_R2_BUCKET, Key='dashboard/data/seen.json', Body=buf.getvalue())
     except Exception as e:
         print(f"⚠️ Could not upload seen.json to R2: {e}")
 
@@ -621,27 +632,75 @@ async def process_entry_in_forum(client, entry, forum_channel):
     except Exception:
         pass
 
-    body = await build_full_body(entry)
-    chunks = _split_message_by_newline(body) or [" "]
+    # Collect media
+    media_urls = entry.get('media_all', []) or []
+    image_exts = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+    video_exts = ('.mp4', '.mov', '.webm', '.mkv')
+    video_link = None
+    image_files: list[discord.File] = []
+    for url in media_urls:
+        u = (url or '').split('?')[0].lower()
+        try:
+            if video_link is None and (u.endswith(video_exts) or '/videos/' in u):
+                video_link = url
+                continue
+            if u.endswith(image_exts):
+                data = await download_bytes(url)
+                if len(data) > DISCORD_LIMIT:
+                    continue
+                name = url.split('/')[-1].split('?')[0] or 'image.jpg'
+                image_files.append(discord.File(io.BytesIO(data), filename=name))
+        except Exception:
+            continue
+
+    # Build body text and strip trailing original link
+    body_full = await build_full_body(entry)
+    post_link = entry.get('link') or ''
+    link_token = f"<{post_link}>" if post_link else ''
+    if link_token and body_full.rstrip().endswith(link_token):
+        body_text = body_full[: body_full.rfind(link_token)].rstrip()
+    else:
+        body_text = body_full
+    chunks = _split_message_by_newline(body_text) or [" "]
 
     try:
         webhook_url = await get_or_create_webhook_url(forum_channel)
         webhook = discord.Webhook.from_url(webhook_url, client=client)
         username = (entry.get('page_name') or '').strip() or 'Facebook Page'
         avatar = avatar_for(entry)
-        # Create thread with first chunk
-        msg = await webhook.send(content=chunks[0], username=username, avatar_url=avatar, thread_name=title, wait=True)
+        # Create thread with media or text
+        if video_link:
+            msg = await webhook.send(content=video_link, username=username, avatar_url=avatar, thread_name=title, wait=True)
+        elif image_files:
+            first_batch = image_files[:10]
+            msg = await webhook.send(username=username, avatar_url=avatar, thread_name=title, files=first_batch, wait=True)
+        else:
+            msg = await webhook.send(content=chunks[0], username=username, avatar_url=avatar, thread_name=title, wait=True)
         thread = msg.channel
-        # Post remaining chunks
-        for chunk in chunks[1:]:
+        # Send remaining images batches
+        if len(image_files) > 10:
+            for i in range(10, len(image_files), 10):
+                await webhook.send(username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), files=image_files[i:i+10], wait=False)
+        # Post details below media
+        if post_link:
+            await webhook.send(content=f"Details - <{post_link}>", username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
+        # Post remaining text chunks (skip first if used as initial content)
+        start_idx = 1 if (not video_link and not image_files and chunks) else 0
+        for chunk in chunks[start_idx:]:
             await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
         return
     except Exception as e:
         print(f"⚠️ Webhook forum post failed: {e}")
         # Fallback to direct API (bot identity)
         try:
-            thread = await forum_channel.create_thread(name=title, content=chunks[0])
-            for chunk in chunks[1:]:
+            first = video_link or (chunks[0] if chunks else ' ')
+            thread = await forum_channel.create_thread(name=title, content=first)
+            if image_files:
+                for i in range(0, len(image_files), 10):
+                    await thread.send(files=image_files[i:i+10])
+            if post_link:
+                await thread.send(f"Details - <{post_link}>")
+            for chunk in (chunks[1:] if (not video_link and not image_files) else chunks):
                 try:
                     await thread.send(chunk)
                 except Exception:
