@@ -558,66 +558,6 @@ async def process_entry_in_thread(client, entry, thread, summary):
     if last_msg:
         await update_daily_summary_message(summary, entry, last_msg)
 
-async def process_entry_in_forum(client, entry, forum_channel):
-    """Process a single entry in a forum channel by creating a new thread"""
-    title = entry.get('title', 'No Title')[:100]  # Forum thread titles are limited
-    # Improve title by generating from body to avoid tag-only titles like [HTTT]
-    try:
-        from bot.formatter import build_thread_title_prompt
-        gen_reply = await asyncio.to_thread(call_gemini, build_thread_title_prompt(entry.get('raw', '') or ''))
-        if gen_reply:
-            title = gen_reply.strip().splitlines()[0][:100]
-    except Exception:
-        pass
-
-    try:
-        # Build the post body first; forum thread creation requires a non-empty initial message
-        body = await build_full_body(entry)
-        chunks = [body[i:i+2000] for i in range(0, len(body), 2000)] if body else [" "]
-        first_chunk = chunks[0] if chunks else " "
-
-        print(f"🧵 Creating forum thread for: {title} (initial chunk length={len(first_chunk)})")
-        # Provide the initial message when creating the thread to avoid empty message error
-        thread = await forum_channel.create_thread(name=title, content=first_chunk)
-
-        # Post remaining chunks (skip first) into the thread
-        posted_via = None
-        try:
-            for chunk in chunks[1:]:
-                await thread.send(chunk)
-            posted_via = 'direct'
-        except AttributeError:
-            # Handle ThreadWithMessage which may not expose send(); try replying to starter message
-            try:
-                if hasattr(thread, 'message') and thread.message is not None and hasattr(thread.message, 'reply'):
-                    for chunk in chunks[1:]:
-                        await thread.message.reply(chunk)
-                    posted_via = 'starter_message_reply'
-            except Exception:
-                posted_via = None
-
-            # Try resolving channel by id via client.get_channel
-            if not posted_via and hasattr(thread, 'id'):
-                try:
-                    resolved = client.get_channel(thread.id)
-                    if resolved and hasattr(resolved, 'send'):
-                        for chunk in chunks[1:]:
-                            await resolved.send(chunk)
-                        posted_via = 'resolved_channel'
-                except Exception:
-                    posted_via = None
-
-        if posted_via:
-            print(f"✅ Posted remaining chunks via: {posted_via}")
-        else:
-            print(f"⚠️ Could not post remaining chunks for forum thread '{title}'; skipping remaining content")
-
-        print(f"✅ Created forum thread: {title}")
-        return
-    except Exception as e:
-        print(f"❌ Failed to create/send forum thread for '{title}' in channel {getattr(forum_channel, 'id', 'unknown')}: {e}")
-        import traceback
-        traceback.print_exc()
         print(f"❌ Skipping forum post for '{title}' due to above error")
 
 # Override with webhook-based forum posting so the sender appears as the FB page

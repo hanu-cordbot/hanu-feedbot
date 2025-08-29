@@ -360,13 +360,6 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,HEAD,POST,PUT,DELETE,OPTIONS',
-    // Admin API: GET /api/feed-mappings (protected)
-    if (request.method === 'GET' && pathname === '/api/feed-mappings') {
-      if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
-      const obj = await FEEDS_BUCKET.get('dashboard/data/feed_map.json');
-      const map = obj ? JSON.parse(await obj.text()) : {};
-      return jsonResponse({ map }, 200);
-    }
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   };
 }
