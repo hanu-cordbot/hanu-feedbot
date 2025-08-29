@@ -1,7 +1,13 @@
 // R2-backed Cloudflare Worker router
 // Assumptions (set in Worker environment):
-// - R2 binding named `FEEDS_BUCKET` containing JSON files under keys like 'data/feeds.json'
+// - R2 binding named `FEEDS_BUCKET` containing JSON files under keys like 'dashboard/data/stats.json'
 // - A secret/environment binding `ADMIN_TOKEN` with a bearer token for admin writes
+//
+// Data layout:
+// - Published/derived data lives under DASH_PREFIX (default: dashboard/data)
+// - Authoritative editable sources live under SOURCE_PREFIX (default: dashboard/data/source)
+const DASH_PREFIX = (typeof DASHBOARD_PREFIX !== 'undefined' && DASHBOARD_PREFIX) ? DASHBOARD_PREFIX.replace(/^\/+|\/+$/g, '') : 'dashboard/data';
+const SOURCE_PREFIX = (typeof SOURCE_PREFIX !== 'undefined' && SOURCE_PREFIX) ? SOURCE_PREFIX.replace(/^\/+|\/+$/g, '') : `${DASH_PREFIX}/source`;
 
 addEventListener('fetch', event => {
   event.respondWith(handleRequest(event));
@@ -22,9 +28,9 @@ async function handleRequest(event) {
 
   try {
     // Public read endpoints (serve JSON from R2)
-    if (request.method === 'GET' && (pathname === '/api/public/feeds' || pathname === '/api/public/meta' || pathname === '/api/public/stats')) {
+    if (request.method === 'GET' && (pathname === '/api/public/meta' || pathname === '/api/public/stats')) {
       const key = mapPathToKey(pathname);
-      const obj = await FEEDS_BUCKET.get(key);
+      const obj = await FEEDS_BUCKET.get(key) || await FEEDS_BUCKET.get(key.replace(DASH_PREFIX, SOURCE_PREFIX));
       if (!obj) return jsonResponse({ error: 'not_found' }, 404);
       const text = await obj.text();
       return new Response(text, { status: 200, headers: jsonCorsHeaders() });
@@ -77,59 +83,109 @@ async function handleRequest(event) {
       return jsonResponse({ error: 'Authentication required' }, 401);
     }
 
-    // Public API: GET /api/public/feeds -> return feeds data from stats.json instead of feeds.json
+    // Public API: GET /api/public/feeds -> aggregate from stats + source configs
     if (request.method === 'GET' && pathname === '/api/public/feeds') {
-      const obj = await FEEDS_BUCKET.get('data/stats.json');
-      if (!obj) return jsonResponse({ last_updated: new Date().toISOString(), feeds: [], total_feeds: 0 }, 200);
-      const text = await obj.text();
-      try {
-        const data = JSON.parse(text);
-        if (data.stats && data.stats.feed_health) {
-          const feeds = Object.values(data.stats.feed_health).map(feed => ({
+      // Load stats from DASH_PREFIX, fallback to legacy
+      const statsObj = await (FEEDS_BUCKET.get(`${DASH_PREFIX}/stats.json`) || FEEDS_BUCKET.get('dashboard/data/stats.json') || FEEDS_BUCKET.get('data/stats.json'));
+      let statsJson = null;
+      if (statsObj) {
+        try { statsJson = JSON.parse(await statsObj.text()); } catch (e) { statsJson = null; }
+      }
+
+      let feeds = [];
+      const metadata = {};
+      let lastUpdated = new Date().toISOString();
+      let totalFeeds = 0;
+      if (statsJson && statsJson.stats && statsJson.stats.feed_health) {
+        lastUpdated = statsJson.stats.last_updated || lastUpdated;
+        totalFeeds = statsJson.stats.total_feeds || 0;
+        for (const feed of Object.values(statsJson.stats.feed_health)) {
+          feeds.push({
             url: feed.url,
             title: feed.title || 'Unknown Feed',
             description: feed.description || '',
             entry_count: feed.entry_count || 0,
             last_post: feed.last_post,
             last_updated: feed.last_updated,
-            has_metadata: feed.has_metadata || false,
+            has_metadata: !!feed.has_metadata,
             channel: feed.channel,
             page_url: feed.page_url,
             status: feed.status || 'unknown'
-          }));
-          return jsonResponse({
-            last_updated: data.stats.last_updated,
-            feeds: feeds,
-            total_feeds: data.stats.total_feeds
-          }, 200);
+          });
+          metadata[feed.url] = {
+            title: feed.title || 'Unknown Feed',
+            last_post: feed.last_post || null,
+            page_url: feed.page_url || null
+          };
         }
-      } catch (e) {
-        console.error('Failed to parse stats.json:', e);
       }
-      return jsonResponse({ last_updated: new Date().toISOString(), feeds: [], total_feeds: 0 }, 200);
+
+      // Load mappings (feed_map.json)
+      const mapObj = await (FEEDS_BUCKET.get(`${SOURCE_PREFIX}/feed_map.json`) || FEEDS_BUCKET.get(`${DASH_PREFIX}/feed_map.json`) || FEEDS_BUCKET.get('feed_map.json'));
+      const mappings = {};
+      if (mapObj) {
+        try {
+          const rawMap = JSON.parse(await mapObj.text());
+          for (const [k, v] of Object.entries(rawMap)) {
+            if (v && typeof v === 'object') {
+              const cid = v.channel || v.channel_id || v.id || v.discord_channel || null;
+              if (cid) mappings[k] = String(cid);
+            } else if (typeof v === 'string' || typeof v === 'number') {
+              mappings[k] = String(v);
+            }
+          }
+        } catch (e) {}
+      }
+
+      // Load channels list
+      const chObj = await (FEEDS_BUCKET.get(`${SOURCE_PREFIX}/channels.json`) || FEEDS_BUCKET.get(`${DASH_PREFIX}/channels.json`) || FEEDS_BUCKET.get('channels.json'));
+      let channels = [];
+      if (chObj) {
+        try {
+          const cj = JSON.parse(await chObj.text());
+          if (Array.isArray(cj)) channels = cj; else if (Array.isArray(cj.channels)) channels = cj.channels;
+        } catch (e) {}
+      }
+
+      // Load groups mapping
+      const grpObj = await (FEEDS_BUCKET.get(`${SOURCE_PREFIX}/groups.json`) || FEEDS_BUCKET.get(`${DASH_PREFIX}/groups.json`) || FEEDS_BUCKET.get('groups.json'));
+      let groups = {};
+      if (grpObj) {
+        try { groups = JSON.parse(await grpObj.text()); } catch (e) { groups = {}; }
+      }
+
+      return jsonResponse({
+        last_updated: lastUpdated,
+        total_feeds: totalFeeds || feeds.length,
+        feeds,
+        metadata,
+        mappings,
+        groups,
+        channels
+      }, 200);
     }
 
-    // Admin API: GET /api/feeds (protected) -> list from dashboard/data/feeds.txt
+    // Admin API: GET /api/feeds (protected) -> list from SOURCE_PREFIX/feeds.txt
     if (request.method === 'GET' && pathname === '/api/feeds') {
       if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
-      const obj = await FEEDS_BUCKET.get('dashboard/data/feeds.txt');
+      const obj = await FEEDS_BUCKET.get(`${SOURCE_PREFIX}/feeds.txt`) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/feeds.txt`);
       const text = obj ? await obj.text() : '';
       const feeds = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       return jsonResponse({ feeds }, 200);
     }
 
-    // Admin API: POST /api/feeds (protected) -> add feed URL to dashboard/data/feeds.txt
+    // Admin API: POST /api/feeds (protected) -> add feed URL to SOURCE_PREFIX/feeds.txt
     if (request.method === 'POST' && pathname === '/api/feeds') {
       if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
       const body = await request.json().catch(() => ({}));
       const feedUrl = (body.feedUrl || body.url || '').toString();
       if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
-      const obj = await FEEDS_BUCKET.get('dashboard/data/feeds.txt');
+      const obj = await FEEDS_BUCKET.get(`${SOURCE_PREFIX}/feeds.txt`) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/feeds.txt`);
       const current = obj ? (await obj.text()) : '';
       const lines = current.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       if (!lines.includes(feedUrl)) lines.push(feedUrl);
       const next = lines.join('\n') + '\n';
-      await FEEDS_BUCKET.put('dashboard/data/feeds.txt', next, { httpMetadata: { contentType: 'text/plain' } });
+      await FEEDS_BUCKET.put(`${SOURCE_PREFIX}/feeds.txt`, next, { httpMetadata: { contentType: 'text/plain' } });
       return jsonResponse({ success: true, feed: feedUrl }, 200);
     }
 
@@ -139,11 +195,11 @@ async function handleRequest(event) {
       const body = await request.json().catch(() => ({}));
       const feedUrl = (body.feedUrl || body.url || '').toString();
       if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
-      const obj = await FEEDS_BUCKET.get('dashboard/data/feeds.txt');
+      const obj = await FEEDS_BUCKET.get(`${SOURCE_PREFIX}/feeds.txt`) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/feeds.txt`);
       const current = obj ? (await obj.text()) : '';
       const lines = current.split(/\r?\n/).map(l => l.trim());
       const filtered = lines.filter(l => l && l !== feedUrl).join('\n') + '\n';
-      await FEEDS_BUCKET.put('dashboard/data/feeds.txt', filtered, { httpMetadata: { contentType: 'text/plain' } });
+      await FEEDS_BUCKET.put(`${SOURCE_PREFIX}/feeds.txt`, filtered, { httpMetadata: { contentType: 'text/plain' } });
       return jsonResponse({ success: true }, 200);
     }
 
@@ -152,13 +208,14 @@ async function handleRequest(event) {
       if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
       const body = await request.json().catch(() => ({}));
       const feedUrl = (body.feedUrl || body.url || '').toString();
-      const channelId = (body.channelId || body.channel || '').toString();
+      const channelId = (body.channelId ?? body.channel ?? null);
+      const channelIdStr = (channelId == null ? null : String(channelId));
       
       if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
       
       try {
-        // Load existing feed_map.json
-        const obj = await FEEDS_BUCKET.get('dashboard/data/feed_map.json');
+        // Load existing feed_map.json (prefer SOURCE_PREFIX, fallback to DASH_PREFIX)
+        const obj = await FEEDS_BUCKET.get(`${SOURCE_PREFIX}/feed_map.json`) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/feed_map.json`);
         let feedMap = {};
         if (obj) {
           try {
@@ -169,8 +226,8 @@ async function handleRequest(event) {
         }
         
         // Update mapping (simplified format: url -> channelId)
-        if (channelId) {
-          feedMap[feedUrl] = channelId;
+        if (channelIdStr) {
+          feedMap[feedUrl] = channelIdStr;
         } else {
           // Remove mapping if no channelId provided
           delete feedMap[feedUrl];
@@ -178,15 +235,15 @@ async function handleRequest(event) {
         
         // Save updated feed_map.json
         const contents = JSON.stringify(feedMap, null, 2);
-        await FEEDS_BUCKET.put('dashboard/data/feed_map.json', contents, { 
+        await FEEDS_BUCKET.put(`${SOURCE_PREFIX}/feed_map.json`, contents, { 
           httpMetadata: { contentType: 'application/json' } 
         });
         
         return jsonResponse({ 
           success: true, 
           feedUrl,
-          channelId: channelId || null,
-          message: channelId ? 'Mapping updated' : 'Mapping removed'
+          channelId: channelIdStr,
+          message: channelIdStr ? 'Mapping updated' : 'Mapping removed'
         }, 200);
         
       } catch (error) {
@@ -205,21 +262,21 @@ async function handleRequest(event) {
       const feedUrl = (body.feedUrl || body.url || '').toString();
       const groupName = (body.groupName || body.group || '').toString();
       if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
-      const obj = await FEEDS_BUCKET.get('dashboard/data/groups.json');
+      const obj = await FEEDS_BUCKET.get(`${SOURCE_PREFIX}/groups.json`) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/groups.json`);
       const groups = obj ? JSON.parse(await obj.text()) : {};
       if (groupName) groups[feedUrl] = groupName; else delete groups[feedUrl];
-      await FEEDS_BUCKET.put('dashboard/data/groups.json', JSON.stringify(groups, null, 2), { httpMetadata: { contentType: 'application/json' } });
+      await FEEDS_BUCKET.put(`${SOURCE_PREFIX}/groups.json`, JSON.stringify(groups, null, 2), { httpMetadata: { contentType: 'application/json' } });
       return jsonResponse({ success: true, feedUrl, groupName: groupName || null }, 200);
     }
 
     // Admin API: GET/POST/PUT/DELETE /api/groups (protected)
     if (pathname === '/api/groups') {
       if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
-      const listKey = 'dashboard/data/group_list.json';
-      const mapKey = 'dashboard/data/groups.json';
+      const listKey = `${SOURCE_PREFIX}/group_list.json`;
+      const mapKey = `${SOURCE_PREFIX}/groups.json`;
       if (request.method === 'GET') {
-        const l = await FEEDS_BUCKET.get(listKey);
-        const m = await FEEDS_BUCKET.get(mapKey);
+        const l = await FEEDS_BUCKET.get(listKey) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/group_list.json`);
+        const m = await FEEDS_BUCKET.get(mapKey) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/groups.json`);
         const mapping = m ? JSON.parse(await m.text()) : {};
         const list = l ? JSON.parse(await l.text()) : Array.from(new Set(Object.values(mapping)));
         return jsonResponse({ groups: list, mapping }, 200);
@@ -228,7 +285,7 @@ async function handleRequest(event) {
         const body = await request.json().catch(() => ({}));
         const name = (body.groupName || body.name || '').toString().trim();
         if (!name) return jsonResponse({ error: 'groupName required' }, 400);
-        const l = await FEEDS_BUCKET.get(listKey);
+        const l = await FEEDS_BUCKET.get(listKey) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/group_list.json`);
         const list = l ? JSON.parse(await l.text()) : [];
         if (!list.includes(name)) list.push(name);
         await FEEDS_BUCKET.put(listKey, JSON.stringify(list, null, 2));
@@ -239,8 +296,8 @@ async function handleRequest(event) {
         const oldName = (body.oldName || '').toString();
         const newName = (body.newName || '').toString();
         if (!oldName || !newName || oldName === newName) return jsonResponse({ error: 'invalid_names' }, 400);
-        const l = await FEEDS_BUCKET.get(listKey);
-        const m = await FEEDS_BUCKET.get(mapKey);
+        const l = await FEEDS_BUCKET.get(listKey) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/group_list.json`);
+        const m = await FEEDS_BUCKET.get(mapKey) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/groups.json`);
         const list = l ? JSON.parse(await l.text()) : [];
         const mapping = m ? JSON.parse(await m.text()) : {};
         const renamed = list.map(g => (g === oldName ? newName : g));
@@ -253,8 +310,8 @@ async function handleRequest(event) {
       if (request.method === 'DELETE') {
         const name = (url.searchParams.get('name') || '').toString();
         if (!name) return jsonResponse({ error: 'name required' }, 400);
-        const l = await FEEDS_BUCKET.get(listKey);
-        const m = await FEEDS_BUCKET.get(mapKey);
+        const l = await FEEDS_BUCKET.get(listKey) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/group_list.json`);
+        const m = await FEEDS_BUCKET.get(mapKey) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/groups.json`);
         const list = l ? JSON.parse(await l.text()) : [];
         const mapping = m ? JSON.parse(await m.text()) : {};
         const filtered = list.filter(g => g !== name);
@@ -268,9 +325,9 @@ async function handleRequest(event) {
     // Admin API: GET/POST/DELETE /api/channels (protected)
     if (pathname === '/api/channels') {
       if (!verifyBearer(request)) return jsonResponse({ error: 'Authentication required' }, 401);
-      const key = 'dashboard/data/channels.json';
+      const key = `${SOURCE_PREFIX}/channels.json`;
       if (request.method === 'GET') {
-        const obj = await FEEDS_BUCKET.get(key);
+        const obj = await FEEDS_BUCKET.get(key) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/channels.json`);
         const channels = obj ? JSON.parse(await obj.text()) : [];
         return jsonResponse({ channels }, 200);
       }
@@ -278,7 +335,7 @@ async function handleRequest(event) {
         const body = await request.json().catch(() => ({}));
         const id = (body.channelId || body.id || '').toString();
         if (!id) return jsonResponse({ error: 'channelId required' }, 400);
-        const obj = await FEEDS_BUCKET.get(key);
+        const obj = await FEEDS_BUCKET.get(key) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/channels.json`);
         const channels = obj ? JSON.parse(await obj.text()) : [];
         const idx = channels.findIndex(ch => String(ch.id) === id);
         const next = { id, name: body.name || '', type: body.type || (body.channelType || 'text') };
@@ -290,7 +347,7 @@ async function handleRequest(event) {
         const body = await request.json().catch(() => ({}));
         const id = (body.channelId || body.id || '').toString();
         if (!id) return jsonResponse({ error: 'channelId required' }, 400);
-        const obj = await FEEDS_BUCKET.get(key);
+        const obj = await FEEDS_BUCKET.get(key) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/channels.json`);
         const channels = obj ? JSON.parse(await obj.text()) : [];
         const filtered = channels.filter(ch => String(ch.id) !== id);
         await FEEDS_BUCKET.put(key, JSON.stringify(filtered, null, 2), { httpMetadata: { contentType: 'application/json' } });
@@ -325,8 +382,8 @@ async function handleRequest(event) {
           default: return 'text';
         }
       })(info.type);
-      const key = 'dashboard/data/channels.json';
-      const obj = await FEEDS_BUCKET.get(key);
+      const key = `${SOURCE_PREFIX}/channels.json`;
+      const obj = await FEEDS_BUCKET.get(key) || await FEEDS_BUCKET.get(`${DASH_PREFIX}/channels.json`);
       const channels = obj ? JSON.parse(await obj.text()) : [];
       const idx = channels.findIndex(ch => String(ch.id) === channelId);
       const next = { id: channelId, name, type };
@@ -337,7 +394,7 @@ async function handleRequest(event) {
     // Examples: GET /feed_map.json -> dashboard/data/feed_map.json
     if (request.method === 'GET') {
       const key = mapPathToKey(pathname);
-      const obj = await FEEDS_BUCKET.get(key);
+      const obj = await FEEDS_BUCKET.get(key) || await FEEDS_BUCKET.get(key.replace(DASH_PREFIX, SOURCE_PREFIX));
       if (obj) {
         const text = await obj.text();
         return new Response(text, { status: 200, headers: jsonCorsHeaders() });
@@ -370,8 +427,7 @@ function verifyBearer(request) {
 function mapPathToKey(pathname) {
   // Map public routes to keys in the R2 bucket
   // Allow configurable prefix via DASHBOARD_PREFIX binding or default to 'dashboard/data'
-  const rawPrefix = typeof DASHBOARD_PREFIX !== 'undefined' ? DASHBOARD_PREFIX : 'dashboard/data';
-  const prefix = rawPrefix.replace(/^\/+|\/+$/g, ''); // trim slashes
+  const prefix = DASH_PREFIX; // already normalized
   switch (pathname) {
     case '/api/public/feeds':
       // Redirect feeds endpoint to use stats.json instead of feeds.json

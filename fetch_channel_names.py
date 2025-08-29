@@ -19,7 +19,7 @@ from urllib.error import HTTPError, URLError
 DISCORD_API = "https://discord.com/api/v10/channels/"
 TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
 
-def load_feed_map(path='dashboard/data/feed_map.json'):
+def load_feed_map(path='dashboard/data/source/feed_map.json'):
     if not os.path.exists(path):
         return {}
     try:
@@ -60,7 +60,7 @@ TYPE_MAP = {
 }
 
 
-def load_existing(out='channels.json'):
+def load_existing(out='dashboard/data/source/channels.json'):
     try:
         if os.path.exists(out):
             arr = json.load(open(out, 'r', encoding='utf-8'))
@@ -79,7 +79,8 @@ if __name__ == '__main__':
         print('DISCORD_BOT_TOKEN not set; exiting (no changes).')
         sys.exit(0)
 
-    feed_map = load_feed_map('dashboard/data/feed_map.json')
+    # Prefer authoritative source feed_map
+    feed_map = load_feed_map('dashboard/data/source/feed_map.json') or load_feed_map('dashboard/data/feed_map.json')
     candidates = set()
     for v in feed_map.values():
         if isinstance(v, list):
@@ -93,7 +94,7 @@ if __name__ == '__main__':
         print('No numeric channel IDs found in feed_map.json; nothing to fetch.')
         sys.exit(0)
 
-    existing = load_existing('channels.json')
+    existing = load_existing('dashboard/data/source/channels.json') or load_existing('dashboard/data/channels.json')
     channels = []
     for cid in sorted(candidates):
         print(f'Fetching channel {cid}...')
@@ -118,7 +119,9 @@ if __name__ == '__main__':
                 channels.append(existing[cid])
 
     if channels:
-        out = 'channels.json'
+        # Write authoritative channels list into the source folder
+        os.makedirs('dashboard/data/source', exist_ok=True)
+        out = 'dashboard/data/source/channels.json'
         try:
             json.dump(channels, open(out, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
             print(f'Wrote {len(channels)} channels to {out}')

@@ -40,22 +40,36 @@ def generate_stats():
     print("📊 Generating stats...")
     
     # Load existing data
-    # Prefer dashboard/data/seen.json, fallback to root seen.json
-    seen_path_candidates = ['dashboard/data/seen.json', 'seen.json']
+    # Prefer source folder where available
+    seen_path_candidates = [
+        'dashboard/data/source/seen.json',
+        'dashboard/data/seen.json',
+        'seen.json'
+    ]
     seen_data = {}
     for cand in seen_path_candidates:
         seen_data = load_json_file(cand, {})
         if seen_data:
             break
     feed_meta = load_json_file('feed_meta.json', {})
-    feed_map = load_json_file('dashboard/data/feed_map.json', {})
-    channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
+    # Prefer authoritative configs from dashboard/data/source, with fallbacks for compatibility
+    feed_map = (
+        load_json_file('dashboard/data/source/feed_map.json', {}) or
+        load_json_file('dashboard/data/feed_map.json', {})
+    )
+    channels = (
+        load_json_file('dashboard/data/source/channels.json', []) or
+        load_json_file('dashboard/data/channels.json', []) or
+        load_json_file('channels.json', [])
+    )
     
-    # Load feeds list
+    # Load feeds list (prefer source folder)
     feeds = []
-    if os.path.exists('feeds.txt'):
-        with open('feeds.txt', 'r') as f:
-            feeds = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+    for cand in ['dashboard/data/source/feeds.txt', 'dashboard/data/feeds.txt', 'feeds.txt']:
+        if os.path.exists(cand):
+            with open(cand, 'r', encoding='utf-8') as f:
+                feeds = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+            break
     
     # Calculate stats
     now = datetime.now(timezone.utc)
@@ -201,8 +215,17 @@ def generate_meta_data():
     """Generate metadata for the dashboard"""
     print("🔍 Generating meta data...")
     
-    channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
-    groups = load_json_file('groups.json', {})
+    channels = (
+        load_json_file('dashboard/data/source/channels.json', []) or
+        load_json_file('dashboard/data/channels.json', []) or
+        load_json_file('channels.json', [])
+    )
+    # Prefer groups from source folder
+    groups = (
+        load_json_file('dashboard/data/source/groups.json', {}) or
+        load_json_file('dashboard/data/groups.json', {}) or
+        load_json_file('groups.json', {})
+    )
     system_prompt = load_json_file('system_prompt.json', {})
     
     meta_data = {
@@ -244,10 +267,17 @@ def main():
         # Ensure the authoritative feed_map is published into docs/data so it gets uploaded
         # to R2 under the dashboard prefix (dashboard/data/feed_map.json).
         try:
-            feed_map_root = load_json_file('dashboard/data/feed_map.json', {})
+            feed_map_root = (
+                load_json_file('dashboard/data/source/feed_map.json', {}) or
+                load_json_file('dashboard/data/feed_map.json', {})
+            )
             # Enrich the feed_map for dashboard consumption with channel name/type
             # without changing the root dashboard/data/feed_map.json (which other components may rely on).
-            channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
+            channels = (
+                load_json_file('dashboard/data/source/channels.json', []) or
+                load_json_file('dashboard/data/channels.json', []) or
+                load_json_file('channels.json', [])
+            )
             # Build lookup by id
             channels_by_id = {str(ch.get('id')): {'id': str(ch.get('id')), 'name': ch.get('name'), 'type': ch.get('type')} for ch in channels if ch.get('id')}
 

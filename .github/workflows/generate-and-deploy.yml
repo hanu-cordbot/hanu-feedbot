@@ -61,29 +61,29 @@ jobs:
           endpoint = os.getenv('R2_ENDPOINT')
           if not bucket or not access or not secret:
             print('R2 credentials not present; skipping fetch of feed_map.json')
-            os.makedirs('dashboard/data', exist_ok=True)
-            if not os.path.exists('dashboard/data/feed_map.json'):
-              open('dashboard/data/feed_map.json','w').write('{}')
-              print('Wrote empty dashboard/data/feed_map.json')
+            os.makedirs('dashboard/data/source', exist_ok=True)
+            if not os.path.exists('dashboard/data/source/feed_map.json'):
+              open('dashboard/data/source/feed_map.json','w').write('{}')
+              print('Wrote empty dashboard/data/source/feed_map.json')
             sys.exit(0)
           try:
             import boto3
             s3 = boto3.client('s3', aws_access_key_id=access, aws_secret_access_key=secret, endpoint_url=endpoint)
-            os.makedirs('dashboard/data', exist_ok=True)
-            # Try dashboard/data/feed_map.json first, fallback to root
-            for key in ['dashboard/data/feed_map.json', 'feed_map.json']:
+            os.makedirs('dashboard/data/source', exist_ok=True)
+            # Try new authoritative path first, fallback to legacy locations
+            for key in ['dashboard/data/source/feed_map.json', 'dashboard/data/feed_map.json', 'feed_map.json']:
               try:
-                s3.download_file(bucket, key, 'dashboard/data/feed_map.json')
+                s3.download_file(bucket, key, 'dashboard/data/source/feed_map.json')
                 print('Downloaded', key)
                 break
               except Exception as e:
                 print('Could not download', key, '-', e)
           except Exception as e:
             print('boto3 not available or download failed:', e)
-            os.makedirs('dashboard/data', exist_ok=True)
-            if not os.path.exists('dashboard/data/feed_map.json'):
-              open('dashboard/data/feed_map.json','w').write('{}')
-              print('Wrote empty dashboard/data/feed_map.json')
+            os.makedirs('dashboard/data/source', exist_ok=True)
+            if not os.path.exists('dashboard/data/source/feed_map.json'):
+              open('dashboard/data/source/feed_map.json','w').write('{}')
+              print('Wrote empty dashboard/data/source/feed_map.json')
           PY
 
       - name: Fetch seen.json from R2 (optional)
@@ -101,11 +101,11 @@ jobs:
             sys.exit(0)
           try:
             import boto3, os
-            os.makedirs('dashboard/data', exist_ok=True)
+            os.makedirs('dashboard/data/source', exist_ok=True)
             c=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
-            for key in ['dashboard/data/seen.json','seen.json']:
+            for key in ['dashboard/data/source/seen.json','dashboard/data/seen.json','seen.json']:
               try:
-                c.download_file(b, key, 'dashboard/data/seen.json'); print('Downloaded', key); break
+                c.download_file(b, key, 'dashboard/data/source/seen.json'); print('Downloaded', key); break
               except Exception as ex:
                 print('Could not download', key, '-', ex)
           except Exception as ex:
@@ -171,14 +171,15 @@ jobs:
           # NOTE: Do NOT overwrite dashboard/data/feed_map.json as it should persist from R2 download
           python - <<'PY'
           import os, json
-          os.makedirs('dashboard/data', exist_ok=True)
-          for fn, default in [('channels.json', [])]:
-              if not os.path.exists(fn):
-                  open(fn, 'w', encoding='utf-8').write(json.dumps(default, indent=2))
+          os.makedirs('dashboard/data/source', exist_ok=True)
+          # Ensure source channels.json exists for generator
+          ch_path = 'dashboard/data/source/channels.json'
+          if not os.path.exists(ch_path):
+              open(ch_path, 'w', encoding='utf-8').write(json.dumps([], indent=2))
           PY
           python generate_dashboard_data.py
 
-      - name: Upload generated docs/data -> R2 (if configured)
+      - name: Upload generated docs/data and source configs -> R2 (if configured)
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -206,21 +207,16 @@ jobs:
           PREFIX="dashboard/data"
           PREFIX=$(echo "$PREFIX" | sed 's#^/*##; s#/*$##')
 
-          # Upload authoritative feed_map.json to preserve user mappings
-          if [ -f "dashboard/data/feed_map.json" ]; then
-            echo "Uploading dashboard/data/feed_map.json -> s3://$BUCKET/dashboard/data/feed_map.json"
-            aws --endpoint-url "$R2_ENDPOINT" s3 cp "dashboard/data/feed_map.json" "s3://$BUCKET/dashboard/data/feed_map.json" --acl public-read || echo "Upload failed for dashboard/data/feed_map.json"
+          # Upload authoritative source configs (feed_map.json, channels.json, groups.json, feeds.txt)
+          if [ -d "dashboard/data/source" ]; then
+            echo "Syncing dashboard/data/source -> s3://$BUCKET/dashboard/data/source/"
+            aws --endpoint-url "$R2_ENDPOINT" s3 sync "dashboard/data/source" "s3://$BUCKET/dashboard/data/source" --acl public-read --exclude ".git/*" || echo "Source sync failed"
           fi
 
           mkdir -p docs/data
           for f in docs/data/*.json; do
             [ -f "$f" ] || continue
             base=$(basename "$f")
-            # Do NOT overwrite feed_map.json; that is maintained under dashboard/data separately
-            if [ "$base" = "feed_map.json" ]; then
-              echo "Skipping upload of docs/data/feed_map.json to preserve authoritative mapping"
-              continue
-            fi
             key="$PREFIX/$base"
             echo "Uploading $f -> s3://$BUCKET/$key (endpoint: $R2_ENDPOINT)"
             aws --endpoint-url "$R2_ENDPOINT" s3 cp "$f" "s3://$BUCKET/$key" --acl public-read || echo "Upload failed for $f"

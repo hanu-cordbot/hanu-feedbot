@@ -12,11 +12,12 @@ else:
 
 # Prefer dashboard/data structure, fallback to root
 def _get_data_path(filename):
-    """Get path for data files, preferring dashboard/data/ structure"""
+    """Get path for data files, preferring dashboard/data/source then dashboard/data, else root"""
+    source_path = BASE_DIR / "dashboard" / "data" / "source" / filename
     dashboard_path = BASE_DIR / "dashboard" / "data" / filename
     root_path = BASE_DIR / filename
-    
-    # If dashboard version exists, use it; otherwise use root (for backward compatibility)
+    if source_path.exists():
+        return source_path
     if dashboard_path.exists():
         return dashboard_path
     return root_path
@@ -39,10 +40,11 @@ def _maybe_fetch_feeds_from_r2():
         # Lazy-import boto3 to avoid requiring it unless configured
         import boto3
         s3 = boto3.client('s3', aws_access_key_id=access_key, aws_secret_access_key=secret, endpoint_url=endpoint)
-        target = _get_data_path("feeds.txt")
+        # Ensure we place feeds.txt under source folder by default
+        target = BASE_DIR / "dashboard" / "data" / "source" / "feeds.txt"
         target.parent.mkdir(parents=True, exist_ok=True)
-        # Try dashboard/data/feeds.txt first, fallback to feeds.txt
-        for key in ['dashboard/data/feeds.txt', 'feeds.txt']:
+        # Try new source key, then dashboard/data, then root
+        for key in ['dashboard/data/source/feeds.txt', 'dashboard/data/feeds.txt', 'feeds.txt']:
             try:
                 with open(target, 'wb') as f:
                     s3.download_fileobj(bucket, key, f)
@@ -61,7 +63,7 @@ def _maybe_fetch_feeds_from_r2():
 
 # Try to fetch feeds from R2 on import
 _maybe_fetch_feeds_from_r2()
-SEEN_DB   = _get_data_path("seen.json")  # Try dashboard/data/seen.json first
+SEEN_DB   = _get_data_path("seen.json")  # Try dashboard/data/source/seen.json, then dashboard/data, then root
 
 # Optional R2/S3 bucket for persisting runtime state (seen.json)
 SEEN_R2_BUCKET = os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('R2_BUCKET')

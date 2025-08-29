@@ -10,6 +10,9 @@ workers_dev = true
 RAILWAY_BASE = "https://splendid-eagerness-production-4843.up.railway.app"
 # Prefix inside the bucket where dashboard files are stored (no leading/trailing slash)
 DASHBOARD_PREFIX = "dashboard/data"
+# Optional: where authoritative editable sources live (feeds.txt, feed_map.json, channels.json, groups.json)
+# Defaults to "${DASHBOARD_PREFIX}/source" if not set
+# SOURCE_PREFIX = "dashboard/data/source"
 
 # NOTE: This worker has been updated to serve static dashboard data from an R2 bucket.
 # To deploy the R2-backed endpoints you must add an R2 binding and an admin token.

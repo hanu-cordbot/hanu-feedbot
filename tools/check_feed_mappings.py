@@ -2,10 +2,15 @@
 import json, os
 from pathlib import Path
 BASE_DIR = Path('.')
-feed_map_path = BASE_DIR / 'feed_map.json'
+feed_map_path = BASE_DIR / 'dashboard' / 'data' / 'source' / 'feed_map.json'
 if not feed_map_path.exists():
-    print('feed_map.json not found')
-    raise SystemExit(1)
+    # Fallback to legacy path for convenience
+    legacy = BASE_DIR / 'dashboard' / 'data' / 'feed_map.json'
+    if legacy.exists():
+        feed_map_path = legacy
+    else:
+        print('authoritative feed_map.json not found (expected dashboard/data/source/feed_map.json)')
+        raise SystemExit(1)
 with open(feed_map_path, 'r', encoding='utf-8') as f:
     user_map = json.load(f)
 print(f'Loaded feed_map.json with {len(user_map)} keys')

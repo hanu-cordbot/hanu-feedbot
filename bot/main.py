@@ -147,9 +147,9 @@ def load_seen_guids():
             try:
                 import io, gzip
                 buf = io.BytesIO()
-                # Prefer dashboard/data/seen.json, fallback to legacy seen.json
+                # Prefer dashboard/data/source/seen.json, then dashboard/data/seen.json, fallback to legacy seen.json
                 last_err = None
-                for key in ('dashboard/data/seen.json', 'seen.json'):
+                for key in ('dashboard/data/source/seen.json', 'dashboard/data/seen.json', 'seen.json'):
                     try:
                         buf.seek(0); buf.truncate(0)
                         client.download_fileobj(SEEN_R2_BUCKET, key, buf)
@@ -219,12 +219,12 @@ def save_seen_guids(guids):
             # Write plain JSON bytes (no gzip)
             buf.write(json.dumps(list(guids)[-500:]).encode('utf-8'))
             buf.seek(0)
-            # Upload plain JSON content under dashboard/data/seen.json (canonical)
+            # Upload plain JSON content under dashboard/data/source/seen.json (authoritative)
             try:
-                client.upload_fileobj(buf, SEEN_R2_BUCKET, 'dashboard/data/seen.json')
+                client.upload_fileobj(buf, SEEN_R2_BUCKET, 'dashboard/data/source/seen.json')
             except TypeError:
                 # Fallback if client.upload_fileobj signature differs
-                client.put_object(Bucket=SEEN_R2_BUCKET, Key='dashboard/data/seen.json', Body=buf.getvalue())
+                client.put_object(Bucket=SEEN_R2_BUCKET, Key='dashboard/data/source/seen.json', Body=buf.getvalue())
     except Exception as e:
         print(f"⚠️ Could not upload seen.json to R2: {e}")
 
@@ -656,18 +656,32 @@ async def process_feeds_once(client: discord.Client):
 
     # Load mappings and thread map
     try:
-        # Try dashboard/data/feed_map.json first (preferred), fallback to root
+        # Try dashboard/data/source/feed_map.json first (preferred), then dashboard/data/feed_map.json, fallback to root
+        source_path = os.path.join(BASE_DIR, 'dashboard', 'data', 'source', 'feed_map.json')
         dashboard_path = os.path.join(BASE_DIR, 'dashboard', 'data', 'feed_map.json')
         root_path = os.path.join(BASE_DIR, 'feed_map.json')
         
-        if os.path.exists(dashboard_path):
+        if os.path.exists(source_path):
+            with open(source_path, 'r') as f:
+                raw_map = json.load(f)
+            # Handle both formats: {"url": "channel_id"} or {"url": {"id": "channel_id", ...}}
+            user_map = {}
+            for url, value in raw_map.items():
+                if isinstance(value, dict):
+                    channel_id = value.get('id', '') or value.get('channel') or value.get('channel_id')
+                    if channel_id:
+                        user_map[url] = str(channel_id)
+                else:
+                    user_map[url] = str(value)
+            print(f"🔧 Processed dashboard/data/source/feed_map.json: {len(raw_map)} entries -> {len(user_map)} valid mappings")
+        elif os.path.exists(dashboard_path):
             with open(dashboard_path, 'r') as f:
                 raw_map = json.load(f)
             # Handle both formats: {"url": "channel_id"} or {"url": {"id": "channel_id", ...}}
             user_map = {}
             for url, value in raw_map.items():
                 if isinstance(value, dict):
-                    channel_id = value.get('id', '')
+                    channel_id = value.get('id', '') or value.get('channel') or value.get('channel_id')
                     if channel_id:
                         user_map[url] = str(channel_id)
                 else:
