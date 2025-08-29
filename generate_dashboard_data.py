@@ -40,7 +40,13 @@ def generate_stats():
     print("📊 Generating stats...")
     
     # Load existing data
-    seen_data = load_json_file('seen.json', {})
+    # Prefer dashboard/data/seen.json, fallback to root seen.json
+    seen_path_candidates = ['dashboard/data/seen.json', 'seen.json']
+    seen_data = {}
+    for cand in seen_path_candidates:
+        seen_data = load_json_file(cand, {})
+        if seen_data:
+            break
     feed_meta = load_json_file('feed_meta.json', {})
     feed_map = load_json_file('dashboard/data/feed_map.json', {})
     channels = load_json_file('channels.json', [])

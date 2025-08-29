@@ -118,6 +118,25 @@ async def download_bytes(url: str) -> bytes:
         resp.raise_for_status()
         return await resp.read()
 
+def _split_message_by_newline(content: str, limit: int = 2000) -> list[str]:
+    """Split content into chunks <= limit, preferring newline breaks over mid-line cuts."""
+    if len(content) <= limit:
+        return [content]
+    parts = content.split("\n")
+    chunks: list[str] = []
+    current = ""
+    for p in parts:
+        add = p if not current else ("\n" + p)
+        if len(current) + len(add) > limit:
+            if current:
+                chunks.append(current)
+            current = p
+        else:
+            current += add
+    if current:
+        chunks.append(current)
+    return chunks
+
 def load_seen_guids():
     """Loads the set of processed post IDs from the state file."""
     print(f"🔍 Loading seen guids from: {SEEN_FILE}")
@@ -201,15 +220,25 @@ def save_seen_guids(guids):
 async def build_full_body(entry: dict) -> str:
     """Build full formatted body for an entry using existing logic."""
     maybe_update(entry)
-    
-    if len(entry.get('raw', '').split()) < SHORT_POST_WORD_THRESHOLD:
+    # Remove useless FB error bodies like "This content isn't available right now".
+    raw_text = (entry.get('raw') or '').strip()
+    lowered = raw_text.lower()
+    unavailable_markers = [
+        "this content isn't available right now",
+        "this post isn't available right now",
+        "bài viết hiện không khả dụng",
+        "không khả dụng"
+    ]
+    if any(m in lowered for m in unavailable_markers):
+        raw_text = ""
+
+    if len(raw_text.split()) < SHORT_POST_WORD_THRESHOLD:
         parts = []
         title = entry.get('title', '')
         if title:
             parts.append(f"# **{title}**")
-        raw = entry.get('raw', '')
-        if raw and raw.strip() != title.strip():
-            parts.append(raw)
+        if raw_text and raw_text.strip() != title.strip():
+            parts.append(raw_text)
         body = "\n\n".join(parts)
         return f"{body}\n\n<{entry.get('link')}>"
     else:
@@ -501,14 +530,18 @@ async def process_media(entry, channel):
         if temp_dir not in TEMP_DIRS_TO_CLEANUP:
             TEMP_DIRS_TO_CLEANUP.append(temp_dir)
 
-async def process_entry_in_thread(entry, thread, summary):
-    """Process a single entry in a text channel thread"""
-    # Generate and send body content
+async def process_entry_in_thread(client, entry, thread, summary):
+    """Process a single entry in a text channel thread via webhook (impersonate FB poster)."""
     body = await build_full_body(entry)
+    # Send via webhook so messages show as the FB poster
+    parent = getattr(thread, 'parent', None)
+    webhook_url = await get_or_create_webhook_url(parent or thread)
+    webhook = discord.Webhook.from_url(webhook_url, client=client)
+    username = (entry.get('page_name') or '').strip() or 'Facebook Page'
+    avatar = avatar_for(entry)
     last_msg = None
-    for idx in range(0, len(body), 2000):
-        chunk = body[idx:idx+2000]
-        last_msg = await thread.send(chunk)
+    for chunk in _split_message_by_newline(body):
+        last_msg = await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=True)
     
     # Update per-channel summary if we have a posted message
     if last_msg:
@@ -517,6 +550,14 @@ async def process_entry_in_thread(entry, thread, summary):
 async def process_entry_in_forum(client, entry, forum_channel):
     """Process a single entry in a forum channel by creating a new thread"""
     title = entry.get('title', 'No Title')[:100]  # Forum thread titles are limited
+    # Improve title by generating from body to avoid tag-only titles like [HTTT]
+    try:
+        from bot.formatter import build_thread_title_prompt
+        gen_reply = await asyncio.to_thread(call_gemini, build_thread_title_prompt(entry.get('raw', '') or ''))
+        if gen_reply:
+            title = gen_reply.strip().splitlines()[0][:100]
+    except Exception:
+        pass
 
     try:
         # Build the post body first; forum thread creation requires a non-empty initial message
@@ -567,6 +608,46 @@ async def process_entry_in_forum(client, entry, forum_channel):
         import traceback
         traceback.print_exc()
         print(f"❌ Skipping forum post for '{title}' due to above error")
+
+# Override with webhook-based forum posting so the sender appears as the FB page
+async def process_entry_in_forum(client, entry, forum_channel):
+    """Create a forum thread via webhook using FB page identity and post content in newline-safe chunks."""
+    title = (entry.get('title') or 'Post')[:100]
+    try:
+        from bot.formatter import build_thread_title_prompt
+        gen = await asyncio.to_thread(call_gemini, build_thread_title_prompt(entry.get('raw', '') or ''))
+        if gen:
+            title = gen.strip().splitlines()[0][:100]
+    except Exception:
+        pass
+
+    body = await build_full_body(entry)
+    chunks = _split_message_by_newline(body) or [" "]
+
+    try:
+        webhook_url = await get_or_create_webhook_url(forum_channel)
+        webhook = discord.Webhook.from_url(webhook_url, client=client)
+        username = (entry.get('page_name') or '').strip() or 'Facebook Page'
+        avatar = avatar_for(entry)
+        # Create thread with first chunk
+        msg = await webhook.send(content=chunks[0], username=username, avatar_url=avatar, thread_name=title, wait=True)
+        thread = msg.channel
+        # Post remaining chunks
+        for chunk in chunks[1:]:
+            await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
+        return
+    except Exception as e:
+        print(f"⚠️ Webhook forum post failed: {e}")
+        # Fallback to direct API (bot identity)
+        try:
+            thread = await forum_channel.create_thread(name=title, content=chunks[0])
+            for chunk in chunks[1:]:
+                try:
+                    await thread.send(chunk)
+                except Exception:
+                    pass
+        except Exception as e2:
+            print(f"❌ Direct forum thread creation also failed: {e2}")
 
 async def process_feeds_once(client: discord.Client):
     """Scans feeds and processes new entries per-channel summary."""
@@ -740,7 +821,7 @@ async def process_feeds_once(client: discord.Client):
 
             # Post full entries in that thread and update per-channel summary
             for e in entries:
-                await process_entry_in_thread(e, thr, summary)
+                await process_entry_in_thread(client, e, thr, summary)
                 
                 # Process media (Facebook videos, images, etc.)
                 await process_media(e, ch)
