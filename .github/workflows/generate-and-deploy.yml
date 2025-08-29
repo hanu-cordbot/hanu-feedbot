@@ -215,7 +215,13 @@ jobs:
           mkdir -p docs/data
           for f in docs/data/*.json; do
             [ -f "$f" ] || continue
-            key="$PREFIX/$(basename "$f")"
+            base=$(basename "$f")
+            # Do NOT overwrite feed_map.json; that is maintained under dashboard/data separately
+            if [ "$base" = "feed_map.json" ]; then
+              echo "Skipping upload of docs/data/feed_map.json to preserve authoritative mapping"
+              continue
+            fi
+            key="$PREFIX/$base"
             echo "Uploading $f -> s3://$BUCKET/$key (endpoint: $R2_ENDPOINT)"
             aws --endpoint-url "$R2_ENDPOINT" s3 cp "$f" "s3://$BUCKET/$key" --acl public-read || echo "Upload failed for $f"
           done
