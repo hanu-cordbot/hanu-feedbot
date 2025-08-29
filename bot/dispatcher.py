@@ -359,7 +359,7 @@ async def create_daily_summary_message(channel, vietnamese_date):
     
     # Format header with credit line
     header_line = f"{vietnamese_date} ({today_str})"
-    credit_line = "-# *[hanu-news bot](https://hanu-feedbot-production.up.railway.app/) - made with <3 by namesn_pe*"
+    credit_line = "-# *[hanu-news bot](https://hanu-cordbot.github.io/hanu-feedbot) - made with <3 by namesn_pe*"
     content = f"{header_line}\n{credit_line}"
     
     try:

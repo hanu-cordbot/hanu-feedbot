@@ -9,10 +9,10 @@ window.CONFIG = {
   
   // Data sync settings
   DATA_SYNC: {
-    enabled: true,
-    localDataPath: './data/', // Path to locally cached data
-    fallbackToAPI: true, // Fall back to direct API if local data fails
-    cacheTimeout: 3600000 // 1 hour cache timeout
+    enabled: false,
+    localDataPath: './data/',
+    fallbackToAPI: true,
+    cacheTimeout: 3600000
   },
   
   // Last data update timestamp (updated by GitHub Actions)

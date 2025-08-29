@@ -58,11 +58,16 @@ jobs:
           FEEDS_R2_BUCKET: ${{ secrets.FEEDS_R2_BUCKET }}
           SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
         run: |
-          echo "Checking for seen.json to upload to R2"
+          echo "Checking for dashboard/data/seen.json to upload to R2"
           echo "PWD=$(pwd)"
           ls -la
-          if [ ! -f "seen.json" ]; then
-            echo "No seen.json present; skipping upload"
+          mkdir -p dashboard/data
+          if [ ! -f "dashboard/data/seen.json" ] && [ -f "seen.json" ]; then
+            echo "Found legacy seen.json; moving to dashboard/data/seen.json"
+            mv seen.json dashboard/data/seen.json
+          fi
+          if [ ! -f "dashboard/data/seen.json" ]; then
+            echo "No dashboard/data/seen.json present; skipping upload"
             exit 0
           fi
           # Choose bucket: prefer R2_BUCKET, then FEEDS_R2_BUCKET, then SEEN_R2_BUCKET
@@ -81,6 +86,6 @@ jobs:
           export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
           export AWS_DEFAULT_REGION="us-east-1"
 
-          echo "Uploading seen.json to s3://${TARGET_BUCKET}/seen.json (endpoint: ${R2_ENDPOINT})"
-          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "seen.json" "s3://${TARGET_BUCKET}/seen.json" || (echo "Upload failed"; exit 1)
-          echo "Uploaded seen.json"
+          echo "Uploading dashboard/data/seen.json to s3://${TARGET_BUCKET}/dashboard/data/seen.json (endpoint: ${R2_ENDPOINT})"
+          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "dashboard/data/seen.json" "s3://${TARGET_BUCKET}/dashboard/data/seen.json" || (echo "Upload failed"; exit 1)
+          echo "Uploaded dashboard/data/seen.json"

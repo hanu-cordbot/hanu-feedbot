@@ -5,7 +5,7 @@ class HanuAPI {
   constructor() {
     // Use configured API_BASE if available (dashboard) or same origin
     this.baseUrl = window.DEFAULT_AUTH_BASE || window.location.origin;
-    this.railwayAPI = window.CONFIG?.API_BASE_URL || 'https://hanu-feedbot-production.up.railway.app';
+    // this.railwayAPI = window.CONFIG?.API_BASE_URL || 'https://hanu-feedbot-production.up.railway.app'; we no longer use railway
     this.localDataEnabled = window.CONFIG?.DATA_SYNC?.enabled || false;
     this.localDataPath = window.CONFIG?.DATA_SYNC?.localDataPath || './data/';
   }
