@@ -7,6 +7,7 @@ import os
 import json
 import time
 from datetime import datetime, timezone, timedelta
+import datetime as dt
 from pathlib import Path
 import feedparser
 from collections import defaultdict
@@ -182,14 +183,14 @@ def generate_stats():
                             t = getattr(e, key, None)
                             if t:
                                 try:
-                                    return datetime.datetime(*t[:6], tzinfo=datetime.timezone.utc)
+                                    return dt.datetime(*t[:6], tzinfo=dt.timezone.utc)
                                 except Exception:
                                     pass
                         for key in ('published','updated'):
                             v = getattr(e, key, None)
                             if v:
                                 try:
-                                    return datetime.datetime.fromisoformat(v.replace('Z','+00:00'))
+                                    return dt.datetime.fromisoformat(v.replace('Z','+00:00'))
                                 except Exception:
                                     pass
                         return None
@@ -307,3 +308,4 @@ def main():
 if __name__ == "__main__":
     import sys
     sys.exit(main())
+
