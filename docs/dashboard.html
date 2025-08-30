@@ -1120,6 +1120,53 @@
       return `${hours}h ${minutes}m ${seconds}s`;
     }
 
+    // Override: compact health metrics
+    loadHealthMetrics = async function() {
+      try {
+        const [health, ping] = await Promise.all([
+          HanuAPI.getSystemHealth(),
+          HanuAPI.ping().catch(() => ({ success: false }))
+        ]);
+        const container = document.getElementById('health-metrics');
+        const m = (health && health.metrics) ? health.metrics : {};
+        const checks = (health && health.checks) ? health.checks : {};
+        const statusText = (health && health.status === 'ok') ? 'OK' : 'Degraded';
+        const latency = (ping && ping.success) ? (ping.latency + ' ms') : 'n/a';
+        let html = '<div class="health-grid">';
+        html += `
+          <div class="health-item"><div class="health-label">Status</div><div class="health-status">${statusText}</div></div>
+          <div class="health-item"><div class="health-label">Latency</div><div class="health-status">${latency}</div></div>
+          <div class="health-item"><div class="health-label">Feeds</div><div class="health-status">${m.feedsTotal ?? '-'}</div></div>
+          <div class="health-item"><div class="health-label">Mapped</div><div class="health-status">${m.mapped ?? '-'}</div></div>
+          <div class="health-item"><div class="health-label">Active ≤14d</div><div class="health-status">${m.active ?? '-'}</div></div>
+          <div class="health-item"><div class="health-label">Stale</div><div class="health-status">${m.stale ?? '-'}</div></div>
+          <div class="health-item"><div class="health-label">Last Updated</div><div class="health-status">${m.last_updated ?? '-'}</div></div>
+        `;
+        html += '</div>';
+        const presence = [
+          { label: 'feed_map.json', key: 'dashboard/data/source/feed_map.json' },
+          { label: 'channels.json', key: 'dashboard/data/source/channels.json' },
+          { label: 'groups.json', key: 'dashboard/data/source/groups.json' },
+          { label: 'stats.json', key: 'dashboard/data/stats.json' }
+        ];
+        html += '<div class="list-group" style="margin-top:10px">';
+        for (const item of presence) {
+          const ok = checks[item.key] === true;
+          html += `<div class="list-item"><div class="item-title">${item.label}</div><div class="item-subtitle">${ok ? 'present' : 'missing'}</div></div>`;
+        }
+        html += '</div>';
+        container.innerHTML = html;
+        // Hide legacy chart if present
+        try {
+          const chartCard = document.getElementById('performance-chart')?.closest('.card');
+          if (chartCard) chartCard.style.display = 'none';
+        } catch (_) {}
+      } catch (error) {
+        console.error('Failed to load health metrics:', error);
+        document.getElementById('health-metrics').innerHTML = '<div class="error">Failed to load health metrics</div>';
+      }
+    }
+
     // Alert helper
     function showAlert(message, type = 'info') {
       const alertDiv = document.createElement('div');
