@@ -264,51 +264,6 @@ def main():
         meta_data = generate_meta_data()
         save_json_file('docs/data/meta.json', meta_data)
 
-        # Ensure the authoritative feed_map is published into docs/data so it gets uploaded
-        # to R2 under the dashboard prefix (dashboard/data/feed_map.json).
-        try:
-            feed_map_root = (
-                load_json_file('dashboard/data/source/feed_map.json', {}) or
-                load_json_file('dashboard/data/feed_map.json', {})
-            )
-            # Enrich the feed_map for dashboard consumption with channel name/type
-            # without changing the root dashboard/data/feed_map.json (which other components may rely on).
-            channels = (
-                load_json_file('dashboard/data/source/channels.json', []) or
-                load_json_file('dashboard/data/channels.json', []) or
-                load_json_file('channels.json', [])
-            )
-            # Build lookup by id
-            channels_by_id = {str(ch.get('id')): {'id': str(ch.get('id')), 'name': ch.get('name'), 'type': ch.get('type')} for ch in channels if ch.get('id')}
-
-            def enrich_value(v):
-                # If mapping is a list of ids/names, enrich each item
-                if isinstance(v, list):
-                    out = []
-                    for item in v:
-                        sid = str(item) if item is not None else None
-                        if sid and sid in channels_by_id:
-                            out.append(channels_by_id[sid])
-                        else:
-                            out.append(item)
-                    return out
-                # If mapping is a single id-like value, try to enrich
-                sid = str(v) if v is not None else None
-                if sid and sid in channels_by_id:
-                    return channels_by_id[sid]
-                return v
-
-            enriched = {}
-            for k, v in feed_map_root.items():
-                try:
-                    enriched[k] = enrich_value(v)
-                except Exception:
-                    enriched[k] = v
-
-            save_json_file('docs/data/feed_map.json', enriched)
-        except Exception as e:
-            print('❌ Failed to write docs/data/feed_map.json:', e)
-
         print("\n✅ Dashboard data generation completed!")
         print(f"📊 Generated stats for {stats['total_feeds']} feeds")
         print(f"📡 Processed {len(stats['feed_health'])} feed health entries")

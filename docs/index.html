@@ -260,8 +260,6 @@
   // (e.g. dashboard/data/feed_map.json). Merge them in if present so channel resolution works.
   try {
 
-  try {
-  try {
     const chRes = await fetch(`${API_BASE}/api/public/channels`, { headers: { 'Content-Type': 'application/json' } });
     if (chRes.ok) {
       const chJson = await chRes.json().catch(() => null);
