@@ -900,7 +900,16 @@
       }
 
       try {
-        await HanuAPI.addChannel(channelId);
+        // Try to fetch Discord metadata client-side to minimize backend work
+        let name = null, type = null;
+        try {
+          const info = await HanuAPI.fetchChannelName(channelId);
+          if (info && info.success && info.channel) {
+            name = info.channel.name || null;
+            type = info.channel.type || null;
+          }
+        } catch (_) {}
+        await HanuAPI.addChannel(channelId, name, type);
         document.getElementById('new-channel-id').value = '';
         await loadChannels();
         populateTestSelects();
