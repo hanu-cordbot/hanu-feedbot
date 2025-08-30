@@ -13,8 +13,14 @@ from typing import Optional, Tuple
 from bot.config import r2_client, SEEN_R2_BUCKET
 
 # R2 video storage configuration
-R2_VIDEO_BUCKET = os.getenv('R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or SEEN_R2_BUCKET
-R2_PUBLIC_URL = os.getenv('R2_PUBLIC_URL')  # e.g., "https://pub-xxxxx.r2.dev"
+# IMPORTANT: Use a dedicated public bucket for videos to avoid exposing private state.
+R2_VIDEO_BUCKET = (
+    os.getenv('R2_VIDEO_BUCKET')
+    or os.getenv('R2_BUCKET')
+    or os.getenv('FEEDS_R2_BUCKET')
+)
+# Prefer a dedicated public URL for the video bucket; fallback to generic R2_PUBLIC_URL
+R2_VIDEO_PUBLIC_URL = os.getenv('R2_VIDEO_PUBLIC_URL') or os.getenv('R2_PUBLIC_URL')  # e.g., "https://videos.example.r2.dev"
 
 def generate_video_filename(post_title: str, extension: str = "mp4") -> str:
     """Generate a unique filename for video storage"""
@@ -46,7 +52,7 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
         filename = generate_video_filename(post_title)
 
         # Determine public base URL at call time (so runtime env is respected)
-        r2_public_env = os.getenv('R2_PUBLIC_URL')
+        r2_public_env = os.getenv('R2_VIDEO_PUBLIC_URL') or os.getenv('R2_PUBLIC_URL')
         print(f"📤 Uploading video to R2: {filename} ({len(video_data)/1024/1024:.2f}MB)")
 
         # Upload to R2
@@ -64,12 +70,12 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
         if r2_public_env:
             public_url = f"{r2_public_env.rstrip('/')}/{filename}"
             print(f"ℹ️ Using R2_PUBLIC_URL from environment: {r2_public_env}")
-        elif R2_PUBLIC_URL:
-            public_url = f"{R2_PUBLIC_URL.rstrip('/')}/{filename}"
-            print(f"ℹ️ Using R2_PUBLIC_URL from module config: {R2_PUBLIC_URL}")
+        elif R2_VIDEO_PUBLIC_URL:
+            public_url = f"{R2_VIDEO_PUBLIC_URL.rstrip('/')}/{filename}"
+            print(f"ℹ️ Using R2_VIDEO_PUBLIC_URL from module config: {R2_VIDEO_PUBLIC_URL}")
         else:
             # Refuse to generate a cloudflarestorage fallback URL
-            print('ERROR: R2_PUBLIC_URL is not set in the runtime environment; refusing to return a fallback cloudflarestorage URL.')
+            print('ERROR: No R2 public URL configured for videos; refusing fallback cloudflarestorage URL.')
             return None
 
         print(f"✅ Video uploaded to R2: {public_url}")
@@ -135,11 +141,11 @@ def build_public_url_for_key(key: str) -> str:
     Useful for runtime testing without performing an upload.
     """
     # Prefer runtime env
-    r2_public_env = os.getenv('R2_PUBLIC_URL')
+    r2_public_env = os.getenv('R2_VIDEO_PUBLIC_URL') or os.getenv('R2_PUBLIC_URL')
     if r2_public_env:
         return f"{r2_public_env.rstrip('/')}/{key}"
-    if R2_PUBLIC_URL:
-        return f"{R2_PUBLIC_URL.rstrip('/')}/{key}"
+    if R2_VIDEO_PUBLIC_URL:
+        return f"{R2_VIDEO_PUBLIC_URL.rstrip('/')}/{key}"
     return f"https://{R2_VIDEO_BUCKET}.r2.cloudflarestorage.com/{key}"
 
 
@@ -156,7 +162,7 @@ def _mask_url(u: Optional[str]) -> str:
         return '(invalid)'
 
 try:
-    masked = _mask_url(R2_PUBLIC_URL)
-    print(f"🔎 R2_PUBLIC_URL (masked): {masked}")
+    masked = _mask_url(R2_VIDEO_PUBLIC_URL)
+    print(f"🔎 R2_VIDEO_PUBLIC_URL (masked): {masked}")
 except Exception:
     pass
