@@ -259,50 +259,18 @@
   // The Cloudflare worker maps bare paths like /feed_map.json and /channels.json to R2 keys
   // (e.g. dashboard/data/feed_map.json). Merge them in if present so channel resolution works.
   try {
-    const mapResp = await fetch(`${API_BASE}/feed_map.json`);
-    if (mapResp.ok) {
-      const mapJson = await mapResp.json().catch(() => null);
-      if (mapJson && typeof mapJson === 'object') {
-        // feed_map.json may use different shapes. Possible forms:
-        // { "feed_url": "<channelId>" }
-        // { "feed_url": { "channel": "<id>", "channel_name": "name", "channel_type": "forum" } }
-        // or { map: { ... } }
-        const candidate = mapJson.map || mapJson.mappings || mapJson || {};
-        // Merge feed->channel mapping
-        for (const [feedUrl, v] of Object.entries(candidate)) {
-          if (typeof v === 'string' || typeof v === 'number') {
-            mappings[feedUrl] = String(v);
-          } else if (v && typeof v === 'object') {
-            // prefer explicit channel id fields
-            const chId = v.channel || v.channel_id || v.id || v.discord_channel || null;
-            if (chId) mappings[feedUrl] = String(chId);
-            // if channel metadata present, record to channelsById
-            const recordedId = chId ? String(chId) : null;
-            if (recordedId) {
-              channelsById[recordedId] = channelsById[recordedId] || {};
-              if (v.channel_name) channelsById[recordedId].name = v.channel_name;
-              if (v.channel_display_name) channelsById[recordedId].name = v.channel_display_name;
-              if (v.name) channelsById[recordedId].name = v.name;
-              if (v.channel_type) channelsById[recordedId].type = v.channel_type;
-              if (v.type) channelsById[recordedId].type = v.type;
-            }
-          }
-        }
-      }
-    }
-  } catch (e) { console.debug('feed_map.json fetch failed', e); }
 
   try {
-    const chResp = await fetch(`${API_BASE}/channels.json`);
-    if (chResp.ok) {
-      const chJson = await chResp.json().catch(() => null);
+  try {
+    const chRes = await fetch(`${API_BASE}/api/public/channels`, { headers: { 'Content-Type': 'application/json' } });
+    if (chRes.ok) {
+      const chJson = await chRes.json().catch(() => null);
       if (chJson) {
-        if (Array.isArray(chJson)) channels = chJson;
-        else if (Array.isArray(chJson.channels)) channels = chJson.channels;
-        else if (Array.isArray(chJson.channel_list)) channels = chJson.channel_list;
+        const arr = Array.isArray(chJson) ? chJson : (Array.isArray(chJson.channels) ? chJson.channels : []);
+        channels = arr;
       }
     }
-  } catch (e) { console.debug('channels.json fetch failed', e); }
+  } catch (e) { console.debug('public channels fetch failed', e); }
 
   // Populate channelsById from channels array (channels.json) so lookups can resolve names/types
   try {
@@ -781,3 +749,4 @@
   </script>
 </body>
 </html>
+
