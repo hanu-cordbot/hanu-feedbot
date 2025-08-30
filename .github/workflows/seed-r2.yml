@@ -1,0 +1,33 @@
+name: Seed R2 Bucket
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_stats:
+        description: 'Upload docs/data/stats.json to dashboard/data/stats.json'
+        required: false
+        default: 'true'
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Seed R2 (create source files and publish stats.json)
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          FEEDS_R2_BUCKET: ${{ secrets.FEEDS_R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          set -e
+          python tools/seed_r2_bucket.py
+

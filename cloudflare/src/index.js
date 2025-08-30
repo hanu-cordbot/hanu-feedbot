@@ -40,6 +40,20 @@ async function handleRequest(event) {
       return new Response(text, { status: 200, headers: jsonCorsHeaders() });
     }
 
+    // Public channels list for display-only UIs
+    if (request.method === 'GET' && pathname === '/api/public/channels') {
+      const obj = await (FEEDS_BUCKET.get(`${SOURCE_PREFIX}/channels.json`) || FEEDS_BUCKET.get(`${DASH_PREFIX}/channels.json`));
+      if (!obj) return jsonResponse({ channels: [] }, 200);
+      try {
+        const txt = await obj.text();
+        const parsed = JSON.parse(txt);
+        const channels = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.channels) ? parsed.channels : []);
+        return jsonResponse({ channels }, 200);
+      } catch (e) {
+        return jsonResponse({ channels: [] }, 200);
+      }
+    }
+
     // Admin upload endpoint: write JSON to R2. Requires Authorization: Bearer <ADMIN_TOKEN>
     if (request.method === 'POST' && pathname === '/api/admin/upload') {
       const auth = request.headers.get('Authorization') || '';

@@ -265,6 +265,7 @@ class HanuAPI {
   // ===== CHANNEL MANAGEMENT =====
 
   async getChannels() {
+    // Prefer admin API when available; otherwise fall back to public list
     if (this.localDataEnabled) {
       try {
         const meta = await this.loadDataSmart('/api/channels', 'meta.json');
@@ -273,7 +274,23 @@ class HanuAPI {
         console.warn('Failed to load local meta.json for channels:', err);
       }
     }
-    return this.get('/api/channels');
+    try {
+      return await this.get('/api/channels');
+    } catch (error) {
+      console.warn('Admin channels endpoint unavailable, falling back to public:', error);
+      try {
+        const url = `${this.baseUrl}/api/public/channels`;
+        const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+        const data = await response.json();
+        if (Array.isArray(data)) return { channels: data };
+        if (Array.isArray(data.channels)) return { channels: data.channels };
+        return { channels: [] };
+      } catch (pubErr) {
+        console.warn('Public channels endpoint unavailable:', pubErr);
+        return { channels: [] };
+      }
+    }
   }
 
   async addChannel(channelId) {
