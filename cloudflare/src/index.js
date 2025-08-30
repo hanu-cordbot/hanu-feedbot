@@ -41,6 +41,24 @@ async function getJson(key) {
   try { return JSON.parse(txt); } catch { return null; }
 }
 
+// Convert any group mapping to canonical { groupName: [feedUrl, ...] }
+function toCanonicalGroupMap(obj) {
+  if (!obj || typeof obj !== 'object') return {};
+  // If values are arrays, assume already canonical
+  let isCanonical = true;
+  for (const v of Object.values(obj)) { if (!Array.isArray(v)) { isCanonical = false; break; } }
+  if (isCanonical) return obj;
+  // Otherwise treat as feed->group and invert
+  const out = {};
+  for (const [feed, grp] of Object.entries(obj)) {
+    if (!grp) continue;
+    const g = String(grp);
+    if (!out[g]) out[g] = [];
+    out[g].push(feed);
+  }
+  return out;
+}
+
 async function handlePublicFeeds() {
   // Try stats first
   const stats = await getJson(`${dashPrefix()}/stats.json`);
@@ -99,7 +117,8 @@ async function handlePublicFeeds() {
   const ch = await getJson(`${sourcePrefix()}/channels.json`) || await getJson(`${dashPrefix()}/channels.json`) || [];
   if (Array.isArray(ch)) channels = ch; else if (Array.isArray(ch.channels)) channels = ch.channels;
 
-  const groups = (await getJson(`${sourcePrefix()}/groups.json`)) || (await getJson(`${dashPrefix()}/groups.json`)) || {};
+  const groupsRaw = (await getJson(`${sourcePrefix()}/groups.json`)) || (await getJson(`${dashPrefix()}/groups.json`)) || {};
+  const groups = toCanonicalGroupMap(groupsRaw);
 
   return jsonResponse({
     last_updated: lastUpdated,
@@ -160,12 +179,6 @@ async function handleRequest({ request }) {
     return await handlePublicFeeds();
   }
 
-  if (request.method === 'GET' && pathname === '/api/public/channels') {
-    const ch = await getJson(`${sourcePrefix()}/channels.json`) || await getJson(`${dashPrefix()}/channels.json`) || [];
-    const channels = Array.isArray(ch) ? ch : (Array.isArray(ch.channels) ? ch.channels : []);
-    return jsonResponse({ channels }, 200);
-  }
-
   if (request.method === 'GET' && pathname === '/api/public/meta') {
     const meta = await getText(`${dashPrefix()}/meta.json`);
     if (!meta) return jsonResponse({ error: 'not_found' }, 404);
@@ -175,6 +188,13 @@ async function handleRequest({ request }) {
     const stats = await getText(`${dashPrefix()}/stats.json`);
     if (!stats) return jsonResponse({ error: 'not_found' }, 404);
     return new Response(stats, { status: 200, headers: jsonCorsHeaders() });
+  }
+
+  // Public: channels list (no auth)
+  if (request.method === 'GET' && pathname === '/api/public/channels') {
+    const ch = await getJson(`${sourcePrefix()}/channels.json`) || await getJson(`${dashPrefix()}/channels.json`) || [];
+    const arr = Array.isArray(ch) ? ch : (Array.isArray(ch.channels) ? ch.channels : []);
+    return jsonResponse({ channels: arr }, 200);
   }
 
   // ---- Admin: helper for bearer verification ----
@@ -233,13 +253,37 @@ async function handleRequest({ request }) {
     if (request.method === 'POST') {
       const body = await request.json().catch(() => ({}));
       const id = (body.channelId || body.id || '').toString().trim();
-      const name = (body.channelName || body.name || '').toString();
-      const type = (body.channelType || body.type || 'text').toString();
+      let name = (body.channelName || body.name || '').toString();
+      let type = (body.channelType || body.type || '').toString();
       if (!id) return jsonResponse({ error: 'channelId required' }, 400);
+      // Auto-enrich from Discord when possible
+      if ((!name || !type) && globalThis.DISCORD_BOT_TOKEN) {
+        try {
+          const resp = await fetch(`https://discord.com/api/v10/channels/${id}`, {
+            headers: { 'Authorization': `Bot ${globalThis.DISCORD_BOT_TOKEN}` }
+          });
+          if (resp.ok) {
+            const info = await resp.json();
+            const mapType = (t) => {
+              switch (t) {
+                case 0: return 'text';
+                case 2: return 'voice';
+                case 4: return 'category';
+                case 5: return 'announcement';
+                case 13: return 'stage';
+                case 15: return 'forum';
+                default: return 'text';
+              }
+            };
+            name = name || info.name || '';
+            type = type || mapType(info.type);
+          }
+        } catch (_) {}
+      }
       const ch = await getJson(key) || [];
       const arr = Array.isArray(ch) ? ch : (Array.isArray(ch.channels) ? ch.channels : []);
       const idx = arr.findIndex(x => String(x.id) === id);
-      const next = { id, ...(name && { name }), ...(type && { type }) };
+      const next = { id, ...(name && { name }), ...(type && { type: type || 'text' }) };
       if (idx >= 0) arr[idx] = { ...arr[idx], ...next }; else arr.push(next);
       await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(arr, null, 2), { httpMetadata: { contentType: 'application/json' } });
       return jsonResponse({ success: true, channel: next }, 200);
@@ -253,6 +297,36 @@ async function handleRequest({ request }) {
       const filtered = channels.filter(ch => String(ch.id) !== id);
       await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(filtered, null, 2), { httpMetadata: { contentType: 'application/json' } });
       return jsonResponse({ success: true }, 200);
+    }
+  }
+
+  // Admin: fetch single channel info from Discord
+  if (request.method === 'POST' && pathname === '/api/channels/fetch-name') {
+    if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
+    const body = await request.json().catch(() => ({}));
+    const id = (body.channelId || body.id || '').toString().trim();
+    if (!id) return jsonResponse({ success: false, error: 'channelId required' }, 400);
+    if (!globalThis.DISCORD_BOT_TOKEN) return jsonResponse({ success: false, error: 'DISCORD_BOT_TOKEN not configured' }, 400);
+    try {
+      const resp = await fetch(`https://discord.com/api/v10/channels/${id}`, {
+        headers: { 'Authorization': `Bot ${globalThis.DISCORD_BOT_TOKEN}` }
+      });
+      if (!resp.ok) return jsonResponse({ success: false, error: `discord_http_${resp.status}` }, resp.status);
+      const info = await resp.json();
+      const mapType = (t) => {
+        switch (t) {
+          case 0: return 'text';
+          case 2: return 'voice';
+          case 4: return 'category';
+          case 5: return 'announcement';
+          case 13: return 'stage';
+          case 15: return 'forum';
+          default: return 'text';
+        }
+      };
+      return jsonResponse({ success: true, channel: { id, name: info.name || `channel-${id.slice(-4)}`, type: mapType(info.type) } }, 200);
+    } catch (e) {
+      return jsonResponse({ success: false, error: String(e) }, 500);
     }
   }
 
@@ -270,18 +344,79 @@ async function handleRequest({ request }) {
     return jsonResponse({ success: true, mappings: m }, 200);
   }
 
-  // ---- Admin: groups.json (simple map feed->group) ----
+  // ---- Admin: update feed->group assignment (persisted as group->list) ----
   if (request.method === 'POST' && pathname === '/api/feed-groups') {
     if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
     const body = await request.json().catch(() => ({}));
-    const feedUrl = (body.feedUrl || body.url || '').toString();
-    const groupName = (body.groupName || body.group || '').toString();
+    const feedUrl = (body.feedUrl || body.url || '').toString().trim();
+    const groupName = (body.groupName || body.group || '').toString().trim();
     if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
     const key = `${sourcePrefix()}/groups.json`;
-    const g = await getJson(key) || {};
-    if (groupName) g[feedUrl] = groupName; else delete g[feedUrl];
-    await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(g, null, 2), { httpMetadata: { contentType: 'application/json' } });
-    return jsonResponse({ success: true, groups: g }, 200);
+    const stored = await getJson(key) || {};
+    const groups = toCanonicalGroupMap(stored);
+    // Remove feed from all groups
+    for (const [g, arr] of Object.entries(groups)) {
+      if (!Array.isArray(arr)) continue;
+      const idx = arr.indexOf(feedUrl);
+      if (idx >= 0) arr.splice(idx, 1);
+      if (arr.length === 0) delete groups[g];
+    }
+    // Add to new group if provided
+    if (groupName) {
+      if (!groups[groupName]) groups[groupName] = [];
+      if (!groups[groupName].includes(feedUrl)) groups[groupName].push(feedUrl);
+    }
+    await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(groups, null, 2), { httpMetadata: { contentType: 'application/json' } });
+    return jsonResponse({ success: true, groups }, 200);
+  }
+
+  // ---- Admin: group list management (create/rename/delete) ----
+  if (pathname === '/api/groups') {
+    if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
+    const key = `${sourcePrefix()}/groups.json`;
+    if (request.method === 'GET') {
+      const stored = await getJson(key) || {};
+      const groups = toCanonicalGroupMap(stored);
+      return jsonResponse({ groups }, 200);
+    }
+    if (request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const name = (body.groupName || body.name || '').toString().trim();
+      if (!name) return jsonResponse({ error: 'groupName required' }, 400);
+      const stored = await getJson(key) || {};
+      const groups = toCanonicalGroupMap(stored);
+      if (!groups[name]) groups[name] = [];
+      await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(groups, null, 2), { httpMetadata: { contentType: 'application/json' } });
+      return jsonResponse({ success: true, groups }, 200);
+    }
+    if (request.method === 'PUT') {
+      const body = await request.json().catch(() => ({}));
+      const oldName = (body.oldName || body.old || '').toString().trim();
+      const newName = (body.newName || body.new || '').toString().trim();
+      if (!oldName || !newName) return jsonResponse({ error: 'oldName and newName required' }, 400);
+      const stored = await getJson(key) || {};
+      const groups = toCanonicalGroupMap(stored);
+      if (!groups[oldName]) return jsonResponse({ error: 'old_not_found' }, 404);
+      if (groups[newName]) return jsonResponse({ error: 'new_already_exists' }, 400);
+      groups[newName] = groups[oldName] || [];
+      delete groups[oldName];
+      await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(groups, null, 2), { httpMetadata: { contentType: 'application/json' } });
+      return jsonResponse({ success: true, groups }, 200);
+    }
+    if (request.method === 'DELETE') {
+      const url2 = new URL(request.url);
+      const qn = (url2.searchParams.get('name') || '').toString().trim();
+      const body = await request.json().catch(() => ({}));
+      const bn = (body && (body.groupName || body.name)) ? String(body.groupName || body.name).trim() : '';
+      const name = qn || bn;
+      if (!name) return jsonResponse({ error: 'groupName required' }, 400);
+      const stored = await getJson(key) || {};
+      const groups = toCanonicalGroupMap(stored);
+      if (!groups[name]) return jsonResponse({ error: 'not_found' }, 404);
+      delete groups[name];
+      await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(groups, null, 2), { httpMetadata: { contentType: 'application/json' } });
+      return jsonResponse({ success: true, groups }, 200);
+    }
   }
 
   return jsonResponse({ error: 'not_found' }, 404);

@@ -112,6 +112,58 @@ jobs:
             print('boto3 not available or download failed:', ex)
           PY
 
+      - name: Fetch channels.json from R2 (optional)
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          python - << 'PY'
+          import os, sys
+          b=os.getenv('R2_BUCKET'); a=os.getenv('R2_ACCESS_KEY_ID'); s=os.getenv('R2_SECRET_ACCESS_KEY'); e=os.getenv('R2_ENDPOINT')
+          if not b or not a or not s:
+            print('R2 not configured; skipping channels.json fetch')
+            sys.exit(0)
+          try:
+            import boto3, os
+            os.makedirs('dashboard/data/source', exist_ok=True)
+            c=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
+            for key in ['dashboard/data/source/channels.json','dashboard/data/channels.json','channels.json']:
+              try:
+                c.download_file(b, key, 'dashboard/data/source/channels.json'); print('Downloaded', key); break
+              except Exception as ex:
+                print('Could not download', key, '-', ex)
+          except Exception as ex:
+            print('boto3 not available or download failed:', ex)
+          PY
+
+      - name: Fetch groups.json from R2 (optional)
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          python - << 'PY'
+          import os, sys
+          b=os.getenv('R2_BUCKET'); a=os.getenv('R2_ACCESS_KEY_ID'); s=os.getenv('R2_SECRET_ACCESS_KEY'); e=os.getenv('R2_ENDPOINT')
+          if not b or not a or not s:
+            print('R2 not configured; skipping groups.json fetch')
+            sys.exit(0)
+          try:
+            import boto3, os
+            os.makedirs('dashboard/data/source', exist_ok=True)
+            c=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
+            for key in ['dashboard/data/source/groups.json','dashboard/data/groups.json','groups.json']:
+              try:
+                c.download_file(b, key, 'dashboard/data/source/groups.json'); print('Downloaded', key); break
+              except Exception as ex:
+                print('Could not download', key, '-', ex)
+          except Exception as ex:
+            print('boto3 not available or download failed:', ex)
+          PY
+
       - name: Fetch feeds.txt from R2
         env:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
