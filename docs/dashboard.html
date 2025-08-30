@@ -265,6 +265,17 @@
           btn.onclick = () => window.testRunIgnoreSeen();
           header.appendChild(btn);
         }
+        // If a header button exists, move it behind login into main content
+        try {
+          const hdrBtn = document.getElementById('btn-test-run');
+          const main = document.getElementById('main-content');
+          if (hdrBtn && hdrBtn.closest('.header') && main) {
+            const wrap2 = document.createElement('div');
+            wrap2.className = 'controls mb-15';
+            wrap2.appendChild(hdrBtn);
+            main.insertBefore(wrap2, main.firstChild);
+          }
+        } catch (_) {}
       } catch (_) {}
     });
     

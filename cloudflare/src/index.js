@@ -257,21 +257,47 @@ async function handleRequest({ request }) {
 
   // ---- System health (public) ----
   if (request.method === 'GET' && pathname === '/api/system-health') {
-    const out = { status: 'ok', checks: {} };
-    try {
-      const stats = await getJson(`${dashPrefix()}/stats.json`);
-      out.checks.stats = !!stats;
-      if (stats && stats.stats && stats.stats.last_updated) out.last_updated = stats.stats.last_updated;
-    } catch (_) { out.checks.stats = false; }
-    const keys = [
-      `${sourcePrefix()}/feed_map.json`,
-      `${sourcePrefix()}/channels.json`,
-      `${sourcePrefix()}/groups.json`,
-      `${dashPrefix()}/stats.json`
-    ];
+    const out = { status: 'ok', metrics: {}, checks: {} };
+    // Load stats.json
+    let s = null;
+    try { s = await getJson(`${dashPrefix()}/stats.json`); } catch (_) {}
+    const stats = s && s.stats ? s.stats : null;
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const recentLimit = 14 * dayMs;
+
+    // Compute metrics
+    let feedHealth = stats && stats.feed_health ? stats.feed_health : {};
+    if (feedHealth && typeof feedHealth === 'object') {
+      let feedsTotal = 0, mapped = 0, active = 0, stale = 0;
+      for (const fh of Object.values(feedHealth)) {
+        if (!fh || typeof fh !== 'object') continue;
+        feedsTotal++;
+        const lp = fh.last_post ? new Date(fh.last_post).getTime() : 0;
+        const hasRecent = lp && (now - lp) <= recentLimit;
+        const hasChannel = !!(fh.channel && fh.channel.id);
+        if (hasChannel) mapped++;
+        if (hasRecent) active++; else stale++;
+      }
+      out.metrics = { feedsTotal, mapped, active, stale, last_updated: stats.last_updated || null };
+      // Checks
+      out.checks.stats = true;
+      out.checks.last_updated_recent = !!(stats && stats.last_updated && (now - new Date(stats.last_updated).getTime()) <= dayMs);
+      out.checks.activity_ok = active > 0;
+    } else {
+      out.checks.stats = false;
+    }
+
+    // Presence checks for config files
+    const keys = [ `${sourcePrefix()}/feed_map.json`, `${sourcePrefix()}/channels.json`, `${sourcePrefix()}/groups.json`, `${dashPrefix()}/stats.json` ];
     for (const k of keys) {
       try { out.checks[k] = !!(await getText(k)); } catch (_) { out.checks[k] = false; }
     }
+
+    // Status derivation
+    if (!out.checks.stats || !out.checks.last_updated_recent) out.status = 'degraded';
+    if (out.metrics && out.metrics.feedsTotal > 0 && out.metrics.active === 0) out.status = 'degraded';
+
     return jsonResponse(out, 200);
   }
 
@@ -295,7 +321,7 @@ async function handleRequest({ request }) {
     const body = await request.json().catch(() => ({}));
     const ignoreSeen = !!(body && (body.ignoreSeen || body.ignore_seen));
     const repo = (typeof globalThis.GITHUB_REPO !== 'undefined' && globalThis.GITHUB_REPO) ? globalThis.GITHUB_REPO : 'hanu-cordbot/hanu-feedbot';
-    const token = (typeof globalThis.GITHUB_PAT !== 'undefined' && globalThis.GITHUB_PAT) ? globalThis.GITHUB_PAT : (typeof globalThis.GITHUB_TOKEN !== 'undefined' ? globalThis.GITHUB_TOKEN : null);
+    const token = (globalThis.GITHUB_PAT || globalThis.GITHUB_TOKEN || globalThis.GH_BOT_PAT || globalThis.GH_BOT_TOKEN || null);
     if (!token) return jsonResponse({ error: 'github_token_missing' }, 500);
     try {
       const resp = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/feed-bot.yml/dispatches`, {
@@ -553,6 +579,8 @@ export default {
           if (typeof env.RAILWAY_BASE !== 'undefined') globalThis.RAILWAY_BASE = env.RAILWAY_BASE;
           if (typeof env.GITHUB_REPO !== 'undefined') globalThis.GITHUB_REPO = env.GITHUB_REPO;
           if (typeof env.GITHUB_PAT !== 'undefined') globalThis.GITHUB_PAT = env.GITHUB_PAT;
+          if (typeof env.GH_BOT_PAT !== 'undefined') globalThis.GH_BOT_PAT = env.GH_BOT_PAT;
+          if (typeof env.GH_BOT_TOKEN !== 'undefined') globalThis.GH_BOT_TOKEN = env.GH_BOT_TOKEN;
           if (typeof env.GITHUB_TOKEN !== 'undefined') globalThis.GITHUB_TOKEN = env.GITHUB_TOKEN;
         }
       } catch (_) {}

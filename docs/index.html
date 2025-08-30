@@ -350,14 +350,13 @@
     try { twemoji.parse(document.body, { folder: 'svg', ext: '.svg' }); } catch (e) {}
     }
 
-    // Return status: 'active', 'unmapped', or 'inactive'
+    // Return status: 'active' (recent + mapped), 'unmapped' (recent + no map), or 'inactive' (older than 14 days)
     function getFeedStatus(feed) {
       const channelId = mappings[feed.url] || feed.channel;
       const lastPost = getLastPost(feed);
       const hasRecent = lastPost && (Date.now() - new Date(lastPost)) <= (14 * 24 * 60 * 60 * 1000);
-
-      if (channelId) return 'active';
-      if (hasRecent) return 'unmapped';
+      if (hasRecent && channelId) return 'active';
+      if (hasRecent && !channelId) return 'unmapped';
       return 'inactive';
     }
 
@@ -652,14 +651,9 @@
     }
 
     function isActiveFeed(feed) {
-      // Enhanced activity detection: mapped to channel OR has post within 14 days
-      const channelId = mappings[feed.url];
-      const hasMappedChannel = !!channelId;
-      
+      // Active only if the last post is within 14 days (mapping does not override age)
       const lastPost = getLastPost(feed);
-      const hasRecentPost = lastPost && (Date.now() - new Date(lastPost)) <= (14 * 24 * 60 * 60 * 1000); // 14 days
-      
-      return hasMappedChannel || hasRecentPost;
+      return !!(lastPost && (Date.now() - new Date(lastPost)) <= (14 * 24 * 60 * 60 * 1000));
     }
 
     function formatDate(dateStr) {
@@ -668,14 +662,13 @@
       const iso = /(?:Z|[+\-]\d{2}:\d{2})$/.test(dateStr) ? dateStr : dateStr + 'Z';
       const date = new Date(iso);
       const now = new Date();
-      const diffHours = Math.floor((now - date) / (1000 * 60 * 60));
-      
-      if (diffHours < 24) {
-        return diffHours < 1 ? 'Just now' : `${diffHours}h ago`;
-      } else {
-        const diffDays = Math.floor(diffHours / 24);
-        return `${diffDays}d ago`;
+      const sameDay = date.getUTCFullYear() === now.getUTCFullYear() && date.getUTCMonth() === now.getUTCMonth() && date.getUTCDate() === now.getUTCDate();
+      if (sameDay) {
+        return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
       }
+      const diffHours = Math.floor((now - date) / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffHours / 24);
+      return diffDays < 1 ? '1d ago' : `${diffDays}d ago`;
     }
 
     // Control functions
