@@ -6,11 +6,11 @@ from typing import Optional
 
 def upload_file(file_obj: io.BytesIO, key: str, size: int) -> Optional[str]:
     """Upload file-like object to R2-compatible S3 and return public URL or None."""
-    bucket = os.getenv('R2_BUCKET')
+    bucket = os.getenv('R2_VIDEO_BUCKET') or os.getenv('R2_BUCKET')
     access = os.getenv('R2_ACCESS_KEY_ID')
     secret = os.getenv('R2_SECRET_ACCESS_KEY')
     endpoint = os.getenv('R2_ENDPOINT')
-    public_base = os.getenv('R2_PUBLIC_BASE')
+    public_base = os.getenv('R2_VIDEO_PUBLIC_URL') or os.getenv('R2_PUBLIC_BASE')
 
     if not (bucket and access and secret and endpoint):
         raise RuntimeError('R2 credentials not configured')
@@ -30,3 +30,4 @@ def upload_file(file_obj: io.BytesIO, key: str, size: int) -> Optional[str]:
     if account_id:
         return f"https://{account_id}.r2.cloudflarestorage.com/{bucket}/{key}"
     return None
+
