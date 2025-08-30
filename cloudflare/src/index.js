@@ -124,6 +124,38 @@ async function handleRequest({ request }) {
     return jsonResponse({ status: 'ok' }, 200);
   }
 
+  // ---- Auth endpoints ----
+  if (request.method === 'POST' && pathname === '/api/auth/login') {
+    try {
+      const body = await request.json().catch(() => ({}));
+      const user = (body.username || '').toString();
+      const pass = (body.password || '').toString();
+      const U = (typeof globalThis.ADMIN_USER_BINDING !== 'undefined' && globalThis.ADMIN_USER_BINDING) ? globalThis.ADMIN_USER_BINDING : 'admin';
+      const P = (typeof globalThis.ADMIN_PASS_BINDING !== 'undefined' && globalThis.ADMIN_PASS_BINDING) ? globalThis.ADMIN_PASS_BINDING : '';
+      if (user === U && pass === P && P) {
+        const now = Math.floor(Date.now() / 1000);
+        const token = btoa(JSON.stringify({ user, exp: now + 3600 }));
+        return jsonResponse({ success: true, token }, 200);
+      }
+      return jsonResponse({ success: false, error: 'invalid_credentials' }, 401);
+    } catch (e) {
+      return jsonResponse({ success: false, error: 'internal_error' }, 500);
+    }
+  }
+  if (request.method === 'GET' && pathname === '/api/status') {
+    const auth = request.headers.get('Authorization') || '';
+    if (!auth.startsWith('Bearer ')) return jsonResponse({ error: 'Authentication required' }, 401);
+    const token = auth.slice('Bearer '.length).trim();
+    try {
+      if (typeof globalThis.ADMIN_TOKEN !== 'undefined' && globalThis.ADMIN_TOKEN && token === globalThis.ADMIN_TOKEN) {
+        return jsonResponse({ status: 'ok' }, 200);
+      }
+      const decoded = JSON.parse(atob(token));
+      if (decoded.exp && decoded.exp > Math.floor(Date.now() / 1000)) return jsonResponse({ status: 'ok' }, 200);
+    } catch (_) {}
+    return jsonResponse({ error: 'Authentication required' }, 401);
+  }
+
   if (request.method === 'GET' && pathname === '/api/public/feeds') {
     return await handlePublicFeeds();
   }
@@ -143,6 +175,113 @@ async function handleRequest({ request }) {
     const stats = await getText(`${dashPrefix()}/stats.json`);
     if (!stats) return jsonResponse({ error: 'not_found' }, 404);
     return new Response(stats, { status: 200, headers: jsonCorsHeaders() });
+  }
+
+  // ---- Admin: helper for bearer verification ----
+  function isAuthorized() {
+    const auth = request.headers.get('Authorization') || '';
+    if (!auth.startsWith('Bearer ')) return false;
+    const token = auth.slice('Bearer '.length).trim();
+    try {
+      if (typeof globalThis.ADMIN_TOKEN !== 'undefined' && globalThis.ADMIN_TOKEN && token === globalThis.ADMIN_TOKEN) return true;
+      const decoded = JSON.parse(atob(token));
+      return !!(decoded && decoded.exp && decoded.exp > Math.floor(Date.now() / 1000));
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ---- Admin: feeds.txt management ----
+  if (pathname === '/api/feeds') {
+    if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
+    if (request.method === 'GET') {
+      const txt = await getText(`${sourcePrefix()}/feeds.txt`) || await getText(`${dashPrefix()}/feeds.txt`) || '';
+      const feeds = (txt ? txt.split(/\r?\n/) : []).map(s => s.trim()).filter(Boolean);
+      return jsonResponse({ feeds }, 200);
+    }
+    if (request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const feedUrl = (body.feedUrl || body.url || '').toString().trim();
+      if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
+      const txt = (await getText(`${sourcePrefix()}/feeds.txt`)) || '';
+      const lines = txt.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      if (!lines.includes(feedUrl)) lines.push(feedUrl);
+      await globalThis.FEEDS_BUCKET.put(`${sourcePrefix()}/feeds.txt`, lines.join('\n') + '\n', { httpMetadata: { contentType: 'text/plain' } });
+      return jsonResponse({ success: true }, 200);
+    }
+    if (request.method === 'DELETE') {
+      const body = await request.json().catch(() => ({}));
+      const feedUrl = (body.feedUrl || body.url || '').toString().trim();
+      if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
+      const txt = (await getText(`${sourcePrefix()}/feeds.txt`)) || '';
+      const lines = txt.split(/\r?\n/).map(s => s.trim());
+      const filtered = lines.filter(l => l && l !== feedUrl);
+      await globalThis.FEEDS_BUCKET.put(`${sourcePrefix()}/feeds.txt`, (filtered.join('\n') + (filtered.length ? '\n' : '')), { httpMetadata: { contentType: 'text/plain' } });
+      return jsonResponse({ success: true }, 200);
+    }
+  }
+
+  // ---- Admin: channels.json management ----
+  if (pathname === '/api/channels') {
+    if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
+    const key = `${sourcePrefix()}/channels.json`;
+    if (request.method === 'GET') {
+      const ch = await getJson(key) || [];
+      const channels = Array.isArray(ch) ? ch : (Array.isArray(ch.channels) ? ch.channels : []);
+      return jsonResponse({ channels }, 200);
+    }
+    if (request.method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      const id = (body.channelId || body.id || '').toString().trim();
+      const name = (body.channelName || body.name || '').toString();
+      const type = (body.channelType || body.type || 'text').toString();
+      if (!id) return jsonResponse({ error: 'channelId required' }, 400);
+      const ch = await getJson(key) || [];
+      const arr = Array.isArray(ch) ? ch : (Array.isArray(ch.channels) ? ch.channels : []);
+      const idx = arr.findIndex(x => String(x.id) === id);
+      const next = { id, ...(name && { name }), ...(type && { type }) };
+      if (idx >= 0) arr[idx] = { ...arr[idx], ...next }; else arr.push(next);
+      await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(arr, null, 2), { httpMetadata: { contentType: 'application/json' } });
+      return jsonResponse({ success: true, channel: next }, 200);
+    }
+    if (request.method === 'DELETE') {
+      const body = await request.json().catch(() => ({}));
+      const id = (body.channelId || body.id || '').toString().trim();
+      if (!id) return jsonResponse({ error: 'channelId required' }, 400);
+      const arr = (await getJson(key)) || [];
+      const channels = Array.isArray(arr) ? arr : (Array.isArray(arr.channels) ? arr.channels : []);
+      const filtered = channels.filter(ch => String(ch.id) !== id);
+      await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(filtered, null, 2), { httpMetadata: { contentType: 'application/json' } });
+      return jsonResponse({ success: true }, 200);
+    }
+  }
+
+  // ---- Admin: feed_map.json (mappings) ----
+  if (request.method === 'POST' && pathname === '/api/feed-mappings') {
+    if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
+    const body = await request.json().catch(() => ({}));
+    const feedUrl = (body.feedUrl || body.url || '').toString();
+    const channelId = (body.channelId == null ? null : String(body.channelId));
+    if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
+    const key = `${sourcePrefix()}/feed_map.json`;
+    const m = await getJson(key) || {};
+    if (channelId) m[feedUrl] = channelId; else delete m[feedUrl];
+    await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(m, null, 2), { httpMetadata: { contentType: 'application/json' } });
+    return jsonResponse({ success: true, mappings: m }, 200);
+  }
+
+  // ---- Admin: groups.json (simple map feed->group) ----
+  if (request.method === 'POST' && pathname === '/api/feed-groups') {
+    if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
+    const body = await request.json().catch(() => ({}));
+    const feedUrl = (body.feedUrl || body.url || '').toString();
+    const groupName = (body.groupName || body.group || '').toString();
+    if (!feedUrl) return jsonResponse({ error: 'feedUrl required' }, 400);
+    const key = `${sourcePrefix()}/groups.json`;
+    const g = await getJson(key) || {};
+    if (groupName) g[feedUrl] = groupName; else delete g[feedUrl];
+    await globalThis.FEEDS_BUCKET.put(key, JSON.stringify(g, null, 2), { httpMetadata: { contentType: 'application/json' } });
+    return jsonResponse({ success: true, groups: g }, 200);
   }
 
   return jsonResponse({ error: 'not_found' }, 404);

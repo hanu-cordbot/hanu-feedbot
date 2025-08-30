@@ -150,7 +150,7 @@ def generate_stats():
                     feed_check['page_url'] = meta.get('page')
                 elif 'pageUrl' in meta:
                     feed_check['page_url'] = meta.get('pageUrl')
-                
+
             # Determine status based on current data
             if feed.bozo:
                 feed_check['status'] = 'error'
@@ -172,6 +172,33 @@ def generate_stats():
                 except Exception:
                     feed_check['title'] = 'Unknown Feed'
                     feed_check['description'] = ''
+
+            # If last_post is still missing, try to infer from entries
+            try:
+                if not feed_check.get('last_post') and getattr(feed, 'entries', None):
+                    import datetime
+                    def entry_ts(e):
+                        for key in ('published_parsed','updated_parsed'):
+                            t = getattr(e, key, None)
+                            if t:
+                                try:
+                                    return datetime.datetime(*t[:6], tzinfo=datetime.timezone.utc)
+                                except Exception:
+                                    pass
+                        for key in ('published','updated'):
+                            v = getattr(e, key, None)
+                            if v:
+                                try:
+                                    return datetime.datetime.fromisoformat(v.replace('Z','+00:00'))
+                                except Exception:
+                                    pass
+                        return None
+                    dates = [entry_ts(e) for e in feed.entries]
+                    dates = [d for d in dates if d]
+                    if dates:
+                        feed_check['last_post'] = max(dates).isoformat()
+            except Exception:
+                pass
 
             # Attach channel mapping and enrich with channel metadata
             try:
