@@ -165,9 +165,11 @@ async function handleRequest({ request }) {
       const body = await request.json().catch(() => ({}));
       const user = (body.username || '').toString();
       const pass = (body.password || '').toString();
-      const U = (typeof globalThis.ADMIN_USER_BINDING !== 'undefined' && globalThis.ADMIN_USER_BINDING) ? globalThis.ADMIN_USER_BINDING : 'admin';
-      const P = (typeof globalThis.ADMIN_PASS_BINDING !== 'undefined' && globalThis.ADMIN_PASS_BINDING) ? globalThis.ADMIN_PASS_BINDING : '';
-      if (user === U && pass === P && P) {
+      const U = (globalThis.ADMIN_USER_BINDING || globalThis.ADMIN_USER || 'admin');
+      const P = (globalThis.ADMIN_PASS_BINDING || globalThis.ADMIN_PASS || '');
+      const ALT = (globalThis.ADMIN_TOKEN || globalThis.GH_BOT_PAT || '');
+      // Accept either ADMIN_PASS (preferred), or alternate ADMIN_TOKEN / GH_BOT_PAT as password for convenience
+      if (user === U && (pass && (pass === P || pass === ALT))) {
         const now = Math.floor(Date.now() / 1000);
         const token = btoa(JSON.stringify({ user, exp: now + 3600 }));
         return jsonResponse({ success: true, token }, 200);
