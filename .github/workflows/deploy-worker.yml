@@ -25,15 +25,11 @@ jobs:
             GH_BOT_PAT
             ADMIN_PASS_BINDING
             ADMIN_USER_BINDING
-            ADMIN_TOKEN
-            ADMIN_USER
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GH_BOT_PAT: ${{ secrets.GH_BOT_PAT }}
           ADMIN_PASS_BINDING: ${{ secrets.ADMIN_PASS }}
           ADMIN_USER_BINDING: admin
-          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
-          ADMIN_USER: admin
 
         # Note: this action requires the repo to have a valid cloudflare/wrangler
         # config in cloudflare/wrangler.toml and the secret CF_API_TOKEN configured
