@@ -117,6 +117,22 @@ async function handlePublicFeeds() {
   const ch = await getJson(`${sourcePrefix()}/channels.json`) || await getJson(`${dashPrefix()}/channels.json`) || [];
   if (Array.isArray(ch)) channels = ch; else if (Array.isArray(ch.channels)) channels = ch.channels;
 
+  // Merge channels from meta.json if available (helps when generator wrote richer data)
+  try {
+    const meta = await getJson(`${dashPrefix()}/meta.json`);
+    const metaChannels = (meta && (Array.isArray(meta.channels) ? meta.channels : (Array.isArray(meta.channels?.channels) ? meta.channels.channels : []))) || [];
+    if (metaChannels && metaChannels.length) {
+      const byId = new Map((channels || []).map(c => [String(c.id), c]));
+      for (const c of metaChannels) {
+        const id = c && c.id != null ? String(c.id) : null;
+        if (!id) continue;
+        const cur = byId.get(id) || {};
+        byId.set(id, { id, ...(cur || {}), ...(c || {}) });
+      }
+      channels = Array.from(byId.values());
+    }
+  } catch (_) {}
+
   const groupsRaw = (await getJson(`${sourcePrefix()}/groups.json`)) || (await getJson(`${dashPrefix()}/groups.json`)) || {};
   const groups = toCanonicalGroupMap(groupsRaw);
 
@@ -192,8 +208,50 @@ async function handleRequest({ request }) {
 
   // Public: channels list (no auth)
   if (request.method === 'GET' && pathname === '/api/public/channels') {
-    const ch = await getJson(`${sourcePrefix()}/channels.json`) || await getJson(`${dashPrefix()}/channels.json`) || [];
-    const arr = Array.isArray(ch) ? ch : (Array.isArray(ch.channels) ? ch.channels : []);
+    let ch = await getJson(`${sourcePrefix()}/channels.json`) || await getJson(`${dashPrefix()}/channels.json`) || [];
+    let arr = Array.isArray(ch) ? ch : (Array.isArray(ch.channels) ? ch.channels : []);
+    // Merge from meta.json if richer data available
+    try {
+      const meta = await getJson(`${dashPrefix()}/meta.json`);
+      const metaArr = (meta && (Array.isArray(meta.channels) ? meta.channels : (Array.isArray(meta.channels?.channels) ? meta.channels.channels : []))) || [];
+      if (metaArr && metaArr.length) {
+        const byId = new Map((arr || []).map(c => [String(c.id), c]));
+        for (const c of metaArr) {
+          const id = c && c.id != null ? String(c.id) : null;
+          if (!id) continue;
+          const cur = byId.get(id) || {};
+          byId.set(id, { id, ...(cur || {}), ...(c || {}) });
+        }
+        arr = Array.from(byId.values());
+      }
+    } catch (_) {}
+    // Opportunistic enrichment for records missing name/type (if token available)
+    try {
+      if (globalThis.DISCORD_BOT_TOKEN && Array.isArray(arr)) {
+        const missing = arr.filter(c => !c || !c.id || !c.name || !c.type).slice(0, 20);
+        for (const c of missing) {
+          const id = String(c.id);
+          try {
+            const resp = await fetch(`https://discord.com/api/v10/channels/${id}`, { headers: { 'Authorization': `Bot ${globalThis.DISCORD_BOT_TOKEN}` } });
+            if (resp.ok) {
+              const j = await resp.json();
+              const mapType = (t) => {
+                switch (t) { case 0: return 'text'; case 2: return 'voice'; case 4: return 'category'; case 5: return 'announcement'; case 13: return 'stage'; case 15: return 'forum'; default: return 'text'; }
+              };
+              c.name = c.name || j.name || `channel-${id.slice(-4)}`;
+              c.type = c.type || mapType(j.type);
+            }
+          } catch (_) {}
+        }
+        // Persist back to source for caching if we enriched any
+        if (missing.length) {
+          try {
+            const byId = new Map(arr.map(x => [String(x.id), x]));
+            await globalThis.FEEDS_BUCKET.put(`${sourcePrefix()}/channels.json`, JSON.stringify(Array.from(byId.values()), null, 2), { httpMetadata: { contentType: 'application/json' } });
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
     return jsonResponse({ channels: arr }, 200);
   }
 
