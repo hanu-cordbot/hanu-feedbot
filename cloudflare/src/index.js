@@ -27,6 +27,10 @@ async function handleRequest(event) {
   }
 
   try {
+    // Simple health endpoint for dashboards
+    if (request.method === 'GET' && (pathname === '/health' || pathname === '/api/health')) {
+      return jsonResponse({ status: 'ok', service: 'hanu-api-proxy' }, 200);
+    }
     // Public read endpoints (serve JSON from R2)
     if (request.method === 'GET' && (pathname === '/api/public/meta' || pathname === '/api/public/stats')) {
       const key = mapPathToKey(pathname);
