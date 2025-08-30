@@ -208,7 +208,7 @@
   <script type="module" src="./shared/auth.js"></script>
   <script type="module">
     import HanuAuth from './shared/auth.js';
-    import HanuAPI, { runBotTest } from './shared/api.js';
+    import HanuAPI from './shared/api.js';
 
     // Initialization: wait for DOM and auth (unless local data mode), then load dashboard
     document.addEventListener('DOMContentLoaded', async () => {
@@ -238,10 +238,34 @@
       await loadDashboardData();
       setupPerformanceChart();
 
-      // Only auto-refresh in non-GitHub Pages environments to allow backend idling
-      if (!window.location.hostname.endsWith('github.io')) {
-        startAutoRefresh();
-      }
+      // Hide legacy controls/panels we no longer expose
+      try {
+        document.querySelectorAll('button[onclick="runJob()"], button[onclick="resetDailySummary()"], button[onclick="clearCache()"], button[onclick="refreshStatus()"]').forEach(btn => {
+          const wrap = btn.closest('.controls');
+          if (wrap) wrap.style.display = 'none'; else btn.style.display = 'none';
+        });
+        [
+          'Testing Panel',
+          'Recent Activity'
+        ].forEach(title => {
+          const h2 = Array.from(document.querySelectorAll('h2')).find(el => (el.textContent||'').includes(title));
+          if (h2) {
+            const sec = h2.closest('.section');
+            if (sec) sec.style.display = 'none';
+          }
+        });
+        // Insert a minimal test-run button near the header if not present
+        const header = document.querySelector('.header');
+        if (header && !document.getElementById('btn-test-run')) {
+          const btn = document.createElement('button');
+          btn.id = 'btn-test-run';
+          btn.className = 'btn btn-success';
+          btn.style.marginTop = '10px';
+          btn.textContent = '🧪 Test Run (ignore seen)';
+          btn.onclick = () => window.testRunIgnoreSeen();
+          header.appendChild(btn);
+        }
+      } catch (_) {}
     });
     
     let feedsData = [];
@@ -1036,6 +1060,17 @@
         await loadFeeds();
       } catch (e) {
         console.warn('Failed to fetch channel names:', e);
+      }
+    };
+
+    // Minimal Test Run (ignore seen.json)
+    window.testRunIgnoreSeen = async function() {
+      try {
+        showAlert('Dispatching test run (ignore seen)…', 'info');
+        await HanuAPI.runJob({ ignoreSeen: true });
+        showAlert('Test run dispatched. Check GitHub Actions.', 'success');
+      } catch (e) {
+        showAlert('Failed to dispatch test run: ' + e.message, 'danger');
       }
     };
 

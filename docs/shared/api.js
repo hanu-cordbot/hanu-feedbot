@@ -469,8 +469,12 @@ class HanuAPI {
   
   // ===== JOB MANAGEMENT =====
   // Trigger a new bot run job
-  async runJob() {
-    return this.post('/api/run-job');
+  async runJob(options = {}) {
+    return this.post('/api/run-job', { ignoreSeen: !!options.ignoreSeen });
+  }
+
+  async getSystemHealth() {
+    return this.get('/api/system-health');
   }
 
   // ===== SETTINGS MANAGEMENT =====

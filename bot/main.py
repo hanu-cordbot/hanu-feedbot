@@ -140,6 +140,12 @@ def _split_message_by_newline(content: str, limit: int = 2000) -> list[str]:
 def load_seen_guids():
     """Loads the set of processed post IDs from the state file."""
     print(f"🔍 Loading seen guids from: {SEEN_FILE}")
+    try:
+        if os.getenv('IGNORE_SEEN', '').strip().lower() in ('1', 'true', 'yes'):
+            print('IGNORE_SEEN enabled; starting with empty seen set')
+            return set()
+    except Exception:
+        pass
     # If R2 is configured, try to download seen.json from R2 first
     try:
         client = r2_client()

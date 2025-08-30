@@ -255,6 +255,26 @@ async function handleRequest({ request }) {
     return jsonResponse({ channels: arr }, 200);
   }
 
+  // ---- System health (public) ----
+  if (request.method === 'GET' && pathname === '/api/system-health') {
+    const out = { status: 'ok', checks: {} };
+    try {
+      const stats = await getJson(`${dashPrefix()}/stats.json`);
+      out.checks.stats = !!stats;
+      if (stats && stats.stats && stats.stats.last_updated) out.last_updated = stats.stats.last_updated;
+    } catch (_) { out.checks.stats = false; }
+    const keys = [
+      `${sourcePrefix()}/feed_map.json`,
+      `${sourcePrefix()}/channels.json`,
+      `${sourcePrefix()}/groups.json`,
+      `${dashPrefix()}/stats.json`
+    ];
+    for (const k of keys) {
+      try { out.checks[k] = !!(await getText(k)); } catch (_) { out.checks[k] = false; }
+    }
+    return jsonResponse(out, 200);
+  }
+
   // ---- Admin: helper for bearer verification ----
   function isAuthorized() {
     const auth = request.headers.get('Authorization') || '';
@@ -266,6 +286,42 @@ async function handleRequest({ request }) {
       return !!(decoded && decoded.exp && decoded.exp > Math.floor(Date.now() / 1000));
     } catch (_) {
       return false;
+    }
+  }
+
+  // ---- Admin: trigger CI run (GitHub Actions) ----
+  if (request.method === 'POST' && pathname === '/api/run-job') {
+    if (!isAuthorized()) return jsonResponse({ error: 'Authentication required' }, 401);
+    const body = await request.json().catch(() => ({}));
+    const ignoreSeen = !!(body && (body.ignoreSeen || body.ignore_seen));
+    const repo = (typeof globalThis.GITHUB_REPO !== 'undefined' && globalThis.GITHUB_REPO) ? globalThis.GITHUB_REPO : 'hanu-cordbot/hanu-feedbot';
+    const token = (typeof globalThis.GITHUB_PAT !== 'undefined' && globalThis.GITHUB_PAT) ? globalThis.GITHUB_PAT : (typeof globalThis.GITHUB_TOKEN !== 'undefined' ? globalThis.GITHUB_TOKEN : null);
+    if (!token) return jsonResponse({ error: 'github_token_missing' }, 500);
+    try {
+      const resp = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/feed-bot.yml/dispatches`, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ref: 'main',
+          inputs: {
+            force_run: 'true',
+            debug_mode: 'false',
+            max_age_hours: '36',
+            ignore_seen: ignoreSeen ? 'true' : 'false'
+          }
+        })
+      });
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => '');
+        return jsonResponse({ error: 'github_dispatch_failed', status: resp.status, body: t }, 502);
+      }
+      return jsonResponse({ success: true }, 200);
+    } catch (e) {
+      return jsonResponse({ error: 'github_error', message: String(e) }, 500);
     }
   }
 
@@ -495,6 +551,9 @@ export default {
           if (typeof env.ADMIN_USER_BINDING !== 'undefined') globalThis.ADMIN_USER_BINDING = env.ADMIN_USER_BINDING;
           if (typeof env.ADMIN_PASS_BINDING !== 'undefined') globalThis.ADMIN_PASS_BINDING = env.ADMIN_PASS_BINDING;
           if (typeof env.RAILWAY_BASE !== 'undefined') globalThis.RAILWAY_BASE = env.RAILWAY_BASE;
+          if (typeof env.GITHUB_REPO !== 'undefined') globalThis.GITHUB_REPO = env.GITHUB_REPO;
+          if (typeof env.GITHUB_PAT !== 'undefined') globalThis.GITHUB_PAT = env.GITHUB_PAT;
+          if (typeof env.GITHUB_TOKEN !== 'undefined') globalThis.GITHUB_TOKEN = env.GITHUB_TOKEN;
         }
       } catch (_) {}
       return await handleRequest({ request, env, ctx });
