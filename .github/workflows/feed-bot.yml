@@ -79,15 +79,15 @@ jobs:
             sys.exit(0)
           try:
             import boto3, json, os
-            os.makedirs('dashboard/data', exist_ok=True)
+            os.makedirs('dashboard/data/source', exist_ok=True)
             c=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
-            for key in ['dashboard/data/feed_map.json','feed_map.json']:
+            for key in ['dashboard/data/source/feed_map.json','dashboard/data/feed_map.json','feed_map.json']:
               try:
-                c.download_file(b, key, 'dashboard/data/feed_map.json'); print('Downloaded', key); break
+                c.download_file(b, key, 'dashboard/data/source/feed_map.json'); print('Downloaded', key); break
               except Exception as ex:
                 print('Could not download', key, '-', ex)
-            if not os.path.exists('dashboard/data/feed_map.json'):
-              open('dashboard/data/feed_map.json','w').write('{}'); print('Wrote empty dashboard/data/feed_map.json')
+            if not os.path.exists('dashboard/data/source/feed_map.json'):
+              open('dashboard/data/source/feed_map.json','w').write('{}'); print('Wrote empty dashboard/data/source/feed_map.json')
           except Exception as ex:
             print('boto3 not available or download failed:', ex)
           PY
