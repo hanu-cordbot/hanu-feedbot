@@ -204,8 +204,12 @@ def generate_stats():
             try:
                 channel_id = feed_map.get(feed_url)  # Now just a string ID
                 if channel_id:
-                    # Load channels data for enrichment
-                    channels = (load_json_file('dashboard/data/channels.json', []) or (load_json_file('dashboard/data/channels.json', []) or load_json_file('channels.json', [])))
+                    # Load channels data for enrichment (prefer authoritative source)
+                    channels = (
+                        load_json_file('dashboard/data/source/channels.json', []) or
+                        load_json_file('dashboard/data/channels.json', []) or
+                        load_json_file('channels.json', [])
+                    )
                     channel_info = next((ch for ch in channels if str(ch.get('id')) == str(channel_id)), None)
                     
                     if channel_info:
