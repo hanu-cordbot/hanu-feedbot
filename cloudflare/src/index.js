@@ -138,6 +138,21 @@ async function handleRequest(event) {
         }
       }
 
+      // Fallback: if stats are missing, synthesize list from feeds.txt
+      if (feeds.length === 0) {
+        const feedsTxtObj = await (FEEDS_BUCKET.get(`${SOURCE_PREFIX}/feeds.txt`) || FEEDS_BUCKET.get(`${DASH_PREFIX}/feeds.txt`) || FEEDS_BUCKET.get('feeds.txt'));
+        if (feedsTxtObj) {
+          try {
+            const txt = await feedsTxtObj.text();
+            const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean).filter(l => !l.startsWith('#'));
+            feeds = lines.map(u => ({ url: u }));
+            totalFeeds = feeds.length;
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
       // Load mappings (feed_map.json)
       const mapObj = await (FEEDS_BUCKET.get(`${SOURCE_PREFIX}/feed_map.json`) || FEEDS_BUCKET.get(`${DASH_PREFIX}/feed_map.json`) || FEEDS_BUCKET.get('feed_map.json'));
       const mappings = {};

@@ -14,9 +14,11 @@ jobs:
       - name: Publish Cloudflare Worker
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
+          # Prefer standard secret name
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: cloudflare
-          command: publish
+          command: deploy
+          wranglerVersion: '4'
 
         # Note: this action requires the repo to have a valid cloudflare/wrangler
         # config in cloudflare/wrangler.toml and the secret CF_API_TOKEN configured
