@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -47,22 +47,22 @@
   <div class="container">
     <!-- Navigation -->
     <div class="nav">
-      <a href="index.html">🏠 Home</a>
-      <a href="dashboard.html" class="active">🤖 Dashboard</a>
-      <a href="prompt-editor.html">✏️ Prompt Editor</a>
-      <a href="stats.html">📊 Statistics</a>
-      <a href="analytics.html">📈 Analytics</a>
+      <a href="index.html">ðŸ  Home</a>
+      <a href="dashboard.html" class="active">ðŸ¤– Dashboard</a>
+      <a href="prompt-editor.html">âœï¸ Prompt Editor</a>
+      <a href="stats.html">ðŸ“Š Statistics</a>
+      <a href="analytics.html">ðŸ“ˆ Analytics</a>
     </div>
 
     <!-- Header -->
     <div class="header">
-      <h1>🤖 HANU Bot Dashboard</h1>
+      <h1>ðŸ¤– HANU Bot Dashboard</h1>
       <p>Control and monitor your Discord RSS bot</p>
     </div>
 
     <!-- Authentication -->
     <div class="auth-section" id="auth-section">
-      <h3>🔐 Authentication Required</h3>
+      <h3>ðŸ” Authentication Required</h3>
       <p>Please enter your authentication token to continue:</p>
       <input type="password" id="auth-token" placeholder="Enter AUTH_TOKEN">
       <button id="login-button">Login</button>
@@ -73,18 +73,18 @@
     <div id="main-content" class="hidden">
       <!-- Top Controls -->
       <div class="controls mb-15">
-        <button onclick="runJob()" class="btn btn-success">🚀 Run Job</button>
-        <button onclick="resetDailySummary()" class="btn btn-warning">🔄 Reset Summary</button>
-        <button onclick="clearCache()" class="btn btn-danger">🗑️ Clear Cache</button>
-        <button onclick="refreshStatus()" class="btn btn-secondary">🔄 Refresh</button>
+        <button onclick="runJob()" class="btn btn-success">ðŸš€ Run Job</button>
+        <button onclick="resetDailySummary()" class="btn btn-warning">ðŸ”„ Reset Summary</button>
+        <button onclick="clearCache()" class="btn btn-danger">ðŸ—‘ï¸ Clear Cache</button>
+        <button onclick="refreshStatus()" class="btn btn-secondary">ðŸ”„ Refresh</button>
       </div>
 
       <!-- Feed Management -->
       <div class="section">
-        <h2>📡 Feed Management</h2>
+        <h2>ðŸ“¡ Feed Management</h2>
         <div class="controls mb-15">
           <input type="url" id="new-feed-url" placeholder="Enter RSS feed URL" style="flex: 1; margin-right: 10px;">
-          <button onclick="addFeed()" class="btn btn-primary">➕ Add Feed</button>
+          <button onclick="addFeed()" class="btn btn-primary">âž• Add Feed</button>
         </div>
         <!-- Dashboard view controls -->
         <div class="controls">
@@ -96,7 +96,7 @@
           <a href="#" onclick="setGroupBy('status')" class="active" id="group-status">Status</a>
           <label>Sort by:</label>
           <a href="#" onclick="setSortBy('name')" id="sort-name">Name</a>
-          <a href="#" onclick="setSortBy('date')" class="active" id="sort-date">Date ↑</a>
+          <a href="#" onclick="setSortBy('date')" class="active" id="sort-date">Date â†‘</a>
           <a href="#" onclick="setSortBy('channel')" id="sort-channel">Channel</a>
           <label>Filter:</label>
           <a href="#" onclick="setFilter('all')" class="active" id="filter-all">All</a>
@@ -110,10 +110,10 @@
 
       <!-- Channel Management -->
       <div class="section">
-        <h2>💬 Channel Management</h2>
+        <h2>ðŸ’¬ Channel Management</h2>
         <div class="controls mb-15">
           <input type="text" id="new-channel-id" placeholder="Enter Discord Channel ID" style="flex: 1; margin-right: 10px;">
-          <button onclick="addChannel()" class="btn btn-primary">➕ Add Channel</button>
+          <button onclick="addChannel()" class="btn btn-primary">âž• Add Channel</button>
         </div>
         
         <div id="channels-container">
@@ -123,10 +123,10 @@
 
       <!-- Group Management -->
       <div class="section">
-        <h2>📂 Group Management</h2>
+        <h2>ðŸ“‚ Group Management</h2>
         <div class="controls mb-15">
           <input type="text" id="new-group-name" placeholder="Enter group name" style="flex: 1; margin-right: 10px;">
-          <button onclick="addGroup()" class="btn btn-primary">➕ Create Group</button>
+          <button onclick="addGroup()" class="btn btn-primary">âž• Create Group</button>
         </div>
         
         <div id="groups-container">
@@ -136,7 +136,7 @@
 
       <!-- Test Panel -->
       <div class="section">
-        <h2>🧪 Testing Panel</h2>
+        <h2>ðŸ§ª Testing Panel</h2>
         <div class="grid-2">
           <div class="card">
             <div class="card-header">
@@ -147,8 +147,8 @@
                 <option value="">Select channel...</option>
               </select>
               <textarea id="test-message" placeholder="Enter test message" rows="3" class="mb-10"></textarea>
-            <button onclick="testRunEndpoint()" class="btn btn-warning" style="margin-top:10px;">🧪 Test /run Endpoint</button>
-            <button onclick="resetSeenData()" class="btn btn-danger" style="margin-top:10px;">�️ Reset Seen Data</button>
+            <button onclick="testRunEndpoint()" class="btn btn-warning" style="margin-top:10px;">ðŸ§ª Test /run Endpoint</button>
+            <button onclick="resetSeenData()" class="btn btn-danger" style="margin-top:10px;">ï¿½ï¸ Reset Seen Data</button>
             </div>
           </div>
           
@@ -160,9 +160,9 @@
               <select id="test-feed-select" class="mb-10">
                 <option value="">Select feed...</option>
               </select>
-              <button onclick="testFeedParsing()" class="btn btn-info">🔍 Parse Feed</button>
-              <button onclick="getRandomEntry()" class="btn btn-secondary">🎲 Random Entry</button>
-              <button onclick="sendRandomPost()" class="btn btn-primary">🚀 Send Random Post</button>
+              <button onclick="testFeedParsing()" class="btn btn-info">ðŸ” Parse Feed</button>
+              <button onclick="getRandomEntry()" class="btn btn-secondary">ðŸŽ² Random Entry</button>
+              <button onclick="sendRandomPost()" class="btn btn-primary">ðŸš€ Send Random Post</button>
             </div>
           </div>
         </div>
@@ -174,7 +174,7 @@
 
       <!-- Recent Activity -->
       <div class="section">
-        <h2>📋 Recent Activity</h2>
+        <h2>ðŸ“‹ Recent Activity</h2>
         <div id="activity-feed">
           <div class="loading">Loading recent activity...</div>
         </div>
@@ -182,7 +182,7 @@
 
       <!-- System Health -->
       <div class="section">
-        <h2>🏥 System Health</h2>
+        <h2>ðŸ¥ System Health</h2>
         <div class="grid-2">
           <div class="card">
             <div class="card-header">
@@ -227,7 +227,7 @@
         // Display a notice about read-only mode (optional)
         const status = document.getElementById('auth-status');
         if (status) {
-          status.innerText = '🔎 Read-only local data mode enabled (no login required). Some actions are disabled.';
+          status.innerText = 'ðŸ”Ž Read-only local data mode enabled (no login required). Some actions are disabled.';
         }
       }
 
@@ -236,7 +236,7 @@
 
       // Load all data and start refresh
       await loadDashboardData();
-      setupPerformanceChart();
+      /* chart removed */
 
       // Hide legacy controls/panels we no longer expose
       try {
@@ -261,7 +261,7 @@
           btn.id = 'btn-test-run';
           btn.className = 'btn btn-success';
           btn.style.marginTop = '10px';
-          btn.textContent = '🧪 Test Run (ignore seen)';
+          btn.textContent = 'ðŸ§ª Test Run (ignore seen)';
           btn.onclick = () => window.testRunIgnoreSeen();
           header.appendChild(btn);
         }
@@ -332,7 +332,7 @@
     // Load all dashboard data
     async function loadDashboardData() {
       try {
-        console.log('📊 Loading dashboard data...');
+        console.log('ðŸ“Š Loading dashboard data...');
         
         // Load channels and resolve names before loading feeds
         await loadChannels();
@@ -345,7 +345,7 @@
         await loadHealthMetrics().catch(err => console.error('Health load failed:', err));
         
         populateTestSelects();
-        console.log('✅ Dashboard data loaded');
+        console.log('âœ… Dashboard data loaded');
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
         showAlert('Failed to load dashboard data: ' + error.message, 'danger');
@@ -380,9 +380,9 @@
       const container = document.getElementById('feeds-container');
       container.innerHTML = '<div class="loading">Loading feeds...</div>';
       try {
-        console.log('🔎 Fetching public dashboard data');
+        console.log('ðŸ”Ž Fetching public dashboard data');
         const data = await HanuAPI.getPublicFeeds();
-        console.log('📥 Public data received:', data);
+        console.log('ðŸ“¥ Public data received:', data);
         // Unpack data
         feedsData = data.feeds || [];
         // Fetch channels (with names) via admin API
@@ -491,7 +491,7 @@
             <td class="feed-date">${formatDate(metadataMap[feed.url]?.last_post)}</td>
             <td><select class="mapping-select" onchange="updateFeedMapping('${feed.url}', this.value)"><option value="">Not mapped</option>${channelsData.map(c => `<option value="${c.id}" ${c.id==feed.channelId?'selected':''}>${c.name||c.id}</option>`).join('')}</select></td>
             <td><select class="mapping-select" onchange="updateFeedGroup('${feed.url}', this.value)"><option value="">No group</option>${groupsData.map(g => `<option value="${g.name}" ${g.name===feed.groupName?'selected':''}>${g.name}</option>`).join('')}</select></td>
-            <td><button onclick="removeFeed('${feed.url}')" class="btn btn-sm btn-danger">🗑️</button></td>
+            <td><button onclick="removeFeed('${feed.url}')" class="btn btn-sm btn-danger">ðŸ—‘ï¸</button></td>
           </tr>`;
       });
       html += '</tbody></table>';
@@ -514,7 +514,7 @@
       html += `
           <div class="group-section">
             <div class="group-header" onclick="toggleGroup('${id}')">
-              <span class="group-arrow">▼</span> ${group} <span class="group-count">${count}</span>
+              <span class="group-arrow">â–¼</span> ${group} <span class="group-count">${count}</span>
             </div>
             <div class="group-content" id="${id}">
               <table class="feeds-table">
@@ -545,7 +545,7 @@
                   <td class="feed-date">${formatDate(metadataMap[feed.url]?.last_post)}</td>
                   <td><select class="mapping-select" onchange="updateFeedMapping('${feed.url}', this.value)"><option value="">Not mapped</option>${channelsData.map(c => `<option value="${c.id}" ${c.id==feed.channelId?'selected':''}>${c.name||c.id}</option>`).join('')}</select></td>
                   <td><select class="mapping-select" onchange="updateFeedGroup('${feed.url}', this.value)"><option value="">No group</option>${groupsData.map(g => `<option value="${g.name}" ${g.name===feed.groupName?'selected':''}>${g.name}</option>`).join('')}</select></td>
-                  <td><button onclick="removeFeed('${feed.url}')" class="btn btn-sm btn-danger">🗑️</button></td>
+                  <td><button onclick="removeFeed('${feed.url}')" class="btn btn-sm btn-danger">ðŸ—‘ï¸</button></td>
                 </tr>`;
         });
         html += '</tbody></table></div></div>';
@@ -590,7 +590,7 @@
               </div>
               <div class="item-actions">
                 <span class="badge bg-info">${feedCount} feeds</span>
-                <button onclick="removeChannel('${channel.id}')" class="btn btn-sm btn-danger">🗑️</button>
+                <button onclick="removeChannel('${channel.id}')" class="btn btn-sm btn-danger">ðŸ—‘ï¸</button>
               </div>
             </div>
           </div>
@@ -626,13 +626,13 @@
           <div class="list-item">
             <div class="flex-between">
               <div>
-                <div class="item-title">📂 ${group.name}</div>
+                <div class="item-title">ðŸ“‚ ${group.name}</div>
                 <small>${feedCount} feed(s) in this group</small>
               </div>
               <div class="item-actions">
                 <span class="badge bg-secondary">${feedCount} feeds</span>
-                <button onclick="renameGroup('${group.name}')" class="btn btn-sm btn-outline">✏️</button>
-                <button onclick="removeGroup('${group.name}')" class="btn btn-sm btn-danger">🗑️</button>
+                <button onclick="renameGroup('${group.name}')" class="btn btn-sm btn-outline">âœï¸</button>
+                <button onclick="removeGroup('${group.name}')" class="btn btn-sm btn-danger">ðŸ—‘ï¸</button>
               </div>
             </div>
           </div>
@@ -658,7 +658,7 @@
       
       // Build activity list UI
       let html = '<div class="activity-list">';
-      const iconMap = { success: '✅', warning: '⚠️', error: '❌', info: '📋' };
+      const iconMap = { success: 'âœ…', warning: 'âš ï¸', error: 'âŒ', info: 'ðŸ“‹' };
       activities.forEach(activity => {
         const time = new Date(activity.time);
         html += `
@@ -690,15 +690,15 @@
         const container = document.getElementById('health-metrics');
         const m = health && health.metrics ? health.metrics : {};
         const checks = health && health.checks ? health.checks : {};
-        const statusBadge = (health && health.status === 'ok') ? '🟢 OK' : '🟠 Degraded';
+        const statusBadge = (health && health.status === 'ok') ? 'ðŸŸ¢ OK' : 'ðŸŸ  Degraded';
         let html = '<div class="health-grid">';
         html += `
           <div class="health-item"><div class="health-label">Status</div><div class="health-status">${statusBadge}</div></div>
-          <div class="health-item"><div class="health-label">Feeds</div><div class="health-status">${m.feedsTotal ?? '—'}</div></div>
-          <div class="health-item"><div class="health-label">Mapped</div><div class="health-status">${m.mapped ?? '—'}</div></div>
-          <div class="health-item"><div class="health-label">Active ≤14d</div><div class="health-status">${m.active ?? '—'}</div></div>
-          <div class="health-item"><div class="health-label">Stale</div><div class="health-status">${m.stale ?? '—'}</div></div>
-          <div class="health-item"><div class="health-label">Last Updated</div><div class="health-status">${m.last_updated ?? '—'}</div></div>
+          <div class="health-item"><div class="health-label">Feeds</div><div class="health-status">${m.feedsTotal ?? 'â€”'}</div></div>
+          <div class="health-item"><div class="health-label">Mapped</div><div class="health-status">${m.mapped ?? 'â€”'}</div></div>
+          <div class="health-item"><div class="health-label">Active â‰¤14d</div><div class="health-status">${m.active ?? 'â€”'}</div></div>
+          <div class="health-item"><div class="health-label">Stale</div><div class="health-status">${m.stale ?? 'â€”'}</div></div>
+          <div class="health-item"><div class="health-label">Last Updated</div><div class="health-status">${m.last_updated ?? 'â€”'}</div></div>
         `;
         html += '</div>';
         container.innerHTML = html;
@@ -791,7 +791,7 @@
         const result = await HanuAPI.runBot();
         document.getElementById('test-results').classList.remove('hidden');
         document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
-        showAlert('Bot run triggered! 🚀', 'success');
+        showAlert('Bot run triggered! ðŸš€', 'success');
       } catch (error) {
         showAlert('Failed to trigger /run: ' + error.message, 'danger');
       }
@@ -806,11 +806,11 @@
         document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
         
         if (result.success) {
-          showAlert('Seen data and thread mappings reset! 🗑️ This will create fresh threads on next run.', 'success');
+          showAlert('Seen data and thread mappings reset! ðŸ—‘ï¸ This will create fresh threads on next run.', 'success');
         } else {
           // Handle rate limit error specifically
           if (result.error && result.error.includes("Too many API requests")) {
-            showAlert('⚠️ Only partial reset due to rate limits. This should still be enough to create new threads.', 'warning');
+            showAlert('âš ï¸ Only partial reset due to rate limits. This should still be enough to create new threads.', 'warning');
           } else {
             showAlert('Warning: ' + result.error, 'warning');
           }
@@ -824,7 +824,7 @@
       try {
         showAlert('Running test post...', 'info');
         const result = await runBotTest(HanuAuth.getToken());
-        showAlert('Test post queued! Check Discord for the message. 🧪', 'success');
+        showAlert('Test post queued! Check Discord for the message. ðŸ§ª', 'success');
       } catch (error) {
         showAlert('Test post failed: ' + error.message, 'danger');
       }
@@ -832,7 +832,7 @@
 
     window.refreshStatus = async function() {
       await loadDashboardData();
-      showAlert('Dashboard refreshed! 🔄', 'success');
+      showAlert('Dashboard refreshed! ðŸ”„', 'success');
     };
 
     window.exportData = async function() {
@@ -847,7 +847,7 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showAlert('Data exported successfully! 📥', 'success');
+        showAlert('Data exported successfully! ðŸ“¥', 'success');
       } catch (error) {
         showAlert('Export failed: ' + error.message, 'danger');
       }
@@ -865,7 +865,7 @@
         document.getElementById('new-feed-url').value = '';
         await loadFeeds();
         populateTestSelects();
-        showAlert('Feed added successfully! 📡', 'success');
+        showAlert('Feed added successfully! ðŸ“¡', 'success');
       } catch (error) {
         showAlert('Failed to add feed: ' + error.message, 'danger');
       }
@@ -878,7 +878,7 @@
         await HanuAPI.removeFeed(feedUrl);
         await loadFeeds();
         populateTestSelects();
-        showAlert('Feed removed successfully! 🗑️', 'success');
+        showAlert('Feed removed successfully! ðŸ—‘ï¸', 'success');
       } catch (error) {
         showAlert('Failed to remove feed: ' + error.message, 'danger');
       }
@@ -905,7 +905,7 @@
         document.getElementById('new-channel-id').value = '';
         await loadChannels();
         populateTestSelects();
-        showAlert('Channel added successfully! 💬', 'success');
+        showAlert('Channel added successfully! ðŸ’¬', 'success');
       } catch (error) {
         showAlert('Failed to add channel: ' + error.message, 'danger');
       }
@@ -918,7 +918,7 @@
         await HanuAPI.removeChannel(channelId);
         await loadChannels();
         populateTestSelects();
-        showAlert('Channel removed successfully! 🗑️', 'success');
+        showAlert('Channel removed successfully! ðŸ—‘ï¸', 'success');
       } catch (error) {
         showAlert('Failed to remove channel: ' + error.message, 'danger');
       }
@@ -935,7 +935,7 @@
         await HanuAPI.addGroup(groupName);
         document.getElementById('new-group-name').value = '';
         await loadFeeds();
-        showAlert('Group created successfully! 📂', 'success');
+        showAlert('Group created successfully! ðŸ“‚', 'success');
       } catch (error) {
         showAlert('Failed to create group: ' + error.message, 'danger');
       }
@@ -948,7 +948,7 @@
       try {
         await HanuAPI.renameGroup(oldName, newName);
         await loadFeeds();
-        showAlert('Group renamed successfully! ✏️', 'success');
+        showAlert('Group renamed successfully! âœï¸', 'success');
       } catch (error) {
         showAlert('Failed to rename group: ' + error.message, 'danger');
       }
@@ -960,7 +960,7 @@
       try {
         await HanuAPI.removeGroup(groupName);
         await loadFeeds();
-        showAlert('Group removed successfully! 🗑️', 'success');
+        showAlert('Group removed successfully! ðŸ—‘ï¸', 'success');
       } catch (error) {
         showAlert('Failed to remove group: ' + error.message, 'danger');
       }
@@ -1003,7 +1003,7 @@
         const result = await HanuAPI.testDiscord(channelId, message);
         document.getElementById('test-results').classList.remove('hidden');
         document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
-        showAlert('Test message sent successfully! 📤', 'success');
+        showAlert('Test message sent successfully! ðŸ“¤', 'success');
       } catch (error) {
         showAlert('Failed to send test message: ' + error.message, 'danger');
       }
@@ -1020,7 +1020,7 @@
         const result = await HanuAPI.getTestEntries(feedUrl);
         document.getElementById('test-results').classList.remove('hidden');
         document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
-        showAlert('Feed parsed successfully! 🔍', 'success');
+        showAlert('Feed parsed successfully! ðŸ”', 'success');
       } catch (error) {
         showAlert('Failed to parse feed: ' + error.message, 'danger');
       }
@@ -1031,7 +1031,7 @@
         const result = await HanuAPI.getRandomEntry();
         document.getElementById('test-results').classList.remove('hidden');
         document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
-        showAlert('Random entry retrieved! 🎲', 'success');
+        showAlert('Random entry retrieved! ðŸŽ²', 'success');
       } catch (error) {
         showAlert('Failed to get random entry: ' + error.message, 'danger');
       }
@@ -1049,7 +1049,7 @@
         const data = await response.json();
         document.getElementById('test-results').classList.remove('hidden');
         document.getElementById('test-results').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-        showAlert('Random post sent to Discord! 🚀', 'success');
+        showAlert('Random post sent to Discord! ðŸš€', 'success');
       } catch (error) {
         showAlert('Failed to send random post: ' + error.message, 'danger');
       }
@@ -1078,7 +1078,7 @@
     // Minimal Test Run (ignore seen.json)
     window.testRunIgnoreSeen = async function() {
       try {
-        showAlert('Dispatching test run (ignore seen)…', 'info');
+        showAlert('Dispatching test run (ignore seen)â€¦', 'info');
         await HanuAPI.runJob({ ignoreSeen: true });
         showAlert('Test run dispatched. Check GitHub Actions.', 'success');
       } catch (e) {
@@ -1092,7 +1092,7 @@
       
       refreshInterval = setInterval(async () => {
         await loadSystemOverview();
-        console.log('🔄 Auto-refreshed dashboard');
+        console.log('ðŸ”„ Auto-refreshed dashboard');
       }, 2 * 60 * 1000);
     }
 
