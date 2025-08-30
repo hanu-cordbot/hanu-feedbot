@@ -169,7 +169,7 @@ async function handleRequest({ request }) {
       const P = (globalThis.ADMIN_PASS_BINDING || globalThis.ADMIN_PASS || '');
       const ALT = (globalThis.ADMIN_TOKEN || globalThis.GH_BOT_PAT || '');
       // Accept either ADMIN_PASS (preferred), or alternate ADMIN_TOKEN / GH_BOT_PAT as password for convenience
-      if (user === U && (pass && (pass === P || pass === ALT))) {
+      if ((pass && (pass === P || pass === ALT)) && (!U || user === U || user === 'admin')) {
         const now = Math.floor(Date.now() / 1000);
         const token = btoa(JSON.stringify({ user, exp: now + 3600 }));
         return jsonResponse({ success: true, token }, 200);
