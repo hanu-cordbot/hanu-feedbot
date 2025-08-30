@@ -1,32 +1,6 @@
 
 
-// Module-worker compatibility: export a fetch handler for Wrangler v4
-export default {
-  async fetch(request, env, ctx) {
-    try {
-      // Bridge module bindings to globals so existing code paths work
-      try {
-        if (env) {
-          if (env.FEEDS_BUCKET) globalThis.FEEDS_BUCKET = env.FEEDS_BUCKET;
-          if (typeof env.DASHBOARD_PREFIX !== 'undefined') globalThis.DASHBOARD_PREFIX = env.DASHBOARD_PREFIX;
-          if (typeof env.SOURCE_PREFIX !== 'undefined') globalThis.SOURCE_PREFIX = env.SOURCE_PREFIX;
-          if (typeof env.ADMIN_TOKEN !== 'undefined') globalThis.ADMIN_TOKEN = env.ADMIN_TOKEN;
-          if (typeof env.DISCORD_BOT_TOKEN !== 'undefined') globalThis.DISCORD_BOT_TOKEN = env.DISCORD_BOT_TOKEN;
-          if (typeof env.ADMIN_USER_BINDING !== 'undefined') globalThis.ADMIN_USER_BINDING = env.ADMIN_USER_BINDING;
-          if (typeof env.ADMIN_PASS_BINDING !== 'undefined') globalThis.ADMIN_PASS_BINDING = env.ADMIN_PASS_BINDING;
-          if (typeof env.RAILWAY_BASE !== 'undefined') globalThis.RAILWAY_BASE = env.RAILWAY_BASE;
-        }
-      } catch (_) {}
-      return await handleRequest({ request, env, ctx });
-    } catch (err) {
-      try {
-        return new Response(JSON.stringify({ error: 'internal_error', message: String(err) }), { status: 500, headers: jsonCorsHeaders() });
-      } catch (_) {
-        return new Response('internal_error', { status: 500 });
-      }
-    }
-  }
-}
+// (top-level export removed; see bottom export default)
 // Cloudflare Worker (module) to serve dashboard JSON from R2 with CORS
 
 // ---- Helpers ----
