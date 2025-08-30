@@ -177,7 +177,6 @@ def generate_stats():
             # If last_post is still missing, try to infer from entries
             try:
                 if not feed_check.get('last_post') and getattr(feed, 'entries', None):
-                    import datetime
                     def entry_ts(e):
                         for key in ('published_parsed','updated_parsed'):
                             t = getattr(e, key, None)
