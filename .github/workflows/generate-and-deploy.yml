@@ -207,10 +207,13 @@ jobs:
           PREFIX="dashboard/data"
           PREFIX=$(echo "$PREFIX" | sed 's#^/*##; s#/*$##')
 
-          # Upload authoritative source configs (feed_map.json, channels.json, groups.json, feeds.txt)
-          if [ -d "dashboard/data/source" ]; then
-            echo "Syncing dashboard/data/source -> s3://$BUCKET/dashboard/data/source/"
+          # Optional: Upload authoritative source configs only if explicitly enabled.
+          # By default we do NOT sync source to avoid overwriting live configs.
+          if [ "${SYNC_SOURCE:-}" = "1" ] && [ -d "dashboard/data/source" ]; then
+            echo "Syncing dashboard/data/source -> s3://$BUCKET/dashboard/data/source/ (SYNC_SOURCE=1)"
             aws --endpoint-url "$R2_ENDPOINT" s3 sync "dashboard/data/source" "s3://$BUCKET/dashboard/data/source" --acl public-read --exclude ".git/*" || echo "Source sync failed"
+          else
+            echo "Skipping source sync (set SYNC_SOURCE=1 to enable)"
           fi
 
           mkdir -p docs/data
