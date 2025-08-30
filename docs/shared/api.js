@@ -293,18 +293,19 @@ class HanuAPI {
     }
   }
 
-  async addChannel(channelId) {
+  async addChannel(channelId, name = null, type = null) {
     if (!channelId || !channelId.trim()) {
       throw new Error('Channel ID is required');
     }
-    
     // Validate Discord channel ID format
     const cleanId = channelId.trim();
     if (!/^\d{17,20}$/.test(cleanId)) {
       throw new Error('Invalid Discord channel ID format (should be 17-20 digits)');
     }
-    
-    return this.post('/api/channels', { channelId: cleanId });
+    const body = { channelId: cleanId };
+    if (name) body.name = name;
+    if (type) body.type = type;
+    return this.post('/api/channels', body);
   }
 
   async removeChannel(channelId) {

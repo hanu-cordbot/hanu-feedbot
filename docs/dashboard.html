@@ -1023,9 +1023,12 @@
     window.fetchChannelNames = async function() {
       try {
         for (const ch of channelsData) {
-          if (!ch.name || /^\d+$/.test(ch.name)) {
+          if (!ch.name || /^\d+$/.test(ch.name) || !ch.type) {
             const res = await HanuAPI.fetchChannelName(ch.id);
-            if (res.success && res.name) ch.name = res.name;
+            if (res && res.success && res.channel) {
+              // Persist to server so future loads have names/types
+              await HanuAPI.addChannel(ch.id, res.channel.name, res.channel.type);
+            }
           }
         }
         await loadChannels();
