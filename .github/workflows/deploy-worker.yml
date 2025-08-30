@@ -18,7 +18,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: cloudflare
           command: deploy
-          wranglerVersion: '4'
+          wranglerVersion: '4.33.1'
           # Propagate GitHub secrets into Cloudflare Worker secrets
           secrets: |
             DISCORD_BOT_TOKEN

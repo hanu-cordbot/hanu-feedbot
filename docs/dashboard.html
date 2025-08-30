@@ -683,36 +683,28 @@
       twemoji.parse(container, { folder: 'svg', ext: '.svg' });
     }
 
-    // Load health metrics
+    // Load health metrics from Worker /api/system-health
     async function loadHealthMetrics() {
       try {
-        const health = await HanuAPI.healthCheck();
-        
+        const health = await HanuAPI.getSystemHealth();
         const container = document.getElementById('health-metrics');
-        
+        const m = health && health.metrics ? health.metrics : {};
+        const checks = health && health.checks ? health.checks : {};
+        const statusBadge = (health && health.status === 'ok') ? '🟢 OK' : '🟠 Degraded';
         let html = '<div class="health-grid">';
         html += `
-          <div class="health-item">
-            <div class="health-label">Worker Service</div>
-            <div class="health-status ${health.worker.status === 'healthy' ? 'success' : 'danger'}">
-              ${health.worker.status === 'healthy' ? '🟢 Healthy' : '🔴 Unhealthy'}
-            </div>
-          </div>
-          <div class="health-item">
-            <div class="health-label">Railway Service</div>
-            <div class="health-status ${health.railway.status === 'healthy' ? 'success' : 'danger'}">
-              ${health.railway.status === 'healthy' ? '🟢 Healthy' : '🔴 Unhealthy'}
-            </div>
-          </div>
+          <div class="health-item"><div class="health-label">Status</div><div class="health-status">${statusBadge}</div></div>
+          <div class="health-item"><div class="health-label">Feeds</div><div class="health-status">${m.feedsTotal ?? '—'}</div></div>
+          <div class="health-item"><div class="health-label">Mapped</div><div class="health-status">${m.mapped ?? '—'}</div></div>
+          <div class="health-item"><div class="health-label">Active ≤14d</div><div class="health-status">${m.active ?? '—'}</div></div>
+          <div class="health-item"><div class="health-label">Stale</div><div class="health-status">${m.stale ?? '—'}</div></div>
+          <div class="health-item"><div class="health-label">Last Updated</div><div class="health-status">${m.last_updated ?? '—'}</div></div>
         `;
         html += '</div>';
-        
         container.innerHTML = html;
-        
       } catch (error) {
         console.error('Failed to load health metrics:', error);
-        document.getElementById('health-metrics').innerHTML = 
-          '<div class="error">Failed to load health metrics</div>';
+        document.getElementById('health-metrics').innerHTML = '<div class="error">Failed to load health metrics</div>';
       }
     }
 
