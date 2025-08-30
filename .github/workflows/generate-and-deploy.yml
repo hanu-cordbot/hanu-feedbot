@@ -190,43 +190,7 @@ jobs:
             print('boto3 not available or download failed:', ex)
           PY
 
-      - name: Enrich channels.json with Discord names/types
-        env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-        run: |
-          set -e
-          python fetch_channel_names.py || true
-
-      - name: Upload updated channels.json to R2 (if configured)
-        env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-        run: |
-          set -e
-          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$R2_BUCKET" ]; then
-            echo "R2 not configured; skipping channels.json upload"
-            exit 0
-          fi
-          if ! command -v aws >/dev/null 2>&1; then
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
-            unzip -q awscliv2.zip
-            sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin || true
-          fi
-          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
-          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
-          export AWS_DEFAULT_REGION="us-east-1"
-          KEY="dashboard/data/source/channels.json"
-          if [ -f "$KEY" ]; then
-            echo "Uploading $KEY -> s3://$R2_BUCKET/$KEY"
-            aws --endpoint-url "$R2_ENDPOINT" s3 cp "$KEY" "s3://$R2_BUCKET/$KEY" --acl public-read || true
-          elif [ -f "dashboard/data/source/channels.json" ]; then
-            echo "Uploading dashboard/data/source/channels.json -> s3://$R2_BUCKET/dashboard/data/source/channels.json"
-            aws --endpoint-url "$R2_ENDPOINT" s3 cp "dashboard/data/source/channels.json" "s3://$R2_BUCKET/dashboard/data/source/channels.json" --acl public-read || true
-          else
-            echo "No channels.json to upload"
-          fi
+      # Removed CI-based channel enrichment to minimize minutes; dashboard/worker handle it on-demand
 
       - name: Fetch channel names (CI only; prefer Discord API)
         if: ${{ env.DISCORD_BOT_TOKEN != '' }}
