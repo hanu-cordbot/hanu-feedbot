@@ -3,9 +3,11 @@ import HanuAuth from './auth.js';
 
 class HanuAPI {
   constructor() {
-    // Use GitHub API directly for all operations
-    this.baseUrl = 'https://api.github.com';
-    this.githubRepo = 'hanu-cordbot/hanu-feedbot';
+    // Use configured API_BASE if available (dashboard) or same origin
+    this.baseUrl = window.DEFAULT_AUTH_BASE || window.location.origin;
+    // Prefer configured Railway backend for privileged endpoints
+    this.railwayUrl = (typeof window !== 'undefined' && (window.API_BASE_URL || (window.CONFIG && window.CONFIG.API_BASE_URL))) || this.baseUrl;
+    // this.railwayAPI = window.CONFIG?.API_BASE_URL || 'https://hanu-feedbot-production.up.railway.app'; we no longer use railway
     this.localDataEnabled = window.CONFIG?.DATA_SYNC?.enabled || false;
     this.localDataPath = window.CONFIG?.DATA_SYNC?.localDataPath || './data/';
   }
@@ -34,19 +36,19 @@ class HanuAPI {
     return this.request(`${this.railwayAPI}${endpoint}`);
   }
 
-  // Get authentication headers for GitHub API
+  // Get authentication headers
   getHeaders() {
     const headers = {
-      'Accept': 'application/vnd.github.v3+json'
+      'Content-Type': 'application/json'
     };
 
-    // Add GitHub token if available
+    // Add authorization if available
     try {
       if (HanuAuth && HanuAuth.getToken && HanuAuth.getToken()) {
         headers['Authorization'] = `Bearer ${HanuAuth.getToken()}`;
       }
     } catch (error) {
-      console.warn('Could not get GitHub token:', error);
+      console.warn('Could not get auth token:', error);
     }
 
     return headers;
@@ -135,13 +137,12 @@ class HanuAPI {
   // ===== SYSTEM STATUS & HEALTH =====
   // Get overall system status
   async getSystemStatus() {
-    // Return mock status for GitHub Pages
-    return {
-      status: 'ok',
-      uptime: 0,
-      version: 'GitHub Pages',
-      mode: 'read-only'
-    };
+    try {
+      return await this.get('/api/status');
+    } catch (error) {
+      console.warn('System status endpoint not available:', error);
+      return { status: 'unknown' };
+    }
   }
 
   // Fetch diagnostic logs as recent activity
@@ -156,59 +157,35 @@ class HanuAPI {
 
   async getPublicStats() {
     try {
-      const response = await fetch(`${this.localDataPath}stats.json`);
-      if (response.ok) {
-        return await response.json();
+      const url = `${this.baseUrl}/api/public/stats`;
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      return await response.json();
     } catch (error) {
-      console.warn('Could not load local stats:', error);
+      console.warn('Public stats endpoint not available:', error);
+      // Provide defaults matching expected fields
+      return { feedCount: 0, feeds: [], activeFeedCount: 0, uptime: 0 };
     }
-    // Return mock stats if local file not found
-    return {
-      total_feeds: 0,
-      total_posts: 0,
-      active_channels: 0,
-      last_updated: new Date().toISOString()
-    };
   }
 
-  async getPublicFeeds() {
-    try {
-      const response = await fetch(`${this.localDataPath}feed_map.json`);
-      if (response.ok) {
-        const data = await response.json();
-        return Object.values(data || {});
-      }
-    } catch (error) {
-      console.warn('Could not load local feeds:', error);
-    }
-    return [];
-  }
-
-  async getChannels() {
-    try {
-      const response = await fetch(`${this.localDataPath}meta.json`);
-      if (response.ok) {
-        const data = await response.json();
-        return data.channels || [];
-      }
-    } catch (error) {
-      console.warn('Could not load local channels:', error);
-    }
-    return [];
-  }
 
   // ===== RECENT ACTIVITY LOGS =====
 
   async getActivityLogs() {
-    // Return mock activity logs
-    return [
-      {
-        timestamp: new Date().toISOString(),
-        action: 'dashboard_loaded',
-        details: 'Dashboard accessed from GitHub Pages'
-      }
-    ];
+    // Use diagnostics endpoint and wrap in array for activity list
+    try {
+      const diag = await this.getDiagnostics();
+      return Array.isArray(diag) ? diag : [diag];
+    } catch (error) {
+      console.warn('Unable to load diagnostics for activity logs:', error);
+      return [];
+    }
   }
 
   // ===== FEED MANAGEMENT =====
@@ -249,15 +226,24 @@ class HanuAPI {
   }
 
   async addFeed(feedUrl) {
-    throw new Error('Feed management is not available in read-only mode. Please use GitHub repository settings.');
+    if (!feedUrl || !feedUrl.trim()) {
+      throw new Error('Feed URL is required');
+    }
+    return this.post('/api/feeds', { feedUrl: feedUrl.trim() });
   }
 
   async removeFeed(feedUrl) {
-    throw new Error('Feed management is not available in read-only mode. Please use GitHub repository settings.');
+    if (!feedUrl) {
+      throw new Error('Feed URL is required');
+    }
+    return this.delete('/api/feeds', { feedUrl });
   }
 
   async updateFeedMapping(feedUrl, channelId) {
-    throw new Error('Feed mapping is not available in read-only mode. Please use GitHub repository settings.');
+    return this.post('/api/feed-mappings', { 
+      feedUrl, 
+      channelId: channelId || null 
+    });
   }
 
   async updateFeedGroup(feedUrl, groupName) {
@@ -308,16 +294,37 @@ class HanuAPI {
   }
 
   async addChannel(channelId, name = null, type = null) {
-    throw new Error('Channel management is not available in read-only mode. Please use GitHub repository settings.');
+    if (!channelId || !channelId.trim()) {
+      throw new Error('Channel ID is required');
+    }
+    // Validate Discord channel ID format
+    const cleanId = channelId.trim();
+    if (!/^\d{17,20}$/.test(cleanId)) {
+      throw new Error('Invalid Discord channel ID format (should be 17-20 digits)');
+    }
+    const body = { channelId: cleanId };
+    if (name) body.name = name;
+    if (type) body.type = type;
+    return this.post('/api/channels', body);
   }
 
   async removeChannel(channelId) {
-    throw new Error('Channel management is not available in read-only mode. Please use GitHub repository settings.');
+    if (!channelId) {
+      throw new Error('Channel ID is required');
+    }
+    return this.delete('/api/channels', { channelId });
   }
 
   async fetchChannelName(channelId) {
-    // This could potentially work with Discord API, but for now return mock data
-    return { name: `Channel ${channelId}`, type: 'text' };
+    if (!channelId) {
+      throw new Error('Channel ID is required');
+    }
+    try {
+      return await this.post('/api/channels/fetch-name', { channelId });
+    } catch (error) {
+      console.warn('Channel name fetch failed:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   async getChannelStats() {
@@ -344,15 +351,31 @@ class HanuAPI {
   }
 
   async addGroup(groupName) {
-    throw new Error('Group management is not available in read-only mode. Please use GitHub repository settings.');
+    if (!groupName || !groupName.trim()) {
+      throw new Error('Group name is required');
+    }
+    return this.post('/api/groups', { groupName: groupName.trim() });
   }
 
   async renameGroup(oldName, newName) {
-    throw new Error('Group management is not available in read-only mode. Please use GitHub repository settings.');
+    if (!oldName || !newName) {
+      throw new Error('Both old and new group names are required');
+    }
+    if (oldName.trim() === newName.trim()) {
+      throw new Error('New name must be different from old name');
+    }
+    return this.put('/api/groups', { 
+      oldName: oldName.trim(), 
+      newName: newName.trim() 
+    });
   }
 
   async removeGroup(groupName) {
-    throw new Error('Group management is not available in read-only mode. Please use GitHub repository settings.');
+    if (!groupName) {
+      throw new Error('Group name is required');
+    }
+    // Use URL parameter format as expected by the worker
+    return this.delete(`/api/groups?name=${encodeURIComponent(groupName)}`);
   }
 
   // ===== PROMPT MANAGEMENT =====
@@ -389,8 +412,7 @@ class HanuAPI {
   // ===== BOT CONTROL & TESTING =====
 
   async runBot() {
-    // This should trigger the workflow dispatch (already updated in runJob)
-    return await this.runJob({ ignoreSeen: false });
+    return this.post('/run'); // Railway endpoint
   }
 
   async testGemini(promptData) {
@@ -448,60 +470,75 @@ class HanuAPI {
   // ===== JOB MANAGEMENT =====
   // Trigger a new bot run job via GitHub Actions
   async runJob(options = {}) {
+    // Since we're now using GitHub Actions instead of Railway/proxy,
+    // we'll trigger the workflow directly via GitHub API
     try {
-      // Use GitHub API directly to dispatch workflow
-      const githubToken = (HanuAuth && HanuAuth.getToken && HanuAuth.getToken()) || '';
-      if (!githubToken) {
-        throw new Error('GitHub token required for workflow dispatch');
+      const owner = 'hanu-cordbot';
+      const repo = 'hanu-feedbot';
+      const workflow_id = 'run-bot-now.yml'; // Use the manual dispatch workflow
+      
+      // Get auth token if available
+      const token = (HanuAuth && HanuAuth.getToken && HanuAuth.getToken()) || '';
+      
+      if (!token) {
+        throw new Error('Authentication required to trigger workflow');
       }
-
-      const repo = 'hanu-cordbot/hanu-feedbot';
-      const workflowId = 'feed-bot.yml';
-
-      const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/dispatches`;
-
-      const response = await fetch(dispatchUrl, {
+      
+      const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow_id}/dispatches`;
+      
+      const body = {
+        ref: 'main',
+        inputs: {
+          max_age_hours: '36',
+          force_run: 'true'
+        }
+      };
+      
+      // If ignore seen is requested, we'll use force_run to bypass lock
+      if (options.ignoreSeen) {
+        body.inputs.force_run = 'true';
+      }
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${githubToken}`,
+          'Authorization': `Bearer ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'User-Agent': 'HANU-Dashboard/1.0'
         },
-        body: JSON.stringify({
-          ref: 'main',
-          inputs: {
-            max_age_hours: '36',
-            force_run: 'true',
-            debug_mode: 'true'
-          }
-        })
+        body: JSON.stringify(body)
       });
-
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('GitHub API Error:', response.status, errorData);
-        throw new Error(`GitHub API Error ${response.status}: ${errorData.message || response.statusText}`);
+        const errorText = await response.text();
+        let errorMsg = `GitHub API error ${response.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMsg = errorData.message || errorMsg;
+        } catch (e) {
+          errorMsg = errorText || errorMsg;
+        }
+        throw new Error(errorMsg);
       }
-
-      console.log('✅ Workflow dispatch successful');
+      
+      // GitHub workflow dispatch returns 204 on success with no body
       return { success: true, message: 'Workflow dispatched successfully' };
-
+      
     } catch (err) {
-      console.error('❌ Workflow dispatch failed:', err);
-      throw err;
+      // For backward compatibility, try the old proxy method as fallback
+      console.warn('GitHub direct dispatch failed, trying proxy fallback:', err.message);
+      try {
+        return await this.post('/api/run-job', { ignoreSeen: !!options.ignoreSeen });
+      } catch (proxyErr) {
+        // If both methods fail, throw the original GitHub error
+        throw new Error(`Failed to trigger workflow: ${err.message}`);
+      }
     }
   }
 
   async getSystemHealth() {
-    // Return mock health data
-    return {
-      status: 'ok',
-      checks: {
-        database: 'ok',
-        api: 'ok',
-        cache: 'ok'
-      }
-    };
+    return this.get('/api/system-health');
   }
 
   // ===== SETTINGS MANAGEMENT =====
@@ -570,20 +607,21 @@ class HanuAPI {
 
   async getPublicStats() {
     try {
-      const response = await fetch(`${this.localDataPath}stats.json`);
-      if (response.ok) {
-        return await response.json();
+      const url = `${this.baseUrl}/api/public/stats`;
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
+
+      return await response.json();
     } catch (error) {
-      console.warn('Could not load local stats:', error);
+      console.warn('Public stats endpoint not available:', error);
+      // Provide defaults for dashboard overview
+      return { feedCount: 0, feeds: [], activeFeedCount: 0, uptime: 0 };
     }
-    // Return mock stats if local file not found
-    return {
-      total_feeds: 0,
-      total_posts: 0,
-      active_channels: 0,
-      last_updated: new Date().toISOString()
-    };
   }
   // Note: real activity logs via diagnostics
   async getActivityLogs() {

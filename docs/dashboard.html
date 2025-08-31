@@ -934,16 +934,13 @@
         } else {
           // Handle rate limit error specifically
           if (result.error && result.error.includes("Too many API requests")) {
-            showAlert('⚠️ Only partial reset due to rate limits. This should still be enough to create new threads.', 'warning');
+            showAlert('âš ï¸ Only partial reset due to rate limits. This should still be enough to create new threads.', 'warning');
           } else {
             showAlert('Warning: ' + result.error, 'warning');
           }
         }
       } catch (error) {
-        const message = error.message.includes('read-only mode') 
-          ? 'Reset operations are not available in read-only mode. Please use GitHub Actions manually.'
-          : 'Failed to reset seen data: ' + error.message;
-        showAlert(message, 'warning');
+        showAlert('Failed to reset data: ' + error.message, 'danger');
       }
     };
 
@@ -994,10 +991,7 @@
         populateTestSelects();
         showAlert('Feed added successfully! 📡', 'success');
       } catch (error) {
-        const message = error.message.includes('read-only mode') 
-          ? 'Feed management is only available through GitHub repository settings in read-only mode.'
-          : 'Failed to add feed: ' + error.message;
-        showAlert(message, 'warning');
+        showAlert('Failed to add feed: ' + error.message, 'danger');
       }
     };
 
@@ -1010,10 +1004,7 @@
         populateTestSelects();
         showAlert('Feed removed successfully! 🗑️', 'success');
       } catch (error) {
-        const message = error.message.includes('read-only mode') 
-          ? 'Feed management is only available through GitHub repository settings in read-only mode.'
-          : 'Failed to remove feed: ' + error.message;
-        showAlert(message, 'warning');
+        showAlert('Failed to remove feed: ' + error.message, 'danger');
       }
     };
 
@@ -1040,10 +1031,7 @@
         populateTestSelects();
         showAlert('Channel added successfully! 💬', 'success');
       } catch (error) {
-        const message = error.message.includes('read-only mode') 
-          ? 'Channel management is only available through GitHub repository settings in read-only mode.'
-          : 'Failed to add channel: ' + error.message;
-        showAlert(message, 'warning');
+        showAlert('Failed to add channel: ' + error.message, 'danger');
       }
     };
 
@@ -1056,10 +1044,7 @@
         populateTestSelects();
         showAlert('Channel removed successfully! 🗑️', 'success');
       } catch (error) {
-        const message = error.message.includes('read-only mode') 
-          ? 'Channel management is only available through GitHub repository settings in read-only mode.'
-          : 'Failed to remove channel: ' + error.message;
-        showAlert(message, 'warning');
+        showAlert('Failed to remove channel: ' + error.message, 'danger');
       }
     };
 
@@ -1076,10 +1061,7 @@
         await loadFeeds();
         showAlert('Group created successfully! 📂', 'success');
       } catch (error) {
-        const message = error.message.includes('read-only mode') 
-          ? 'Group management is only available through GitHub repository settings in read-only mode.'
-          : 'Failed to create group: ' + error.message;
-        showAlert(message, 'warning');
+        showAlert('Failed to create group: ' + error.message, 'danger');
       }
     };
 
@@ -1220,11 +1202,11 @@
     // Minimal Test Run (ignore seen.json)
     window.testRunIgnoreSeen = async function() {
       try {
-        showAlert('Dispatching test run (ignore seen)â€¦', 'info');
+        showAlert('Triggering GitHub Actions workflow...', 'info');
         await HanuAPI.runJob({ ignoreSeen: true });
-        showAlert('Test run dispatched. Check GitHub Actions.', 'success');
+        showAlert('GitHub Actions workflow triggered successfully! Check the Actions tab for progress.', 'success');
       } catch (e) {
-        showAlert('Failed to dispatch test run: ' + e.message, 'danger');
+        showAlert('Failed to trigger workflow: ' + e.message, 'danger');
       }
     };
 
