@@ -9,7 +9,7 @@ window.CONFIG = {
   
   // Data sync settings
   DATA_SYNC: {
-    enabled: false,
+    enabled: true,
     localDataPath: './data/',
     fallbackToAPI: true,
     cacheTimeout: 3600000
