@@ -934,13 +934,16 @@
         } else {
           // Handle rate limit error specifically
           if (result.error && result.error.includes("Too many API requests")) {
-            showAlert('âš ï¸ Only partial reset due to rate limits. This should still be enough to create new threads.', 'warning');
+            showAlert('⚠️ Only partial reset due to rate limits. This should still be enough to create new threads.', 'warning');
           } else {
             showAlert('Warning: ' + result.error, 'warning');
           }
         }
       } catch (error) {
-        showAlert('Failed to reset data: ' + error.message, 'danger');
+        const message = error.message.includes('read-only mode') 
+          ? 'Reset operations are not available in read-only mode. Please use GitHub Actions manually.'
+          : 'Failed to reset seen data: ' + error.message;
+        showAlert(message, 'warning');
       }
     };
 
@@ -991,7 +994,10 @@
         populateTestSelects();
         showAlert('Feed added successfully! 📡', 'success');
       } catch (error) {
-        showAlert('Failed to add feed: ' + error.message, 'danger');
+        const message = error.message.includes('read-only mode') 
+          ? 'Feed management is only available through GitHub repository settings in read-only mode.'
+          : 'Failed to add feed: ' + error.message;
+        showAlert(message, 'warning');
       }
     };
 
@@ -1004,7 +1010,10 @@
         populateTestSelects();
         showAlert('Feed removed successfully! 🗑️', 'success');
       } catch (error) {
-        showAlert('Failed to remove feed: ' + error.message, 'danger');
+        const message = error.message.includes('read-only mode') 
+          ? 'Feed management is only available through GitHub repository settings in read-only mode.'
+          : 'Failed to remove feed: ' + error.message;
+        showAlert(message, 'warning');
       }
     };
 
@@ -1031,7 +1040,10 @@
         populateTestSelects();
         showAlert('Channel added successfully! 💬', 'success');
       } catch (error) {
-        showAlert('Failed to add channel: ' + error.message, 'danger');
+        const message = error.message.includes('read-only mode') 
+          ? 'Channel management is only available through GitHub repository settings in read-only mode.'
+          : 'Failed to add channel: ' + error.message;
+        showAlert(message, 'warning');
       }
     };
 
@@ -1044,7 +1056,10 @@
         populateTestSelects();
         showAlert('Channel removed successfully! 🗑️', 'success');
       } catch (error) {
-        showAlert('Failed to remove channel: ' + error.message, 'danger');
+        const message = error.message.includes('read-only mode') 
+          ? 'Channel management is only available through GitHub repository settings in read-only mode.'
+          : 'Failed to remove channel: ' + error.message;
+        showAlert(message, 'warning');
       }
     };
 
@@ -1061,7 +1076,10 @@
         await loadFeeds();
         showAlert('Group created successfully! 📂', 'success');
       } catch (error) {
-        showAlert('Failed to create group: ' + error.message, 'danger');
+        const message = error.message.includes('read-only mode') 
+          ? 'Group management is only available through GitHub repository settings in read-only mode.'
+          : 'Failed to create group: ' + error.message;
+        showAlert(message, 'warning');
       }
     };
 
