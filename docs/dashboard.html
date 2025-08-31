@@ -35,8 +35,8 @@
   
   <script>
     // Auto-login config injected at build/deploy time
-    // Base URL for API calls (Railway production)
-    window.DEFAULT_AUTH_BASE     = 'https://hanu-api-proxy.snacky496.workers.dev';
+    // Base URL for API calls (Worker proxy by default)
+    window.DEFAULT_AUTH_BASE = 'https://hanu-api-proxy.snacky496.workers.dev';
   </script>
   <!-- Force login BEFORE any other JS runs -->
   <script type="module" src="shared/auth-boot.js"></script>
@@ -237,6 +237,59 @@
       // Load all data and start refresh
       await loadDashboardData();
       /* chart removed */
+
+      // Fix mojibake labels and emojis in static UI after initial render
+      try {
+        const nav = document.querySelector('.nav');
+        if (nav) {
+          const links = nav.querySelectorAll('a');
+          if (links[0]) links[0].textContent = '🏠 Home';
+          if (links[1]) links[1].textContent = '🤖 Dashboard';
+          if (links[2]) links[2].textContent = '📝 Prompt Editor';
+          if (links[3]) links[3].textContent = '📊 Statistics';
+          if (links[4]) links[4].textContent = '📈 Analytics';
+        }
+        const headerTitle = document.querySelector('.header h1');
+        if (headerTitle) headerTitle.textContent = '🤖 HANU Bot Dashboard';
+        const authTitle = document.querySelector('#auth-section h3');
+        if (authTitle) authTitle.textContent = '🔐 Authentication Required';
+        // Top control buttons
+        const btnRun = document.querySelector('button[onclick="runJob()"]');
+        if (btnRun) btnRun.textContent = '🚀 Run Job';
+        const btnReset = document.querySelector('button[onclick="resetDailySummary()"]');
+        if (btnReset) btnReset.textContent = '🗓️ Reset Summary';
+        const btnClear = document.querySelector('button[onclick="clearCache()"]');
+        if (btnClear) btnClear.textContent = '🧹 Clear Cache';
+        const btnRefresh = document.querySelector('button[onclick="refreshStatus()"]');
+        if (btnRefresh) btnRefresh.textContent = '🔄 Refresh';
+        // Section headings
+        const feedH2 = Array.from(document.querySelectorAll('h2')).find(h => /Feed Management/i.test(h.textContent||''));
+        if (feedH2) feedH2.textContent = '📰 Feed Management';
+        const chH2 = Array.from(document.querySelectorAll('h2')).find(h => /Channel Management/i.test(h.textContent||''));
+        if (chH2) chH2.textContent = '📣 Channel Management';
+        const grpH2 = Array.from(document.querySelectorAll('h2')).find(h => /Group Management/i.test(h.textContent||''));
+        if (grpH2) grpH2.textContent = '🗂️ Group Management';
+        const testH2 = Array.from(document.querySelectorAll('h2')).find(h => /Testing Panel/i.test(h.textContent||''));
+        if (testH2) testH2.textContent = '🧪 Testing Panel';
+        const actH2 = Array.from(document.querySelectorAll('h2')).find(h => /Recent Activity/i.test(h.textContent||''));
+        if (actH2) actH2.textContent = '📝 Recent Activity';
+        const healthH2 = Array.from(document.querySelectorAll('h2')).find(h => /System Health/i.test(h.textContent||''));
+        if (healthH2) healthH2.textContent = '🩺 System Health';
+        // Other static labels
+        const sortDate = document.getElementById('sort-date');
+        if (sortDate) sortDate.textContent = 'Date ⬍';
+        const addFeedBtn = Array.from(document.querySelectorAll('button')).find(b => /Add Feed/i.test(b.textContent||''));
+        if (addFeedBtn) addFeedBtn.textContent = '➕ Add Feed';
+        const addChannelBtn = Array.from(document.querySelectorAll('button')).find(b => /Add Channel/i.test(b.textContent||''));
+        if (addChannelBtn) addChannelBtn.textContent = '➕ Add Channel';
+        const createGroupBtn = Array.from(document.querySelectorAll('button')).find(b => /Create Group/i.test(b.textContent||''));
+        if (createGroupBtn) createGroupBtn.textContent = '➕ Create Group';
+        // Ensure dynamic test-run button text is correct if present
+        const tbtn = document.getElementById('btn-test-run');
+        if (tbtn) tbtn.textContent = '🧪 Test Run (ignore seen)';
+        // Parse emojis with Twemoji for consistent rendering
+        if (window.twemoji) twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
+      } catch (_) {}
 
       // Hide legacy controls/panels we no longer expose
       try {
@@ -496,6 +549,14 @@
       });
       html += '</tbody></table>';
       container.innerHTML = html;
+      try {
+        container.querySelectorAll('.group-arrow').forEach(el => el.textContent = '▼');
+        container.querySelectorAll('.btn.btn-sm.btn-danger').forEach(el => { if ((el.textContent||'').trim().length < 2) el.textContent = '🗑️'; });
+      } catch (_) {}
+      try {
+        container.querySelectorAll('.group-arrow').forEach(el => el.textContent = '▼');
+        container.querySelectorAll('.btn.btn-sm.btn-danger').forEach(el => { if ((el.textContent||'').trim().length < 2) el.textContent = '🗑️'; });
+      } catch (_) {}
     }
 
     function renderGroupedView(list) {
@@ -1169,6 +1230,22 @@
 
     // Alert helper
     function showAlert(message, type = 'info') {
+      try {
+        message = (message || '').toString()
+          .replace(/ðŸ§ª/g, '🧪')
+          .replace(/ðŸš€/g, '🚀')
+          .replace(/ðŸ—‘ï¸/g, '🗑️')
+          .replace(/âš ï¸/g, '⚠️')
+          .replace(/ðŸ”„/g, '🔄')
+          .replace(/ðŸ“¥/g, '📥')
+          .replace(/ðŸ“¡/g, '📰')
+          .replace(/ðŸ’¬/g, '💬')
+          .replace(/âœï¸/g, '✏️')
+          .replace(/ðŸ“¤/g, '📨')
+          .replace(/ðŸ”�/g, '🔍')
+          .replace(/ðŸŽ²/g, '🎲')
+          .replace(/â€¦/g, '…');
+      } catch (_) {}
       const alertDiv = document.createElement('div');
       alertDiv.className = `alert alert-${type} fade-in`;
       alertDiv.style.position = 'fixed';

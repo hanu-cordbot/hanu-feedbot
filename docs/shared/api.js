@@ -470,7 +470,25 @@ class HanuAPI {
   // ===== JOB MANAGEMENT =====
   // Trigger a new bot run job
   async runJob(options = {}) {
-    return this.post('/api/run-job', { ignoreSeen: !!options.ignoreSeen });
+    try {
+      return await this.post('/api/run-job', { ignoreSeen: !!options.ignoreSeen });
+    } catch (err) {
+      const msg = (err && err.message) ? String(err.message) : '';
+      const shouldFallback = /\b502\b|github_dispatch_failed|User-Agent required|User-Agent header/i.test(msg);
+      if (!shouldFallback) throw err;
+      // Fallback: try same-origin backend if available
+      const url = `${window.location.origin}/api/run-job`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({ ignoreSeen: !!options.ignoreSeen })
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+      }
+      return await response.json();
+    }
   }
 
   async getSystemHealth() {

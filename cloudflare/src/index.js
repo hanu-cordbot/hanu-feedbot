@@ -326,13 +326,16 @@ async function handleRequest({ request }) {
     const token = (globalThis.GITHUB_PAT || globalThis.GITHUB_TOKEN || globalThis.GH_BOT_PAT || globalThis.GH_BOT_TOKEN || null);
     if (!token) return jsonResponse({ error: 'github_token_missing' }, 500);
     try {
+      const ghHeaders = new Headers({
+        'Accept': 'application/vnd.github+json',
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      });
+      try { ghHeaders.set('User-Agent', 'hanu-feedbot-worker/1.0'); } catch (_) {}
       const resp = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/feed-bot.yml/dispatches`, {
         method: 'POST',
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: ghHeaders,
         body: JSON.stringify({
           ref: 'main',
           inputs: {
