@@ -7,7 +7,8 @@ class HanuAPI {
     this.baseUrl = window.DEFAULT_AUTH_BASE || window.location.origin;
     // Prefer configured Railway backend for privileged endpoints
     this.railwayUrl = (typeof window !== 'undefined' && (window.API_BASE_URL || (window.CONFIG && window.CONFIG.API_BASE_URL))) || this.baseUrl;
-    // this.railwayAPI = window.CONFIG?.API_BASE_URL || 'https://hanu-feedbot-production.up.railway.app'; we no longer use railway
+    // Fix: Set railwayAPI for R2 bucket loading
+    this.railwayAPI = window.CONFIG?.API_BASE_URL || this.baseUrl;
     this.localDataEnabled = window.CONFIG?.DATA_SYNC?.enabled || false;
     this.localDataPath = window.CONFIG?.DATA_SYNC?.localDataPath || './data/';
   }
@@ -502,7 +503,7 @@ class HanuAPI {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `token ${token}`,
           'Accept': 'application/vnd.github.v3+json',
           'Content-Type': 'application/json',
           'User-Agent': 'HANU-Dashboard/1.0'
@@ -531,8 +532,14 @@ class HanuAPI {
       try {
         return await this.post('/api/run-job', { ignoreSeen: !!options.ignoreSeen });
       } catch (proxyErr) {
-        // If both methods fail, throw the original GitHub error
-        throw new Error(`Failed to trigger workflow: ${err.message}`);
+        // If both methods fail, provide helpful instructions
+        console.warn('All workflow trigger methods failed:', proxyErr.message);
+        
+        // Provide manual trigger instructions
+        const manualUrl = `https://github.com/hanu-cordbot/hanu-feedbot/actions/workflows/run-bot-now.yml`;
+        console.log('🔗 Manual trigger URL:', manualUrl);
+        
+        throw new Error(`Failed to trigger workflow automatically: ${err.message}. Please manually trigger the workflow at: ${manualUrl}`);
       }
     }
   }

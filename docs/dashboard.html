@@ -1206,7 +1206,18 @@
         await HanuAPI.runJob({ ignoreSeen: true });
         showAlert('GitHub Actions workflow triggered successfully! Check the Actions tab for progress.', 'success');
       } catch (e) {
-        showAlert('Failed to trigger workflow: ' + e.message, 'danger');
+        const errorMsg = e.message;
+        if (errorMsg.includes('Manual trigger URL')) {
+          // Extract the manual URL from the error message
+          const urlMatch = errorMsg.match(/https:\/\/github\.com\/[^\s]+/);
+          if (urlMatch) {
+            showAlert(`Automatic trigger failed. <a href="${urlMatch[0]}" target="_blank" style="color: #007bff;">Click here to manually trigger the workflow</a>`, 'warning');
+          } else {
+            showAlert('Failed to trigger workflow: ' + errorMsg, 'danger');
+          }
+        } else {
+          showAlert('Failed to trigger workflow: ' + errorMsg, 'danger');
+        }
       }
     };
 
