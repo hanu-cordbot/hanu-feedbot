@@ -291,6 +291,64 @@
         if (window.twemoji) twemoji.parse(document.body, { folder: 'svg', ext: '.svg' });
       } catch (_) {}
 
+      // Secondary pass: force emoji via HTML entities to avoid encoding issues
+      try {
+        const nav = document.querySelector('.nav');
+        if (nav) {
+          const links = nav.querySelectorAll('a');
+          if (links[0]) links[0].innerHTML = '&#x1F3E0; Home';
+          if (links[1]) links[1].innerHTML = '&#x1F916; Dashboard';
+          if (links[2]) links[2].innerHTML = '&#x1F4DD; Prompt Editor';
+          if (links[3]) links[3].innerHTML = '&#x1F4CA; Statistics';
+          if (links[4]) links[4].innerHTML = '&#x1F4C8; Analytics';
+        }
+        const headerTitle = document.querySelector('.header h1');
+        if (headerTitle) headerTitle.innerHTML = '&#x1F916; HANU Bot Dashboard';
+        const authTitle = document.querySelector('#auth-section h3');
+        if (authTitle) authTitle.innerHTML = '&#x1F510; Authentication Required';
+        const btnRun = document.querySelector('button[onclick="runJob()"]');
+        if (btnRun) btnRun.innerHTML = '&#x1F680; Run Job';
+        const btnReset = document.querySelector('button[onclick="resetDailySummary()"]');
+        if (btnReset) btnReset.innerHTML = '&#x1F5D3; Reset Summary';
+        const btnClear = document.querySelector('button[onclick="clearCache()"]');
+        if (btnClear) btnClear.innerHTML = '&#x1F9F9; Clear Cache';
+        const btnRefresh = document.querySelector('button[onclick="refreshStatus()"]');
+        if (btnRefresh) btnRefresh.innerHTML = '&#x1F504; Refresh';
+        const feedH2 = Array.from(document.querySelectorAll('h2')).find(h => /Feed Management/i.test(h.textContent||''));
+        if (feedH2) feedH2.innerHTML = '&#x1F4F0; Feed Management';
+        const chH2 = Array.from(document.querySelectorAll('h2')).find(h => /Channel Management/i.test(h.textContent||''));
+        if (chH2) chH2.innerHTML = '&#x1F4E3; Channel Management';
+        const grpH2 = Array.from(document.querySelectorAll('h2')).find(h => /Group Management/i.test(h.textContent||''));
+        if (grpH2) grpH2.innerHTML = '&#x1F5C2; Group Management';
+        const testH2 = Array.from(document.querySelectorAll('h2')).find(h => /Testing Panel/i.test(h.textContent||''));
+        if (testH2) testH2.innerHTML = '&#x1F9EA; Testing Panel';
+        const actH2 = Array.from(document.querySelectorAll('h2')).find(h => /Recent Activity/i.test(h.textContent||''));
+        if (actH2) actH2.innerHTML = '&#x1F4DD; Recent Activity';
+        const healthH2 = Array.from(document.querySelectorAll('h2')).find(h => /System Health/i.test(h.textContent||''));
+        if (healthH2) healthH2.innerHTML = '&#x1FA7A; System Health';
+        const sortDate = document.getElementById('sort-date');
+        if (sortDate) sortDate.innerHTML = 'Date &#x2195;';
+        const addFeedBtn = Array.from(document.querySelectorAll('button')).find(b => /Add Feed/i.test(b.textContent||''));
+        if (addFeedBtn) addFeedBtn.innerHTML = '&#x2795; Add Feed';
+        const addChannelBtn = Array.from(document.querySelectorAll('button')).find(b => /Add Channel/i.test(b.textContent||''));
+        if (addChannelBtn) addChannelBtn.innerHTML = '&#x2795; Add Channel';
+        const createGroupBtn = Array.from(document.querySelectorAll('button')).find(b => /Create Group/i.test(b.textContent||''));
+        if (createGroupBtn) createGroupBtn.innerHTML = '&#x2795; Create Group';
+        const testRunBtn = document.getElementById('btn-test-run');
+        if (testRunBtn) testRunBtn.innerHTML = '&#x1F9EA; Test Run (ignore seen)';
+        // Fix test panel buttons if present
+        const testRunEndpointBtn = Array.from(document.querySelectorAll('button')).find(b => /Test \/run Endpoint/i.test(b.textContent||''));
+        if (testRunEndpointBtn) testRunEndpointBtn.innerHTML = '&#x1F9EA; Test /run Endpoint';
+        const resetSeenBtn = Array.from(document.querySelectorAll('button')).find(b => /Reset Seen Data/i.test(b.textContent||''));
+        if (resetSeenBtn) resetSeenBtn.innerHTML = '&#x267B; Reset Seen Data';
+        const parseFeedBtn = Array.from(document.querySelectorAll('button')).find(b => /Parse Feed/i.test(b.textContent||''));
+        if (parseFeedBtn) parseFeedBtn.innerHTML = '&#x1F50D; Parse Feed';
+        const randomEntryBtn = Array.from(document.querySelectorAll('button')).find(b => /Random Entry/i.test(b.textContent||''));
+        if (randomEntryBtn) randomEntryBtn.innerHTML = '&#x1F3B2; Random Entry';
+        const sendRandomPostBtn = Array.from(document.querySelectorAll('button')).find(b => /Send Random Post/i.test(b.textContent||''));
+        if (sendRandomPostBtn) sendRandomPostBtn.innerHTML = '&#x1F4E4; Send Random Post';
+      } catch (_) {}
+
       // Hide legacy controls/panels we no longer expose
       try {
         document.querySelectorAll('button[onclick="runJob()"], button[onclick="resetDailySummary()"], button[onclick="clearCache()"], button[onclick="refreshStatus()"]').forEach(btn => {
@@ -552,6 +610,11 @@
       try {
         container.querySelectorAll('.group-arrow').forEach(el => el.textContent = '▼');
         container.querySelectorAll('.btn.btn-sm.btn-danger').forEach(el => { if ((el.textContent||'').trim().length < 2) el.textContent = '🗑️'; });
+      // Force group arrows and delete icons to render correctly
+      try {
+        container.querySelectorAll('.group-arrow').forEach(el => el.innerHTML = '&#x25BC;');
+        container.querySelectorAll('.btn.btn-sm.btn-danger').forEach(el => { if ((el.textContent||'').trim().length < 2) el.innerHTML = '&#x1F5D1;'; });
+      } catch (_) {}
       } catch (_) {}
       try {
         container.querySelectorAll('.group-arrow').forEach(el => el.textContent = '▼');

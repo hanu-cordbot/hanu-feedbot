@@ -5,8 +5,8 @@ class HanuAPI {
   constructor() {
     // Use configured API_BASE if available (dashboard) or same origin
     this.baseUrl = window.DEFAULT_AUTH_BASE || window.location.origin;
-    // Default Railway/Backend URL to same as base to avoid undefined fetches
-    this.railwayUrl = this.baseUrl;
+    // Prefer configured Railway backend for privileged endpoints
+    this.railwayUrl = (typeof window !== 'undefined' && (window.API_BASE_URL || (window.CONFIG && window.CONFIG.API_BASE_URL))) || this.baseUrl;
     // this.railwayAPI = window.CONFIG?.API_BASE_URL || 'https://hanu-feedbot-production.up.railway.app'; we no longer use railway
     this.localDataEnabled = window.CONFIG?.DATA_SYNC?.enabled || false;
     this.localDataPath = window.CONFIG?.DATA_SYNC?.localDataPath || './data/';
@@ -474,14 +474,18 @@ class HanuAPI {
       return await this.post('/api/run-job', { ignoreSeen: !!options.ignoreSeen });
     } catch (err) {
       const msg = (err && err.message) ? String(err.message) : '';
-      const shouldFallback = /\b502\b|github_dispatch_failed|User-Agent required|User-Agent header/i.test(msg);
+      const shouldFallback = /\b502\b|github_dispatch_failed|User-Agent required|User-Agent header|Must have admin rights/i.test(msg);
       if (!shouldFallback) throw err;
-      // Fallback: try same-origin backend if available
-      const url = `${window.location.origin}/api/run-job`;
+      // Fallback: trigger Railway /run directly with X-Auth
+      const token = (HanuAuth && HanuAuth.getToken && HanuAuth.getToken()) || '';
+      const url = `${this.railwayUrl}/run`;
       const response = await fetch(url, {
         method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify({ ignoreSeen: !!options.ignoreSeen })
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth': token,
+          'X-Ignore-Seen': options.ignoreSeen ? '1' : '0'
+        }
       });
       if (!response.ok) {
         const text = await response.text();
