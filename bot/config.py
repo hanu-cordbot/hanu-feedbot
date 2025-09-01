@@ -16,6 +16,11 @@ def _get_data_path(filename):
     source_path = BASE_DIR / "dashboard" / "data" / "source" / filename
     dashboard_path = BASE_DIR / "dashboard" / "data" / filename
     root_path = BASE_DIR / filename
+    
+    # Special case for feeds.txt: always use source path since it gets downloaded there
+    if filename == "feeds.txt":
+        return source_path
+    
     if source_path.exists():
         return source_path
     if dashboard_path.exists():
@@ -30,6 +35,9 @@ def _get_source_data_path(filename):
     return source_path
 
 FEED_LIST = _get_data_path("feeds.txt")  # Try dashboard/data/feeds.txt first
+
+# Ensure the feeds directory exists
+FEED_LIST.parent.mkdir(parents=True, exist_ok=True)
 
 # Optional: if FEEDS_R2_BUCKET is configured, attempt to download feeds.txt from R2 at startup
 def _maybe_fetch_feeds_from_r2():

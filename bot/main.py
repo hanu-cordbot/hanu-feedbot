@@ -915,4 +915,14 @@ async def run_bot_job():
 
     await client.start(BOT_TOKEN)
 
+# === STANDALONE EXECUTION ===
+if __name__ == "__main__":
+    print("🤖 Starting standalone bot job...")
+    try:
+        asyncio.run(run_bot_job())
+        print("✅ Bot job completed successfully")
+    except Exception as e:
+        print(f"❌ Bot job failed: {e}")
+        sys.exit(1)
+
 # === END FILE ===
