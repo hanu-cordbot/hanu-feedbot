@@ -75,14 +75,28 @@ async def get_or_create_webhook_url(channel: Any) -> str:
     existing = await channel.webhooks()  # type: ignore
     for hook in existing:
         if hook.name == 'hanu-feedbot':
-            return f"https://discord.com/api/webhooks/{hook.id}/{hook.token}"
+            # Delete existing webhook to ensure clean recreation
+            try:
+                await hook.delete()
+                print(f"🗑️ Deleted existing webhook for clean recreation")
+            except Exception as e:
+                print(f"⚠️ Could not delete existing webhook: {e}")
+            break
     
-    # Create webhook with explicit avatar to ensure it can be overridden
-    new_hook = await channel.create_webhook(
-        name='hanu-feedbot'
-        # Don't set avatar or reason to allow per-message override
-    )  # type: ignore
-    return f"https://discord.com/api/webhooks/{new_hook.id}/{new_hook.token}"
+    # Create fresh webhook without defaults to allow per-message override
+    try:
+        # Create webhook with minimal defaults so send() calls can override
+        new_hook = await channel.create_webhook(
+            name='hanu-feedbot'
+        )
+        print(f"✅ Created fresh webhook for channel {channel.name}")
+        return f"https://discord.com/api/webhooks/{new_hook.id}/{new_hook.token}"
+    except discord.Forbidden as e:
+        print(f"❌ Insufficient permissions to create webhook in {channel.name}: {e}")
+        raise
+    except Exception as e:
+        print(f"❌ Failed to create webhook: {e}")
+        raise
 
 async def push(client: discord.Client, target: discord.TextChannel | discord.ForumChannel | discord.Thread, entry: dict, body: str, tldr: str, post_time: str):
     """
@@ -121,6 +135,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     # Resolve webhook URL
     if channel_for_webhook is not None:
         webhook_url = await get_or_create_webhook_url(channel_for_webhook)
+        print(f"🔗 Using webhook URL for {channel_for_webhook.name}")
     else:
         webhook_url = WH_URL
 
@@ -128,6 +143,16 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     webhook = discord.Webhook.from_url(webhook_url, client=client)
     username = entry["page_name"].strip()
     avatar = avatar_for(entry)
+    
+    # Validate parameters
+    if not username or len(username) < 2:
+        username = "Facebook Page"
+    if not avatar or not avatar.startswith('http'):
+        avatar = None
+    
+    print(f"👤 Posting as: {username}")
+    print(f"🖼️ Avatar URL: {avatar}")
+    
     files_to_upload, video_links = [], []  # Renamed for clarity: includes both R2 and Catbox links
 
     # --- Media Processing Logic ---
@@ -240,12 +265,18 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
         # Create thread with first media or body if no media
         if video_links:
             content_first = video_links[0]
-            send_kwargs = {"content": content_first, "username": username, "avatar_url": avatar, "thread_name": thread_title, "wait": True}
+            send_kwargs = {"content": content_first, "username": username, "thread_name": thread_title, "wait": True}
+            if avatar:
+                send_kwargs["avatar_url"] = avatar
         elif files_to_upload:
             first_files = [files_to_upload.pop(0)]
-            send_kwargs = {"files": first_files, "username": username, "avatar_url": avatar, "thread_name": thread_title, "wait": True}
+            send_kwargs = {"files": first_files, "username": username, "thread_name": thread_title, "wait": True}
+            if avatar:
+                send_kwargs["avatar_url"] = avatar
         else:
-            send_kwargs = {"content": body, "username": username, "avatar_url": avatar, "thread_name": thread_title, "wait": True}
+            send_kwargs = {"content": body, "username": username, "thread_name": thread_title, "wait": True}
+            if avatar:
+                send_kwargs["avatar_url"] = avatar
             
         msg = await webhook.send(**send_kwargs)
         posted_message = msg
@@ -253,24 +284,39 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
         
         # Post description if exists
         if page_description:
-            await webhook.send(content=page_description, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=False)
+            desc_kwargs = {"content": page_description, "username": username, "thread": discord.Object(id=thread_id), "wait": False}
+            if avatar:
+                desc_kwargs["avatar_url"] = avatar
+            await webhook.send(**desc_kwargs)
             
         # Post remaining media
         for link in video_links[1:]:
-            await webhook.send(content=link, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=True)
+            media_kwargs = {"content": link, "username": username, "thread": discord.Object(id=thread_id), "wait": True}
+            if avatar:
+                media_kwargs["avatar_url"] = avatar
+            await webhook.send(**media_kwargs)
             
         # Post remaining files
         for chunk_files in _chunker(files_to_upload, 10):
-            await webhook.send(files=chunk_files, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=True)
+            file_kwargs = {"files": chunk_files, "username": username, "thread": discord.Object(id=thread_id), "wait": True}
+            if avatar:
+                file_kwargs["avatar_url"] = avatar
+            await webhook.send(**file_kwargs)
             
         # If first send was media/files, now post body
         if video_links or files_to_upload:
             for chunk in _split_message(body):
-                await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=False)
+                body_kwargs = {"content": chunk, "username": username, "thread": discord.Object(id=thread_id), "wait": False}
+                if avatar:
+                    body_kwargs["avatar_url"] = avatar
+                await webhook.send(**body_kwargs)
                 
         # Finally, send the tl;dr
         if tldr:
-            await webhook.send(content=tldr, username=username, avatar_url=avatar, thread=discord.Object(id=thread_id), wait=False)
+            tldr_kwargs = {"content": tldr, "username": username, "thread": discord.Object(id=thread_id), "wait": False}
+            if avatar:
+                tldr_kwargs["avatar_url"] = avatar
+            await webhook.send(**tldr_kwargs)
             
         return posted_message
         
@@ -287,11 +333,14 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     # Send video links first
     if video_links:
         for i, video_link in enumerate(video_links):
-            send_kwargs = {"content": video_link, "username": username, "avatar_url": avatar, "wait": True}
+            send_kwargs = {"content": video_link, "username": username, "wait": True}
+            if avatar:
+                send_kwargs["avatar_url"] = avatar
             
             if thread_id is not None:
                 send_kwargs["thread"] = discord.Object(id=int(thread_id))
                 
+            print(f"📤 Sending video link with params: username={username[:20]}..., avatar_url={avatar[:50] if avatar else 'None'}...")
             msg = await webhook.send(**send_kwargs)
             last_media_msg_id = msg.id
             posted_message = msg
@@ -303,7 +352,9 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     # Send file attachments
     if files_to_upload:
         for chunk_files in _chunker(files_to_upload, 10):
-            send_kwargs = {"files": chunk_files, "username": username, "avatar_url": avatar, "wait": True}
+            send_kwargs = {"files": chunk_files, "username": username, "wait": True}
+            if avatar:
+                send_kwargs["avatar_url"] = avatar
             
             if thread_id is not None:
                 send_kwargs["thread"] = discord.Object(id=int(thread_id))
@@ -312,13 +363,16 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             last_media_msg_id = msg.id
             posted_message = msg
             
+            # Queue reaction job
             job = {"channel_id": thread_id if thread_id else target.id, "message_id": msg.id, "reactions": FACEBOOK_REACTIONS}
             redis_client.rpush("reaction_queue", json.dumps(job))
 
     # Send body text
     if body.strip():
         for chunk in _split_message(body):
-            send_kwargs = {"content": chunk, "username": username, "avatar_url": avatar, "wait": True}
+            send_kwargs = {"content": chunk, "username": username, "wait": True}
+            if avatar:
+                send_kwargs["avatar_url"] = avatar
             
             if thread_id is not None:
                 send_kwargs["thread"] = discord.Object(id=int(thread_id))
@@ -335,7 +389,9 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             redis_client.rpush("reaction_queue", json.dumps(job))
     
     if tldr.strip():
-        send_kwargs = {"content": tldr, "username": username, "avatar_url": avatar, "wait": False}
+        send_kwargs = {"content": tldr, "username": username, "wait": False}
+        if avatar:
+            send_kwargs["avatar_url"] = avatar
         
         if thread_id is not None:
             send_kwargs["thread"] = discord.Object(id=int(thread_id))
