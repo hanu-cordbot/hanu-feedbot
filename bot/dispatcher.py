@@ -533,10 +533,28 @@ async def update_daily_summary_message(summary_message, entry, posted_message):
     with open(file_path, 'a', encoding='utf-8') as f:
         f.write(f"\n{new_num}. {summary_text.strip()} - {author} - <{post_url}>{media_part}")
         
-    # Send summary lines as separate message(s)
+    # Send summary lines as separate message(s) using webhook with Facebook identity
     content = f"{summary_header}\n{summary_link}"
-    for chunk in _split_message(content, limit=2000):
-        await summary_message.channel.send(chunk)
+    
+    # Use webhook to impersonate Facebook page identity
+    try:
+        webhook_url = await get_or_create_webhook_url(summary_message.channel)
+        webhook = discord.Webhook.from_url(webhook_url, client=None)
+        
+        username = entry.get("page_name", "").strip() or "Facebook Page"
+        avatar = avatar_for(entry)
+        
+        for chunk in _split_message(content, limit=2000):
+            send_kwargs = {"content": chunk, "username": username, "wait": True}
+            if avatar:
+                send_kwargs["avatar_url"] = avatar
+            await webhook.send(**send_kwargs)
+            
+    except Exception as e:
+        print(f"❌ Failed to send summary via webhook: {e}")
+        # Fallback to regular channel send
+        for chunk in _split_message(content, limit=2000):
+            await summary_message.channel.send(chunk)
 
 def upload_to_catbox(video_data: bytes) -> str | None:
     """Uploads video data to Catbox.moe with retry logic on failures."""
