@@ -72,27 +72,40 @@ def _split_message(content, limit=2000):
 # Helper to get or create a webhook in a TextChannel
 async def get_or_create_webhook_url(channel: Any) -> str:
     """Get or create a webhook URL for the given channel."""
+    print(f"🔍 Checking webhooks in channel: {channel.name}")
     existing = await channel.webhooks()  # type: ignore
+    print(f"📋 Found {len(existing)} webhooks in channel")
+    
     for hook in existing:
+        print(f"🔎 Webhook: {hook.name} (ID: {hook.id})")
         if hook.name == 'hanu-feedbot':
             # Delete existing webhook to ensure clean recreation
             try:
                 await hook.delete()
-                print(f"🗑️ Deleted existing webhook for clean recreation")
+                print(f"🗑️ Successfully deleted existing webhook for clean recreation")
             except Exception as e:
                 print(f"⚠️ Could not delete existing webhook: {e}")
+                # Try to use the existing webhook anyway
+                return f"https://discord.com/api/webhooks/{hook.id}/{hook.token}"
             break
     
-    # Create fresh webhook without defaults to allow per-message override
+    # Create fresh webhook with explicit defaults that can be overridden
     try:
-        # Create webhook with minimal defaults so send() calls can override
+        print(f"🏗️ Creating new webhook in channel: {channel.name}")
+        # Create webhook with explicit defaults that match our desired behavior
         new_hook = await channel.create_webhook(
-            name='hanu-feedbot'
+            name='hanu-feedbot',
+            avatar=None  # Explicitly set to None so send() can override
         )
-        print(f"✅ Created fresh webhook for channel {channel.name}")
+        print(f"✅ Successfully created webhook: {new_hook.name} (ID: {new_hook.id})")
         return f"https://discord.com/api/webhooks/{new_hook.id}/{new_hook.token}"
     except discord.Forbidden as e:
         print(f"❌ Insufficient permissions to create webhook in {channel.name}: {e}")
+        # Try to use existing webhook if creation fails
+        for hook in existing:
+            if hook.name == 'hanu-feedbot':
+                print(f"⚠️ Using existing webhook due to permission issues")
+                return f"https://discord.com/api/webhooks/{hook.id}/{hook.token}"
         raise
     except Exception as e:
         print(f"❌ Failed to create webhook: {e}")
@@ -134,13 +147,37 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
 
     # Resolve webhook URL
     if channel_for_webhook is not None:
-        webhook_url = await get_or_create_webhook_url(channel_for_webhook)
-        print(f"🔗 Using webhook URL for {channel_for_webhook.name}")
+        try:
+            webhook_url = await get_or_create_webhook_url(channel_for_webhook)
+            print(f"🔗 Successfully got webhook URL for {channel_for_webhook.name}")
+        except Exception as e:
+            print(f"❌ Failed to get webhook URL for {channel_for_webhook.name}: {e}")
+            # Don't fall back to WH_URL as it might have default settings
+            raise
     else:
         webhook_url = WH_URL
+        print(f"⚠️ Using fallback webhook URL")
 
     # Initialize webhook client
-    webhook = discord.Webhook.from_url(webhook_url, client=client)
+    try:
+        webhook = discord.Webhook.from_url(webhook_url, client=client)
+        print(f"🤖 Initialized webhook client successfully")
+        
+        # Test the webhook with a simple message to verify it works
+        test_kwargs = {"content": "🧪 Webhook test", "username": "Test User", "wait": True}
+        try:
+            test_msg = await webhook.send(**test_kwargs)
+            print(f"✅ Webhook test successful - message ID: {test_msg.id}")
+            # Delete the test message
+            await test_msg.delete()
+            print(f"🗑️ Test message deleted")
+        except Exception as e:
+            print(f"⚠️ Webhook test failed: {e}")
+            
+    except Exception as e:
+        print(f"❌ Failed to initialize webhook client: {e}")
+        raise
+        
     username = entry["page_name"].strip()
     avatar = avatar_for(entry)
     
@@ -150,8 +187,8 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     if not avatar or not avatar.startswith('http'):
         avatar = None
     
-    print(f"👤 Posting as: {username}")
-    print(f"🖼️ Avatar URL: {avatar}")
+    print(f"👤 Final username: '{username}'")
+    print(f"🖼️ Final avatar: {avatar[:50] if avatar else 'None'}")
     
     files_to_upload, video_links = [], []  # Renamed for clarity: includes both R2 and Catbox links
 
@@ -340,10 +377,15 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
             if thread_id is not None:
                 send_kwargs["thread"] = discord.Object(id=int(thread_id))
                 
-            print(f"📤 Sending video link with params: username={username[:20]}..., avatar_url={avatar[:50] if avatar else 'None'}...")
-            msg = await webhook.send(**send_kwargs)
-            last_media_msg_id = msg.id
-            posted_message = msg
+            print(f"📤 Sending video link with params: username='{username}', avatar_url={avatar[:50] if avatar else 'None'}...")
+            try:
+                msg = await webhook.send(**send_kwargs)
+                print(f"✅ Video link sent successfully")
+                last_media_msg_id = msg.id
+                posted_message = msg
+            except Exception as e:
+                print(f"❌ Failed to send video link: {e}")
+                continue
             
             # Queue reaction job
             job = {"channel_id": thread_id if thread_id else target.id, "message_id": msg.id, "reactions": FACEBOOK_REACTIONS}
