@@ -843,7 +843,9 @@ async def process_feeds_once(client: discord.Client):
             vietnamese_date = format_vietnamese_date(now)
             summary = await get_daily_summary_message(ch, today)
             if not summary:
-                summary = await create_daily_summary_message(ch, vietnamese_date)
+                # Use the first entry to get Facebook page identity for the daily summary
+                first_entry = entries[0] if entries else None
+                summary = await create_daily_summary_message(ch, vietnamese_date, first_entry)
                 if not summary:
                     continue
 
