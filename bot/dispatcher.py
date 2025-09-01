@@ -347,7 +347,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
 async def get_daily_summary_message(channel, today_str):
     """Finds the summary message for the current day."""
     async for message in channel.history(limit=50):
-        if message.author.bot and message.content.startswith(f"#") and today_str in message.content:
+        if message.author.bot and today_str in message.content and "hanu-news bot" in message.content:
             return message
     return None
 
