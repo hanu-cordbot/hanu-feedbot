@@ -333,7 +333,7 @@
             result = new Date(getLastPost(b) || 0) - new Date(getLastPost(a) || 0);
             break;
           case 'channel':
-            result = getChannelName(a).localeCompare(getChannelName(b));
+            result = getChannelName(a).name.localeCompare(getChannelName(b).name);
             break;
           default:
             return 0;
@@ -620,7 +620,9 @@
     function getChannelName(feed) {
       // returns { id, name, emoji, unresolved }
       let channelId = (mappings && mappings[feed.url]) || feed.channel || feed.channel_id || (metadata && metadata[feed.url] && metadata[feed.url].channel_id) || null;
-      if (!channelId) return { id: null, name: 'Not mapped', emoji: '—', unresolved: false };
+      
+      // Handle empty strings and null/undefined as unmapped
+      if (!channelId || channelId === '') return { id: null, name: 'Not mapped', emoji: '—', unresolved: false };
 
       const sid = String(channelId);
 
