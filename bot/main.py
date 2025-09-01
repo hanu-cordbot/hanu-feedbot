@@ -836,15 +836,17 @@ async def process_feeds_once(client: discord.Client):
     # Process each channel
     for ch_id, entries in channel_groups.items():
         ch = client.get_channel(ch_id)
+        print(f"🎯 Processing channel: {ch.name} (ID: {ch_id})")
+        print(f"📋 Channel type: {type(ch).__name__}")
         
         # Support both TextChannel and ForumChannel
         if isinstance(ch, discord.TextChannel):
+            print(f"✅ Detected as TextChannel: {ch.name}")
             # Regular text channel processing
             vietnamese_date = format_vietnamese_date(now)
             summary = await get_daily_summary_message(ch, today)
             if not summary:
-                # Use the first entry to get Facebook page identity for the daily summary
-                first_entry = entries[0] if entries else None
+                # Daily summary always uses bot identity
                 summary = await create_daily_summary_message(ch, vietnamese_date)
                 if not summary:
                     continue
