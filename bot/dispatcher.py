@@ -544,17 +544,58 @@ async def update_daily_summary_message(summary_message, entry, posted_message):
         username = entry.get("page_name", "").strip() or "Facebook Page"
         avatar = avatar_for(entry)
         
-        for chunk in _split_message(content, limit=2000):
-            send_kwargs = {"content": chunk, "username": username, "wait": True}
-            if avatar:
-                send_kwargs["avatar_url"] = avatar
-            await webhook.send(**send_kwargs)
+        # Prepare media attachment for the header message
+        files_to_attach = []
+        if media_urls:
+            # Download first media item for attachment
+            first_media_url = media_urls[0]
+            try:
+                print(f"📥 Downloading media for summary: {first_media_url}")
+                resp = requests.get(first_media_url, timeout=30, headers={'User-Agent': 'DiscordBot/1.0'})
+                resp.raise_for_status()
+                data = resp.content
+                
+                if len(data) < DISCORD_LIMIT:
+                    # Determine filename from URL
+                    filename = first_media_url.split('/')[-1].split('?')[0] or "media.jpg"
+                    if not filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.webm')):
+                        filename += ".jpg"
+                    
+                    files_to_attach.append(discord.File(io.BytesIO(data), filename=filename))
+                    print(f"✅ Media downloaded for summary: {len(data)/1024:.1f}KB")
+                else:
+                    print(f"⚠️ Media too large for summary attachment: {len(data)/1024/1024:.1f}MB")
+            except Exception as e:
+                print(f"⚠️ Failed to download media for summary: {e}")
+        
+        # Send header with media attached
+        header_kwargs = {"content": summary_header, "username": username, "wait": True}
+        if avatar:
+            header_kwargs["avatar_url"] = avatar
+        if files_to_attach:
+            header_kwargs["files"] = files_to_attach
+        
+        await webhook.send(**header_kwargs)
+        print(f"✅ Sent summary header with media")
+        
+        # Send detail link separately
+        link_kwargs = {"content": summary_link, "username": username, "wait": True}
+        if avatar:
+            link_kwargs["avatar_url"] = avatar
+        
+        await webhook.send(**link_kwargs)
+        print(f"✅ Sent summary detail link")
             
     except Exception as e:
         print(f"❌ Failed to send summary via webhook: {e}")
         # Fallback to regular channel send
-        for chunk in _split_message(content, limit=2000):
-            await summary_message.channel.send(chunk)
+        try:
+            # Send header first
+            await summary_message.channel.send(summary_header)
+            # Send detail link
+            await summary_message.channel.send(summary_link)
+        except Exception as e2:
+            print(f"❌ Fallback also failed: {e2}")
 
 def upload_to_catbox(video_data: bytes) -> str | None:
     """Uploads video data to Catbox.moe with retry logic on failures."""
