@@ -22,6 +22,13 @@ def _get_data_path(filename):
         return dashboard_path
     return root_path
 
+def _get_source_data_path(filename):
+    """Get path for data files in dashboard/data/source directory only"""
+    source_path = BASE_DIR / "dashboard" / "data" / "source" / filename
+    # Ensure the source directory exists
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    return source_path
+
 FEED_LIST = _get_data_path("feeds.txt")  # Try dashboard/data/feeds.txt first
 
 # Optional: if FEEDS_R2_BUCKET is configured, attempt to download feeds.txt from R2 at startup
@@ -63,7 +70,7 @@ def _maybe_fetch_feeds_from_r2():
 
 # Try to fetch feeds from R2 on import
 _maybe_fetch_feeds_from_r2()
-SEEN_DB   = _get_data_path("seen.json")  # Try dashboard/data/source/seen.json, then dashboard/data, then root
+SEEN_DB   = _get_source_data_path("seen.json")  # Always use dashboard/data/source/seen.json
 
 # Optional R2/S3 bucket for persisting runtime state (seen.json)
 SEEN_R2_BUCKET = os.getenv('SEEN_R2_BUCKET') or os.getenv('FEEDS_R2_BUCKET') or os.getenv('R2_BUCKET')

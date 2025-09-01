@@ -58,16 +58,20 @@ jobs:
           FEEDS_R2_BUCKET: ${{ secrets.FEEDS_R2_BUCKET }}
           SEEN_R2_BUCKET: ${{ secrets.SEEN_R2_BUCKET }}
         run: |
-          echo "Checking for dashboard/data/seen.json to upload to R2"
+          echo "Checking for dashboard/data/source/seen.json to upload to R2"
           echo "PWD=$(pwd)"
           ls -la
-          mkdir -p dashboard/data
-          if [ ! -f "dashboard/data/seen.json" ] && [ -f "seen.json" ]; then
-            echo "Found legacy seen.json; moving to dashboard/data/seen.json"
-            mv seen.json dashboard/data/seen.json
+          mkdir -p dashboard/data/source
+          if [ ! -f "dashboard/data/source/seen.json" ] && [ -f "dashboard/data/seen.json" ]; then
+            echo "Found legacy dashboard/data/seen.json; moving to dashboard/data/source/seen.json"
+            mv dashboard/data/seen.json dashboard/data/source/seen.json
           fi
-          if [ ! -f "dashboard/data/seen.json" ]; then
-            echo "No dashboard/data/seen.json present; skipping upload"
+          if [ ! -f "dashboard/data/source/seen.json" ] && [ -f "seen.json" ]; then
+            echo "Found legacy seen.json; moving to dashboard/data/source/seen.json"
+            mv seen.json dashboard/data/source/seen.json
+          fi
+          if [ ! -f "dashboard/data/source/seen.json" ]; then
+            echo "No dashboard/data/source/seen.json present; skipping upload"
             exit 0
           fi
           # Choose bucket: prefer R2_BUCKET, then FEEDS_R2_BUCKET, then SEEN_R2_BUCKET
@@ -86,6 +90,6 @@ jobs:
           export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY}"
           export AWS_DEFAULT_REGION="us-east-1"
 
-          echo "Uploading dashboard/data/seen.json to s3://${TARGET_BUCKET}/dashboard/data/seen.json (endpoint: ${R2_ENDPOINT})"
-          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "dashboard/data/seen.json" "s3://${TARGET_BUCKET}/dashboard/data/seen.json" || (echo "Upload failed"; exit 1)
-          echo "Uploaded dashboard/data/seen.json"
+          echo "Uploading dashboard/data/source/seen.json to s3://${TARGET_BUCKET}/dashboard/data/source/seen.json (endpoint: ${R2_ENDPOINT})"
+          aws --endpoint-url "${R2_ENDPOINT}" s3 cp "dashboard/data/source/seen.json" "s3://${TARGET_BUCKET}/dashboard/data/source/seen.json" || (echo "Upload failed"; exit 1)
+          echo "Uploaded dashboard/data/source/seen.json"
