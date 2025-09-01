@@ -549,22 +549,34 @@ async def process_media(entry, channel):
 
 async def process_entry_in_thread(client, entry, thread, summary):
     """Process a single entry in a text channel thread via webhook (impersonate FB poster)."""
-    body = await build_full_body(entry)
-    # Send via webhook so messages show as the FB poster
-    parent = getattr(thread, 'parent', None)
-    webhook_url = await get_or_create_webhook_url(parent or thread)
-    webhook = discord.Webhook.from_url(webhook_url, client=client)
-    username = (entry.get('page_name') or '').strip() or 'Facebook Page'
-    avatar = avatar_for(entry)
-    last_msg = None
-    for chunk in _split_message_by_newline(body):
-        last_msg = await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=True)
-    
-    # Update per-channel summary if we have a posted message
-    if last_msg:
-        await update_daily_summary_message(summary, entry, last_msg)
-
-        print(f"❌ Skipping forum post for '{title}' due to above error")
+    try:
+        body = await build_full_body(entry)
+        # Send via webhook so messages show as the FB poster
+        parent = getattr(thread, 'parent', None)
+        webhook_url = await get_or_create_webhook_url(parent or thread)
+        webhook = discord.Webhook.from_url(webhook_url, client=client)
+        username = (entry.get('page_name') or '').strip() or 'Facebook Page'
+        avatar = avatar_for(entry)
+        last_msg = None
+        for chunk in _split_message_by_newline(body):
+            try:
+                last_msg = await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=True)
+                print(f"✅ Posted chunk to thread {thread.id}: {chunk[:50]}...")
+            except Exception as e:
+                print(f"❌ Failed to send webhook chunk: {e}")
+                return None
+        
+        # Update per-channel summary if we have a posted message
+        if last_msg:
+            await update_daily_summary_message(summary, entry, last_msg)
+            print(f"✅ Successfully posted entry '{entry.get('title', 'No title')[:50]}' to thread")
+            return last_msg
+        else:
+            print(f"⚠️ No message posted for entry '{entry.get('title', 'No title')[:50]}'")
+            return None
+    except Exception as e:
+        print(f"❌ Error processing entry in thread: {e}")
+        return None
 
 # Override with webhook-based forum posting so the sender appears as the FB page
 async def process_entry_in_forum(client, entry, forum_channel):
@@ -840,10 +852,21 @@ async def process_feeds_once(client: discord.Client):
 
             # Post full entries in that thread and update per-channel summary
             for e in entries:
-                await process_entry_in_thread(client, e, thr, summary)
+                try:
+                    result = await process_entry_in_thread(client, e, thr, summary)
+                    if result:
+                        print(f"✅ Entry processed successfully: {e.get('title', 'No title')[:50]}")
+                    else:
+                        print(f"⚠️ Entry failed to post: {e.get('title', 'No title')[:50]}")
+                except Exception as ex:
+                    print(f"❌ Exception processing entry: {ex}")
+                    continue
                 
                 # Process media (Facebook videos, images, etc.)
-                await process_media(e, ch)
+                try:
+                    await process_media(e, ch)
+                except Exception as ex:
+                    print(f"❌ Exception processing media: {ex}")
                 
                 # Mark as seen and save
                 seen.add(e['guid'])
