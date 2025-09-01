@@ -165,3 +165,20 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Generate Dashboard Data
+        if: always()
+        run: |
+          set -e
+          echo "📊 Generating dashboard data..."
+          python generate_dashboard_data.py
+          
+          # Check if there are changes to commit
+          if git diff --quiet docs/data/; then
+            echo "✅ No dashboard data changes to commit"
+          else
+            echo "📝 Committing dashboard data changes..."
+            git add docs/data/
+            git commit -m "📊 Update dashboard data - run ${{ github.run_id }}" || echo "No changes to commit"
+            git push || echo "Failed to push dashboard data"
+          fi
+

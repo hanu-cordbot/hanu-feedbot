@@ -77,7 +77,11 @@ async def get_or_create_webhook_url(channel: Any) -> str:
         if hook.name == 'hanu-feedbot':
             return f"https://discord.com/api/webhooks/{hook.id}/{hook.token}"
     
-    new_hook = await channel.create_webhook(name='hanu-feedbot')  # type: ignore
+    # Create webhook with explicit avatar to ensure it can be overridden
+    new_hook = await channel.create_webhook(
+        name='hanu-feedbot'
+        # Don't set avatar or reason to allow per-message override
+    )  # type: ignore
     return f"https://discord.com/api/webhooks/{new_hook.id}/{new_hook.token}"
 
 async def push(client: discord.Client, target: discord.TextChannel | discord.ForumChannel | discord.Thread, entry: dict, body: str, tldr: str, post_time: str):
