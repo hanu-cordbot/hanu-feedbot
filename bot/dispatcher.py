@@ -411,8 +411,8 @@ async def get_daily_summary_message(channel, today_str):
             return message
     return None
 
-async def create_daily_summary_message(channel, vietnamese_date, entry=None):
-    """Creates the initial summary message for the day using a file as source of truth."""
+async def create_daily_summary_message(channel, vietnamese_date):
+    """Creates the initial summary message for the day using bot identity."""
     # Create daily summary header and file
     # Use local Vietnam timezone to match displayed Vietnamese date
     today_str = pendulum.now('Asia/Ho_Chi_Minh').to_date_string()
@@ -423,22 +423,8 @@ async def create_daily_summary_message(channel, vietnamese_date, entry=None):
     content = f"{header_line}\n{credit_line}"
     
     try:
-        # Use webhook to impersonate Facebook page identity for daily summary
-        if entry:
-            webhook_url = await get_or_create_webhook_url(channel)
-            webhook = discord.Webhook.from_url(webhook_url, client=None)  # No client needed for sending
-            
-            username = entry.get("page_name", "").strip() or "HANU News Bot"
-            avatar = avatar_for(entry) if entry else None
-            
-            send_kwargs = {"content": content, "username": username, "wait": True}
-            if avatar:
-                send_kwargs["avatar_url"] = avatar
-                
-            message = await webhook.send(**send_kwargs)
-        else:
-            # Fallback to bot identity if no entry provided
-            message = await channel.send(content)
+        # Always use bot identity for daily summary message
+        message = await channel.send(content)
         
         # Add reactions only to the date message
         for reaction in ["👍", "❤️", "😂", "😮", "😢", "😡"]:
@@ -455,15 +441,7 @@ async def create_daily_summary_message(channel, vietnamese_date, entry=None):
         return None
     except Exception as e:
         print(f"❌ Error creating daily summary message: {e}")
-        # Fallback to regular channel send
-        try:
-            message = await channel.send(content)
-            for reaction in ["👍", "❤️", "😂", "😮", "😢", "😡"]:
-                await message.add_reaction(reaction)
-            return message
-        except Exception as e2:
-            print(f"❌ Fallback also failed: {e2}")
-            return None
+        return None
 
 async def update_daily_summary_message(summary_message, entry, posted_message):
     """Appends a new post's summary to the daily summary message."""
