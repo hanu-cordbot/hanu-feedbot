@@ -2,6 +2,8 @@ name: HANU Feed Bot
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 on:
   schedule:
@@ -28,6 +30,10 @@ on:
         required: false
         default: 'false'
         type: string
+      fb_post_url:
+        description: 'Optional Facebook post URL to download and upload to R2'
+        required: false
+        default: ''
 
 jobs:
   run-feed-bot:
@@ -167,9 +173,67 @@ jobs:
 
       - name: Generate Dashboard Data
         if: always()
+        env:
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
         run: |
           set -e
           echo "📊 Generating dashboard data..."
+          
+          # Fetch additional data from R2 for dashboard
+          python - << 'PY'
+          import os, sys
+          b=os.getenv('R2_BUCKET'); a=os.getenv('R2_ACCESS_KEY_ID'); s=os.getenv('R2_SECRET_ACCESS_KEY'); e=os.getenv('R2_ENDPOINT')
+          if not b or not a or not s:
+            print('R2 not configured; skipping additional data fetch')
+            sys.exit(0)
+          try:
+            import boto3
+            os.makedirs('dashboard/data/source', exist_ok=True)
+            c=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
+            
+            # Fetch channels.json
+            for key in ['dashboard/data/source/channels.json','dashboard/data/channels.json','channels.json']:
+              try:
+                c.download_file(b, key, 'dashboard/data/source/channels.json'); print('Downloaded', key); break
+              except Exception as ex:
+                print('Could not download', key, '-', ex)
+            
+            # Fetch groups.json
+            for key in ['dashboard/data/source/groups.json','dashboard/data/groups.json','groups.json']:
+              try:
+                c.download_file(b, key, 'dashboard/data/source/groups.json'); print('Downloaded', key); break
+              except Exception as ex:
+                print('Could not download', key, '-', ex)
+            
+            # Fetch feeds.txt
+            for key in ['dashboard/data/source/feeds.txt','dashboard/data/feeds.txt','feeds.txt']:
+              try:
+                c.download_file(b, key, 'dashboard/data/source/feeds.txt'); print('Downloaded', key); break
+              except Exception as ex:
+                print('Could not download', key, '-', ex)
+          except Exception as ex:
+            print('boto3 not available or download failed:', ex)
+          PY
+          
+          # Fetch channel names if Discord token available
+          if [ -n "$DISCORD_BOT_TOKEN" ]; then
+            python fetch_channel_names.py || echo "fetch_channel_names failed (non-fatal)"
+          fi
+          
+          # Ensure required files exist
+          python - <<'PY'
+          import os, json
+          os.makedirs('dashboard/data/source', exist_ok=True)
+          ch_path = 'dashboard/data/source/channels.json'
+          if not os.path.exists(ch_path):
+              open(ch_path, 'w', encoding='utf-8').write(json.dumps([], indent=2))
+          PY
+          
+          # Generate dashboard data
           python generate_dashboard_data.py
           
           # Check if there are changes to commit
@@ -181,4 +245,85 @@ jobs:
             git commit -m "📊 Update dashboard data - run ${{ github.run_id }}" || echo "No changes to commit"
             git push || echo "Failed to push dashboard data"
           fi
+
+      - name: Download Facebook video (if URL provided)
+        if: ${{ github.event.inputs.fb_post_url != '' }}
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          NETSCAPE_COOKIES_KEY: ${{ secrets.NETSCAPE_COOKIES_KEY }}
+        run: |
+          set -e
+          # Fetch cookies if available
+          if [ -n "$NETSCAPE_COOKIES_KEY" ] && [ -n "$R2_BUCKET" ]; then
+            python - <<'PY'
+          import os, boto3
+          b=os.environ.get('R2_BUCKET'); e=os.environ.get('R2_ENDPOINT'); a=os.environ.get('R2_ACCESS_KEY_ID'); s=os.environ.get('R2_SECRET_ACCESS_KEY'); k=os.environ.get('NETSCAPE_COOKIES_KEY')
+          if all([b,e,a,s,k]):
+            try:
+              c=boto3.client('s3', aws_access_key_id=a, aws_secret_access_key=s, endpoint_url=e)
+              c.download_file(b, k, 'netscape_cookies.txt')
+              print('Downloaded cookies from R2')
+            except Exception as ex:
+              print('Could not download cookies:', ex)
+          PY
+          fi
+          
+          # Download and upload Facebook video
+          python tools/fb_upload_run.py "${{ github.event.inputs.fb_post_url }}" || echo "FB upload step failed (non-fatal)"
+
+      - name: Upload dashboard data to R2
+        if: always()
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          FEEDS_R2_BUCKET: ${{ secrets.FEEDS_R2_BUCKET }}
+        run: |
+          set -e
+          BUCKET="${R2_BUCKET:-${FEEDS_R2_BUCKET:-$SEEN_R2_BUCKET}}"
+          if [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ] || [ -z "$BUCKET" ]; then
+            echo "Missing required R2 secrets; skipping upload"
+            exit 0
+          fi
+
+          if ! command -v aws >/dev/null 2>&1; then
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+            unzip -q awscliv2.zip
+            sudo ./aws/install -i /usr/local/aws-cli -b /usr/local/bin || true
+          fi
+
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION="us-east-1"
+
+          PREFIX="dashboard/data"
+          
+          # Upload generated dashboard data
+          mkdir -p docs/data
+          for f in docs/data/*.json; do
+            [ -f "$f" ] || continue
+            base=$(basename "$f")
+            key="$PREFIX/$base"
+            echo "Uploading $f -> s3://$BUCKET/$key"
+            aws --endpoint-url "$R2_ENDPOINT" s3 cp "$f" "s3://$BUCKET/$key" --acl public-read || echo "Upload failed for $f"
+          done
+
+      - name: Deploy to GitHub Pages
+        if: always()
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact for Pages
+        if: always()
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './docs'
+
+      - name: Deploy to GitHub Pages
+        if: always()
+        id: deployment
+        uses: actions/deploy-pages@v4
 

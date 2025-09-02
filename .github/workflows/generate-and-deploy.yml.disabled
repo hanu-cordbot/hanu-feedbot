@@ -1,3 +1,9 @@
+# RETIRED: This workflow has been integrated into feed-bot.yml
+# The dashboard generation and deployment is now part of the main feed bot workflow
+# to reduce redundancy and improve efficiency.
+#
+# Original workflow name: Generate and deploy dashboard data
+
 name: Generate and deploy dashboard data
 
 on:
