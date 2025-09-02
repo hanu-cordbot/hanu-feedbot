@@ -947,7 +947,7 @@ async def run_bot_job():
 if __name__ == "__main__":
     print("🤖 Starting standalone bot job...")
     try:
-        asyncio.run(run
+        asyncio.run(run_bot_job())
         print("✅ Bot job completed successfully")
     except Exception as e:
         print(f"❌ Bot job failed: {e}")
