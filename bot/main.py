@@ -595,18 +595,92 @@ async def process_entry_in_forum(client, entry, forum_channel):
     except Exception:
         pass
 
-    # Collect media with proper video processing
+    # Collect media with proper video download handling
     media_urls = entry.get('media_all', []) or []
     image_exts = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
     video_exts = ('.mp4', '.mov', '.webm', '.mkv')
-    video_files = []
-    image_files = []
-    video_link = None
+    video_files: list[discord.File] = []
+    image_files: list[discord.File] = []
+    video_links = []  # For R2/external video links
     
     # Create temp directory for video downloads
-    temp_dir = tempfile.mkdtemp(prefix="hanu_feedbot_forum_")
+    temp_dir = tempfile.mkdtemp(prefix="forum_video_")
     TEMP_DIRS_TO_CLEANUP.append(temp_dir)
     
+    try:
+        # Check if this is a Facebook post URL and try to download video
+        post_url = entry.get('link', '')
+        if "facebook.com" in post_url:
+            print(f"📥 Forum: Downloading video from Facebook URL: {post_url}")
+            download_path = os.path.join(temp_dir, f"facebook_video_{random.randint(1000, 9999)}.mp4")
+            file_path = await download_video_ytdlp(post_url, output_path=download_path)
+            
+            if file_path and os.path.exists(file_path):
+                file_size = os.path.getsize(file_path)
+                if file_size > 100000:  # Not just a thumbnail
+                    print(f"✅ Forum: Downloaded video {file_size/1024/1024:.2f}MB")
+                    
+                    if file_size <= DISCORD_LIMIT:
+                        # Small enough for Discord
+                        video_files.append(discord.File(file_path, filename="facebook_video.mp4"))
+                    else:
+                        # Too large, upload to R2
+                        with open(file_path, 'rb') as f:
+                            file_data = f.read()
+                        
+                        if should_use_r2_storage(file_size):
+                            post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
+                            r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
+                            
+                            if r2_url:
+                                video_message = create_video_embed_message(r2_url, post_title, post_url)
+                                video_links.append(video_message)
+                            else:
+                                # Fallback to Catbox
+                                from bot.dispatcher import upload_to_catbox
+                                catbox_url = upload_to_catbox(file_data)
+                                if catbox_url:
+                                    video_links.append(catbox_url)
+        
+        # Process individual media URLs for images and direct video links
+        for url in media_urls:
+            if len(image_files) >= 10:  # Discord limit
+                break
+            u = (url or '').split('?')[0].lower()
+            try:
+                # Facebook video URLs - try to download
+                if "facebook.com" in url and not video_files and not video_links:
+                    video_norm = normalize_url(url)
+                    if video_norm:
+                        download_path = os.path.join(temp_dir, f"facebook_video_{random.randint(1000, 9999)}.mp4")
+                        file_path = await download_video_ytdlp(video_norm, output_path=download_path)
+                        
+                        if file_path and os.path.exists(file_path):
+                            file_size = os.path.getsize(file_path)
+                            if file_size > 100000:
+                                if file_size <= DISCORD_LIMIT:
+                                    video_files.append(discord.File(file_path, filename="facebook_video.mp4"))
+                                    continue
+                
+                # Direct video files
+                if u.endswith(video_exts) and not video_files:
+                    data = await download_bytes(url)
+                    if len(data) <= DISCORD_LIMIT:
+                        name = url.split('/')[-1].split('?')[0] or 'video.mp4'
+                        video_files.append(discord.File(io.BytesIO(data), filename=name))
+                        continue
+                
+                # Images
+                if u.endswith(image_exts):
+                    data = await download_bytes(url)
+                    if len(data) <= DISCORD_LIMIT:
+                        name = url.split('/')[-1].split('?')[0] or 'image.jpg'
+                        image_files.append(discord.File(io.BytesIO(data), filename=name))
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"❌ Forum media processing error: {e}")
+
     # Build body text and strip trailing original link
     body_full = await build_full_body(entry)
     post_link = entry.get('link') or ''
@@ -616,127 +690,43 @@ async def process_entry_in_forum(client, entry, forum_channel):
     else:
         body_text = body_full
     chunks = _split_message_by_newline(body_text) or [" "]
-    
-    # Initialize variables for content determination
-    first_content = None
-    first_files = []
-    
+
     try:
-        # Process each media URL
-        for url in media_urls:
-            if len(video_files) + len(image_files) >= 10:  # Discord limit
-                break
-                
-            try:
-                # Check if it's a video URL
-                if any(url.lower().endswith(ext) for ext in video_exts) or 'facebook.com' in url:
-                    print(f"🎬 Processing video URL: {url}")
-                    
-                    # Download video
-                    download_path = os.path.join(temp_dir, f"video_{random.randint(1000, 9999)}.mp4")
-                    file_path = await download_video_ytdlp(url, output_path=download_path)
-                    
-                    if file_path and os.path.exists(file_path):
-                        file_size = os.path.getsize(file_path)
-                        
-                        if file_size <= DISCORD_LIMIT:
-                            # Small video - send directly
-                            video_files.append(discord.File(file_path, filename="video.mp4"))
-                            print(f"✅ Added video file: {file_size/1024/1024:.2f}MB")
-                        else:
-                            # Large video - upload to R2 and create link
-                            with open(file_path, 'rb') as f:
-                                video_data = f.read()
-                            
-                            if should_use_r2_storage(file_size):
-                                post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                                r2_url = await upload_video_to_r2_async(video_data, post_title, r2_client, R2_VIDEO_BUCKET)
-                                
-                                if r2_url:
-                                    video_message = create_video_embed_message(r2_url, post_title, url)
-                                    # Send R2 video link as text content
-                                    video_link = video_message
-                                    print(f"✅ Uploaded large video to R2: {r2_url}")
-                                else:
-                                    # Fallback to Catbox
-                                    from bot.dispatcher import upload_to_catbox
-                                    catbox_url = upload_to_catbox(video_data)
-                                    if catbox_url:
-                                        video_link = catbox_url
-                                        print(f"✅ Uploaded to Catbox: {catbox_url}")
-                                    else:
-                                        print("❌ Failed to upload large video")
-                            else:
-                                print(f"⚠️ Video too large for any storage: {file_size/1024/1024:.2f}MB")
-                    else:
-                        print(f"⚠️ Failed to download video from: {url}")
-                        
-                # Check if it's an image URL
-                elif any(url.lower().endswith(ext) for ext in image_exts):
-                    print(f"🖼️ Processing image URL: {url}")
-                    
-                    # Download image
-                    data = await download_bytes(url)
-                    if len(data) <= DISCORD_LIMIT:
-                        name = url.split('/')[-1].split('?')[0] or 'image.jpg'
-                        image_files.append(discord.File(io.BytesIO(data), filename=name))
-                        print(f"✅ Added image file: {len(data)/1024:.1f}KB")
-                    else:
-                        print(f"⚠️ Image too large: {len(data)/1024/1024:.1f}MB")
-                        
-            except Exception as e:
-                print(f"⚠️ Error processing media URL {url}: {e}")
-                continue
-    
-        # Determine what to send first
-        first_content = None
-        first_files = []
-        
-        if video_files:
-            # Send first video file
-            first_files = [video_files[0]]
-            print(f"🎬 Sending video file as first content")
-        elif image_files:
-            # Send first batch of images
-            first_files = image_files[:10]
-            print(f"🖼️ Sending {len(first_files)} images as first content")
-        elif video_link:
-            # Send R2/Catbox video link as text
-            first_content = video_link
-            print(f"🔗 Sending video link as first content: {video_link[:50]}...")
-        else:
-            # Send first text chunk
-            first_content = chunks[0] if chunks else " "
-            print(f"📝 Sending text as first content")
-        
         webhook_url = await get_or_create_webhook_url(forum_channel)
         webhook = discord.Webhook.from_url(webhook_url, client=client)
         username = (entry.get('page_name') or '').strip() or 'Facebook Page'
         avatar = avatar_for(entry)
-        
-        # Send initial content (video/image/text)
-        if first_files:
-            msg = await webhook.send(username=username, avatar_url=avatar, thread_name=title, files=first_files, wait=True)
-        elif first_content:
-            msg = await webhook.send(content=first_content, username=username, avatar_url=avatar, thread_name=title, wait=True)
+        # Create thread with media or text
+        if video_files:
+            # Send video files directly
+            msg = await webhook.send(username=username, avatar_url=avatar, thread_name=title, files=video_files[:1], wait=True)
+        elif video_links:
+            # Send video links (R2/external)
+            msg = await webhook.send(content=video_links[0], username=username, avatar_url=avatar, thread_name=title, wait=True)
+        elif image_files:
+            first_batch = image_files[:10]
+            msg = await webhook.send(username=username, avatar_url=avatar, thread_name=title, files=first_batch, wait=True)
         else:
-            msg = await webhook.send(content=chunks[0] if chunks else " ", username=username, avatar_url=avatar, thread_name=title, wait=True)
-        
+            msg = await webhook.send(content=chunks[0], username=username, avatar_url=avatar, thread_name=title, wait=True)
         thread = msg.channel
         
-        # Send remaining video files
+        # Send remaining video files if any
         if len(video_files) > 1:
-            for video_file in video_files[1:]:
-                await webhook.send(username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), files=[video_file], wait=False)
+            for i in range(1, len(video_files)):
+                await webhook.send(username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), files=[video_files[i]], wait=False)
+        
+        # Send remaining video links if any
+        if len(video_links) > 1:
+            for link in video_links[1:]:
+                await webhook.send(content=link, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
         
         # Send remaining images batches
         if len(image_files) > 10:
             for i in range(10, len(image_files), 10):
-                batch = image_files[i:i+10]
-                await webhook.send(username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), files=batch, wait=False)
+                await webhook.send(username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), files=image_files[i:i+10], wait=False)
         
         # Send remaining text chunks FIRST
-        start_idx = 1 if (not first_content and not first_files and chunks) else 0
+        start_idx = 1 if (not video_files and not video_links and not image_files and chunks) else 0
         for chunk in chunks[start_idx:]:
             await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
         
@@ -748,18 +738,31 @@ async def process_entry_in_forum(client, entry, forum_channel):
         print(f"⚠️ Webhook forum post failed: {e}")
         # Fallback to direct API (bot identity)
         try:
-            first = first_content or (chunks[0] if chunks else ' ')
-            thread = await forum_channel.create_thread(name=title, content=first)
-            if first_files:
-                await thread.send(files=first_files)
+            # Determine initial content
+            if video_files:
+                thread = await forum_channel.create_thread(name=title, content=" ", files=video_files[:1])
+            elif video_links:
+                thread = await forum_channel.create_thread(name=title, content=video_links[0])
+            else:
+                first = chunks[0] if chunks else ' '
+                thread = await forum_channel.create_thread(name=title, content=first)
+            
+            # Send remaining videos
             if len(video_files) > 1:
-                for video_file in video_files[1:]:
-                    await thread.send(file=video_file)
-            if len(image_files) > 10:
-                for i in range(10, len(image_files), 10):
-                    batch = image_files[i:i+10]
-                    await thread.send(files=batch)
-            start_idx = 1 if (not first_content and not first_files and chunks) else 0
+                for i in range(1, len(video_files)):
+                    await thread.send(files=[video_files[i]])
+            
+            if len(video_links) > 1:
+                for link in video_links[1:]:
+                    await thread.send(link)
+            
+            # Send images
+            if image_files:
+                for i in range(0, len(image_files), 10):
+                    await thread.send(files=image_files[i:i+10])
+            
+            # Send remaining text chunks
+            start_idx = 1 if (not video_files and not video_links and not image_files) else 0
             for chunk in chunks[start_idx:]:
                 try:
                     await thread.send(chunk)
@@ -769,16 +772,6 @@ async def process_entry_in_forum(client, entry, forum_channel):
                 await thread.send(f"Details - <{post_link}>")
         except Exception as e2:
             print(f"❌ Direct forum thread creation also failed: {e2}")
-    
-    finally:
-        # Cleanup temp directory
-        if temp_dir in TEMP_DIRS_TO_CLEANUP:
-            TEMP_DIRS_TO_CLEANUP.remove(temp_dir)
-        try:
-            import shutil
-            shutil.rmtree(temp_dir, ignore_errors=True)
-        except Exception:
-            pass
 
 async def process_feeds_once(client: discord.Client):
     """Scans feeds and processes new entries per-channel summary."""
