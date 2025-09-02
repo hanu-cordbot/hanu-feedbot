@@ -595,16 +595,31 @@ async def process_entry_in_forum(client, entry, forum_channel):
     except Exception:
         pass
 
-    # Collect media
+    # Collect media with proper video processing
     media_urls = entry.get('media_all', []) or []
     image_exts = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
     video_exts = ('.mp4', '.mov', '.webm', '.mkv')
     video_files = []
     image_files = []
+    video_link = None
     
     # Create temp directory for video downloads
     temp_dir = tempfile.mkdtemp(prefix="hanu_feedbot_forum_")
     TEMP_DIRS_TO_CLEANUP.append(temp_dir)
+    
+    # Build body text and strip trailing original link
+    body_full = await build_full_body(entry)
+    post_link = entry.get('link') or ''
+    link_token = f"<{post_link}>" if post_link else ''
+    if link_token and body_full.rstrip().endswith(link_token):
+        body_text = body_full[: body_full.rfind(link_token)].rstrip()
+    else:
+        body_text = body_full
+    chunks = _split_message_by_newline(body_text) or [" "]
+    
+    # Initialize variables for content determination
+    first_content = None
+    first_files = []
     
     try:
         # Process each media URL
@@ -673,30 +688,33 @@ async def process_entry_in_forum(client, entry, forum_channel):
                 print(f"⚠️ Error processing media URL {url}: {e}")
                 continue
     
-    # Determine what to send first
-    first_content = None
-    first_files = []
-    
-    if video_files:
-        # Send first video file
-        first_files = [video_files[0]]
-        print(f"🎬 Sending video file as first content")
-    elif image_files:
-        # Send first batch of images
-        first_files = image_files[:10]
-        print(f"🖼️ Sending {len(first_files)} images as first content")
-    elif video_link:
-        # Send R2/Catbox video link as text
-        first_content = video_link
-        print(f"🔗 Sending video link as first content: {video_link[:50]}...")
-    else:
-        # Send first text chunk
-        first_content = chunks[0] if chunks else " "
-        print(f"📝 Sending text as first content")
-    
-    # Send initial content (video/image/text)
-    if first_files:
-        # Create thread with media or text
+        # Determine what to send first
+        first_content = None
+        first_files = []
+        
+        if video_files:
+            # Send first video file
+            first_files = [video_files[0]]
+            print(f"🎬 Sending video file as first content")
+        elif image_files:
+            # Send first batch of images
+            first_files = image_files[:10]
+            print(f"🖼️ Sending {len(first_files)} images as first content")
+        elif video_link:
+            # Send R2/Catbox video link as text
+            first_content = video_link
+            print(f"🔗 Sending video link as first content: {video_link[:50]}...")
+        else:
+            # Send first text chunk
+            first_content = chunks[0] if chunks else " "
+            print(f"📝 Sending text as first content")
+        
+        webhook_url = await get_or_create_webhook_url(forum_channel)
+        webhook = discord.Webhook.from_url(webhook_url, client=client)
+        username = (entry.get('page_name') or '').strip() or 'Facebook Page'
+        avatar = avatar_for(entry)
+        
+        # Send initial content (video/image/text)
         if first_files:
             msg = await webhook.send(username=username, avatar_url=avatar, thread_name=title, files=first_files, wait=True)
         elif first_content:
