@@ -549,8 +549,12 @@ async def process_media(entry, channel):
             TEMP_DIRS_TO_CLEANUP.append(temp_dir)
 
 async def process_entry_in_thread(client, entry, thread, summary):
-    """Process a single entry in a text channel thread via webhook (impersonate FB poster)."""
+    """Process entry with media above body text."""
     try:
+        # Process media FIRST (before body text)
+        await process_media(entry, thread)  # Send media to thread
+        
+        # Then send body text
         body = await build_full_body(entry)
         # Send via webhook so messages show as the FB poster
         parent = getattr(thread, 'parent', None)
@@ -640,13 +644,15 @@ async def process_entry_in_forum(client, entry, forum_channel):
         if len(image_files) > 10:
             for i in range(10, len(image_files), 10):
                 await webhook.send(username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), files=image_files[i:i+10], wait=False)
-        # Post details below media
-        if post_link:
-            await webhook.send(content=f"Details - <{post_link}>", username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
-        # Post remaining text chunks (skip first if used as initial content)
+        
+        # Send remaining text chunks FIRST
         start_idx = 1 if (not video_link and not image_files and chunks) else 0
         for chunk in chunks[start_idx:]:
             await webhook.send(content=chunk, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
+        
+        # Send details link LAST (at bottom, near TL;DR)
+        if post_link:
+            await webhook.send(content=f"Details - <{post_link}>", username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
         return
     except Exception as e:
         print(f"⚠️ Webhook forum post failed: {e}")
@@ -657,13 +663,13 @@ async def process_entry_in_forum(client, entry, forum_channel):
             if image_files:
                 for i in range(0, len(image_files), 10):
                     await thread.send(files=image_files[i:i+10])
-            if post_link:
-                await thread.send(f"Details - <{post_link}>")
             for chunk in (chunks[1:] if (not video_link and not image_files) else chunks):
                 try:
                     await thread.send(chunk)
                 except Exception:
                     pass
+            if post_link:
+                await thread.send(f"Details - <{post_link}>")
         except Exception as e2:
             print(f"❌ Direct forum thread creation also failed: {e2}")
 
@@ -867,12 +873,6 @@ async def process_feeds_once(client: discord.Client):
                     print(f"❌ Exception processing entry: {ex}")
                     continue
                 
-                # Process media (Facebook videos, images, etc.)
-                try:
-                    await process_media(e, ch)
-                except Exception as ex:
-                    print(f"❌ Exception processing media: {ex}")
-                
                 # Mark as seen and save
                 seen.add(e['guid'])
                 save_seen_guids(seen)
@@ -947,7 +947,7 @@ async def run_bot_job():
 if __name__ == "__main__":
     print("🤖 Starting standalone bot job...")
     try:
-        asyncio.run(run_bot_job())
+        asyncio.run(run
         print("✅ Bot job completed successfully")
     except Exception as e:
         print(f"❌ Bot job failed: {e}")

@@ -96,8 +96,11 @@ async def upload_video_to_r2_async(video_data: bytes, post_title: str, r2_client
     return await asyncio.to_thread(upload_video_to_r2, video_data, post_title)
 
 def create_video_embed_message(video_url: str, post_title: str, post_url: Optional[str] = None) -> str:
-    """Return only the direct video URL so Discord renders the embed without a title line."""
-    return video_url
+    """Create a simple markdown video link instead of embed."""
+    if post_url:
+        return f"(video)[{video_url}]({post_url})"
+    else:
+        return f"(video)[{video_url}]"
 
 def get_video_size_limit() -> int:
     """Get the size limit for direct Discord uploads (8MB)"""

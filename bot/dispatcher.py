@@ -570,7 +570,13 @@ async def update_daily_summary_message(summary_message, entry, posted_message):
             except Exception as e:
                 print(f"⚠️ Failed to download media for summary: {e}")
         
-        # Send header with media attached
+        # Check for R2 videos and include them in the summary
+        r2_video_content = ""
+        if entry.get('r2_video_url'):
+            r2_video_content = f"\n{create_video_embed_message(entry['r2_video_url'], entry.get('title', 'Facebook Video'), entry.get('link'))}"
+            summary_header += r2_video_content
+        
+        # Send header with media attached (and R2 video if present)
         header_kwargs = {"content": summary_header, "username": username, "wait": True}
         if avatar:
             header_kwargs["avatar_url"] = avatar
@@ -578,7 +584,7 @@ async def update_daily_summary_message(summary_message, entry, posted_message):
             header_kwargs["files"] = files_to_attach
         
         await webhook.send(**header_kwargs)
-        print(f"✅ Sent summary header with media")
+        print(f"✅ Sent summary header with media and R2 videos")
         
         # Send detail link separately
         link_kwargs = {"content": summary_link, "username": username, "wait": True}
