@@ -94,7 +94,8 @@ from bot.r2_video import (
     upload_video_to_r2_async,
     create_video_embed_message,
     should_use_r2_storage,
-    get_video_size_limit
+    get_video_size_limit,
+    R2_VIDEO_BUCKET
 )
 
 print("✅ Configuration loaded.")
@@ -389,7 +390,7 @@ async def process_media(entry, channel):
                         
                         # Try R2 first
                         post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                        r2_url = await upload_video_to_r2_async(file_data, post_title)
+                        r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
                         
                         if r2_url:
                             print(f"✅ Uploaded to R2: {r2_url}")
@@ -438,7 +439,7 @@ async def process_media(entry, channel):
                             if should_use_r2_storage(file_size):
                                 # Try R2 first
                                 post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                                r2_url = await upload_video_to_r2_async(file_data, post_title)
+                                r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
                                 
                                 if r2_url:
                                     video_message = create_video_embed_message(r2_url, post_title, post_url)
@@ -491,7 +492,7 @@ async def process_media(entry, channel):
                                     if should_use_r2_storage(file_size):
                                         # Try R2 first
                                         post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                                        r2_url = await upload_video_to_r2_async(file_data, post_title)
+                                        r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
                                         
                                         if r2_url:
                                             video_message = create_video_embed_message(r2_url, post_title, video_norm)

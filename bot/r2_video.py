@@ -86,11 +86,16 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
         traceback.print_exc()
         return None
 
-async def upload_video_to_r2_async(video_data: bytes, post_title: str) -> Optional[str]:
-    """Async wrapper for R2 video upload"""
+async def upload_video_to_r2_async(video_data: bytes, post_title: str, r2_client=None, bucket_name: Optional[str] = None) -> Optional[str]:
+    """Async wrapper for R2 video upload with storage management"""
+    if r2_client and bucket_name:
+        # Check storage before upload
+        await check_and_cleanup_r2_storage(r2_client, bucket_name)
+    
+    # Perform the upload
     return await asyncio.to_thread(upload_video_to_r2, video_data, post_title)
 
-def create_video_embed_message(video_url: str, post_title: str, post_url: str = None) -> str:
+def create_video_embed_message(video_url: str, post_title: str, post_url: Optional[str] = None) -> str:
     """Return only the direct video URL so Discord renders the embed without a title line."""
     return video_url
 
@@ -102,38 +107,61 @@ def should_use_r2_storage(file_size: int) -> bool:
     """Determine if a video should be stored in R2 instead of direct upload"""
     return file_size > get_video_size_limit()
 
-# Backup cleanup function for large videos
-def cleanup_old_videos(days_old: int = 30) -> None:
-    """Clean up old videos from R2 bucket (optional maintenance function)"""
-    if not R2_VIDEO_BUCKET:
-        return
-        
-    client = r2_client()
-    if not client:
-        return
-        
+async def check_and_cleanup_r2_storage(r2_client, bucket_name: str, max_storage_gb: float = 4.9):
+    """Check R2 storage usage and delete old files if approaching limit."""
+    max_storage_bytes = max_storage_gb * 1024 * 1024 * 1024  # Convert GB to bytes
+    
     try:
-        from datetime import datetime, timedelta
-        cutoff_date = datetime.now() - timedelta(days=days_old)
+        # List all objects in bucket
+        objects = []
+        paginator = r2_client.get_paginator('list_objects_v2')
         
-        # List objects in videos/ folder
-        response = client.list_objects_v2(Bucket=R2_VIDEO_BUCKET, Prefix='videos/')
+        async for page in paginator.paginate(Bucket=bucket_name):
+            if 'Contents' in page:
+                objects.extend(page['Contents'])
         
-        if 'Contents' not in response:
+        if not objects:
+            print(f"📊 R2 Storage: 0GB / {max_storage_gb}GB (0%)")
             return
             
-        deleted_count = 0
-        for obj in response['Contents']:
-            if obj['LastModified'].replace(tzinfo=None) < cutoff_date:
-                client.delete_object(Bucket=R2_VIDEO_BUCKET, Key=obj['Key'])
-                deleted_count += 1
-                
-        if deleted_count > 0:
-            print(f"🧹 Cleaned up {deleted_count} old videos from R2")
+        # Calculate total storage
+        total_size = sum(obj['Size'] for obj in objects)
+        usage_percent = (total_size / max_storage_bytes) * 100
+        
+        print(f"📊 R2 Storage: {total_size/1024/1024/1024:.2f}GB / {max_storage_gb}GB ({usage_percent:.1f}%)")
+        
+        if usage_percent >= 90:  # Start cleanup at 90% usage
+            print("🧹 Starting R2 cleanup...")
+            
+            # Sort by last modified (oldest first)
+            objects.sort(key=lambda x: x['LastModified'])
+            
+            # Delete oldest files until we're under 70%
+            target_size = max_storage_bytes * 0.7
+            deleted_count = 0
+            deleted_size = 0
+            
+            for obj in objects:
+                if total_size <= target_size:
+                    break
+                    
+                try:
+                    await asyncio.to_thread(
+                        r2_client.delete_object,
+                        Bucket=bucket_name,
+                        Key=obj['Key']
+                    )
+                    total_size -= obj['Size']
+                    deleted_size += obj['Size']
+                    deleted_count += 1
+                    print(f"🗑️ Deleted: {obj['Key']} ({obj['Size']/1024/1024:.1f}MB)")
+                except Exception as e:
+                    print(f"❌ Failed to delete {obj['Key']}: {e}")
+            
+            print(f"✅ Cleanup complete: deleted {deleted_count} files ({deleted_size/1024/1024:.1f}MB)")
             
     except Exception as e:
-        print(f"⚠️ Error during video cleanup: {e}")
-
+        print(f"❌ Error checking R2 storage: {e}")
 
 def build_public_url_for_key(key: str) -> str:
     """Return the public URL that would be used for a given object key.

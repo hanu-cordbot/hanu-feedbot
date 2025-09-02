@@ -24,8 +24,10 @@ from bot.r2_video import (
     upload_video_to_r2_async,
     create_video_embed_message,
     should_use_r2_storage,
-    get_video_size_limit
+    get_video_size_limit,
+    R2_VIDEO_BUCKET
 )
+from bot.config import r2_client
 import redis
 import json
 from typing import Any, Optional
@@ -225,7 +227,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
                                 video_data = f.read()
                             
                             post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                            r2_url = await upload_video_to_r2_async(video_data, post_title)
+                            r2_url = await upload_video_to_r2_async(video_data, post_title, r2_client, R2_VIDEO_BUCKET)
                             
                             if r2_url:
                                 # Create embed message for R2 video (no original post link)
@@ -680,7 +682,7 @@ async def process_special_posts(client, config):
                     with open(video_path, 'rb') as f:
                         video_data = f.read()
                     
-                    r2_url = await upload_video_to_r2_async(video_data, post['title'])
+                    r2_url = await upload_video_to_r2_async(video_data, post['title'], r2_client, R2_VIDEO_BUCKET)
                     
                     if r2_url:
                         video_message = create_video_embed_message(r2_url, post['title'])
