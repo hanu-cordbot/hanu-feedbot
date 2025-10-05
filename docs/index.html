@@ -249,11 +249,21 @@
         
   const data = await response.json();
   // Support multiple possible shapes from the generator (legacy and newer keys)
-  feeds = data.feeds || data.stats?.feeds || [];
+  const rawFeeds = data.feeds || data.stats?.feeds || [];
+  feeds = rawFeeds.map(feed => typeof feed === 'string' ? { url: feed } : feed);
   metadata = data.metadata || data.meta || data.stats?.metadata || {};
   groups = data.groups || data.stats?.groups || {};
-  mappings = data.mappings || data.map || data.stats?.mappings || {};
-  channels = data.channels || data.channel_list || data.stats?.channels || [];
+  const rawMappings = data.mappings || data.map || data.stats?.mappings || {};
+  mappings = Object.fromEntries(Object.entries(rawMappings).map(([url, cid]) => [url, cid === undefined || cid === null ? '' : String(cid)]));
+  const rawChannels = data.channels || data.channel_list || data.stats?.channels || [];
+  channels = rawChannels
+    .map(ch => {
+      if (!ch) return null;
+      const cid = ch.id ?? ch.channel_id ?? ch.discord_id ?? ch.name;
+      if (!cid) return null;
+      return { ...ch, id: String(cid) };
+    })
+    .filter(Boolean);
 
   // Additionally, try to fetch R2-backed artifacts directly from the same API proxy.
   // The Cloudflare worker maps bare paths like /feed_map.json and /channels.json to R2 keys
@@ -265,7 +275,14 @@
       const chJson = await chRes.json().catch(() => null);
       if (chJson) {
         const arr = Array.isArray(chJson) ? chJson : (Array.isArray(chJson.channels) ? chJson.channels : []);
-        channels = arr;
+        channels = arr
+          .map(ch => {
+            if (!ch) return null;
+            const cid = ch.id ?? ch.channel_id ?? ch.discord_id ?? ch.name;
+            if (!cid) return null;
+            return { ...ch, id: String(cid) };
+          })
+          .filter(Boolean);
       }
     }
   } catch (e) { console.debug('public channels fetch failed', e); }
@@ -275,7 +292,7 @@
     if (Array.isArray(channels)) {
       for (const ch of channels) {
         if (!ch) continue;
-        const id = ch.id || ch.channel_id || ch.discord_id || ch.name;
+  const id = ch.id || ch.channel_id || ch.discord_id || ch.name;
         if (!id) continue;
         const sid = String(id);
         channelsById[sid] = channelsById[sid] || {};
@@ -284,9 +301,30 @@
         if (ch.channel_type) channelsById[sid].type = ch.channel_type;
       }
     }
+    feeds.forEach(feed => {
+      if (feed && typeof feed.channel === 'object' && feed.channel !== null) {
+        const cid = feed.channel.id || feed.channel.channel_id;
+        if (cid) {
+          const sid = String(cid);
+          channelsById[sid] = channelsById[sid] || {};
+          if (feed.channel.name) channelsById[sid].name = feed.channel.name;
+          if (feed.channel.type) channelsById[sid].type = feed.channel.type;
+        }
+      }
+    });
+    feeds.forEach(feed => {
+      if (!feed) return;
+      const directChannel = typeof feed.channel === 'object' && feed.channel !== null ? feed.channel.id : feed.channel;
+      if (!feed.channelId) {
+        const mapped = mappings[feed.url] || directChannel;
+        if (mapped) feed.channelId = String(mapped);
+      } else {
+        feed.channelId = String(feed.channelId);
+      }
+    });
   } catch(e) { console.debug('channelsById populate failed', e); }
   // last update may be reported in multiple places depending on generator
-  lastUpdate = data.last_update || data.lastUpdated || data.last_updated ||
+  lastUpdate = data.last_update || data.lastUpdated || data.last_updated || data.timestamp ||
          (data.stats && (data.stats.last_updated || data.stats.lastUpdated)) ||
          (data.meta && (data.meta.lastUpdated || data.meta.last_updated)) || null;
         
@@ -352,11 +390,11 @@
 
     // Return status: 'active' (recent + mapped), 'unmapped' (recent + no map), or 'inactive' (older than 14 days)
     function getFeedStatus(feed) {
-      const channelId = mappings[feed.url] || feed.channel;
+      const channelInfo = getChannelName(feed);
       const lastPost = getLastPost(feed);
       const hasRecent = lastPost && (Date.now() - new Date(lastPost)) <= (14 * 24 * 60 * 60 * 1000);
-      if (hasRecent && channelId) return 'active';
-      if (hasRecent && !channelId) return 'unmapped';
+      if (hasRecent && channelInfo.id) return 'active';
+      if (hasRecent && !channelInfo.id) return 'unmapped';
       return 'inactive';
     }
 
@@ -609,6 +647,8 @@
     }
 
     function getGroupName(feed) {
+      const declared = feed.group || feed.groupName;
+      if (declared) return declared;
       for (const [groupName, feedList] of Object.entries(groups)) {
         if (Array.isArray(feedList) && feedList.includes(feed.url)) {
           return groupName;
@@ -619,7 +659,8 @@
 
     function getChannelName(feed) {
       // returns { id, name, emoji, unresolved }
-      let channelId = (mappings && mappings[feed.url]) || feed.channel || feed.channel_id || (metadata && metadata[feed.url] && metadata[feed.url].channel_id) || null;
+      const directChannel = typeof feed.channel === 'object' && feed.channel !== null ? feed.channel.id : feed.channel;
+      let channelId = (mappings && mappings[feed.url]) || feed.channelId || directChannel || feed.channel_id || (metadata && metadata[feed.url] && metadata[feed.url].channel_id) || null;
       
       // Handle empty strings and null/undefined as unmapped
       if (!channelId || channelId === '') return { id: null, name: 'Not mapped', emoji: '—', unresolved: false };

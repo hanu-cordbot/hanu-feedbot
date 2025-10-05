@@ -587,6 +587,7 @@ async def process_entry_in_thread(client, entry, thread, summary):
 async def process_entry_in_forum(client, entry, forum_channel):
     """Create a forum thread via webhook using FB page identity and post content in newline-safe chunks."""
     title = (entry.get('title') or 'Post')[:100]
+    footer_text = "-# post made by [hanu-cordbot](https://hanu-cordbot.github.io/hanu-feedbot), made with <3 by namesn_pe"
     try:
         from bot.formatter import build_thread_title_prompt
         gen = await asyncio.to_thread(call_gemini, build_thread_title_prompt(entry.get('raw', '') or ''))
@@ -733,6 +734,7 @@ async def process_entry_in_forum(client, entry, forum_channel):
         # Send details link LAST (at bottom, near TL;DR)
         if post_link:
             await webhook.send(content=f"Details - <{post_link}>", username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
+        await webhook.send(content=footer_text, username=username, avatar_url=avatar, thread=discord.Object(id=thread.id), wait=False)
         return
     except Exception as e:
         print(f"⚠️ Webhook forum post failed: {e}")
@@ -770,6 +772,7 @@ async def process_entry_in_forum(client, entry, forum_channel):
                     pass
             if post_link:
                 await thread.send(f"Details - <{post_link}>")
+            await thread.send(footer_text)
         except Exception as e2:
             print(f"❌ Direct forum thread creation also failed: {e2}")
 

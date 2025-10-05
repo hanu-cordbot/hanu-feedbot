@@ -236,22 +236,101 @@ def api_reset_summary():
 
 @app.route('/api/public/feeds')
 def api_public_feeds():
-    """Public endpoint for GitHub Pages to fetch feed data"""
+    """Public endpoint for GitHub Pages and dashboards to fetch live feed data."""
     try:
-        # Read feeds data if available
-        feeds_data = []
+        # Load primary data files from the configured data directory
+        feed_urls: list[str] = []
         try:
-            feeds_file = os.path.join(DATA_DIR, 'feeds.txt')
-            if os.path.exists(feeds_file):
-                with open(feeds_file, 'r') as f:
-                    feeds_data = [line.strip() for line in f if line.strip()]
+            if os.path.exists(FEEDS_FILE):
+                with open(FEEDS_FILE, 'r', encoding='utf-8') as f:
+                    feed_urls = [
+                        line.strip()
+                        for line in f
+                        if line.strip() and not line.strip().startswith('#')
+                    ]
         except Exception as e:
-            print(f"Error reading feeds: {e}")
-        
+            print(f"Error reading feeds.txt: {e}")
+
+        def _load_json(path: str, default):
+            try:
+                if os.path.exists(path):
+                    with open(path, 'r', encoding='utf-8') as handle:
+                        return json.load(handle)
+            except Exception as err:
+                print(f"Error reading {path}: {err}")
+            return default
+
+        raw_feed_map = _load_json(FEED_MAP_FILE, {})
+        raw_groups = _load_json(GROUPS_FILE, {})
+        raw_metadata = _load_json(FEED_META_FILE, {})
+        raw_channels = _load_json(CHANNELS_FILE, [])
+
+        # Normalise mappings and channels to string IDs for frontend compatibility
+        mappings: dict[str, str] = {}
+        for url, channel_id in (raw_feed_map or {}).items():
+            if channel_id is None or channel_id == "":
+                continue
+            mappings[url] = str(channel_id)
+
+        channels: list[dict] = []
+        channels_by_id: dict[str, dict] = {}
+        for ch in raw_channels or []:
+            if not isinstance(ch, dict):
+                continue
+            cid = ch.get('id') or ch.get('channel_id') or ch.get('discord_id')
+            if cid is None:
+                continue
+            cid_str = str(cid)
+            channel_copy = {**ch, 'id': cid_str}
+            channels.append(channel_copy)
+            channels_by_id[cid_str] = channel_copy
+
+        groups: dict[str, list[str]] = {}
+        for name, urls in (raw_groups or {}).items():
+            if isinstance(urls, list):
+                groups[name] = [str(u) for u in urls]
+
+        metadata: dict[str, dict] = {}
+        if isinstance(raw_metadata, dict):
+            for url, meta in raw_metadata.items():
+                if isinstance(meta, dict):
+                    metadata[url] = meta
+
+        def resolve_group(url: str) -> str:
+            for group_name, urls in groups.items():
+                if url in urls:
+                    return group_name
+            return ""
+
+        feeds_payload: list[dict] = []
+        for url in feed_urls:
+            meta = metadata.get(url, {})
+            mapped_channel_id = mappings.get(url, "")
+            channel_info = channels_by_id.get(mapped_channel_id, {}) if mapped_channel_id else {}
+            feeds_payload.append({
+                "url": url,
+                "title": meta.get('title') or meta.get('name') or url,
+                "description": meta.get('description'),
+                "channelId": mapped_channel_id,
+                "channel": channel_info,
+                "status": meta.get('status'),
+                "last_post": meta.get('last_post') or meta.get('last_seen') or meta.get('lastUpdated') or meta.get('last_check'),
+                "page": meta.get('page_url') or meta.get('pageUrl') or meta.get('page') or meta.get('link'),
+                "group": resolve_group(url),
+                "has_metadata": bool(meta)
+            })
+
+        now_iso = datetime.now(timezone.utc).isoformat()
         return jsonify({
-            "feeds": feeds_data,
-            "count": len(feeds_data),
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "feeds": feeds_payload,
+            "count": len(feeds_payload),
+            "mappings": mappings,
+            "metadata": metadata,
+            "groups": groups,
+            "channels": channels,
+            "timestamp": now_iso,
+            "last_update": now_iso,
+            "last_updated": now_iso
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

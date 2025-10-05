@@ -13,6 +13,22 @@ class HanuAPI {
     this.localDataPath = window.CONFIG?.DATA_SYNC?.localDataPath || './data/';
   }
 
+  async fetchLocalJson(filename) {
+    if (!this.localDataEnabled || !filename) {
+      return null;
+    }
+    try {
+      const response = await fetch(`${this.localDataPath}${filename}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.warn(`⚠️ Local data fetch failed for ${filename}:`, error);
+      return null;
+    }
+  }
+
   // Smart data loading: try local first, then Railway API
   async loadDataSmart(endpoint, localFile = null) {
     // If we're on GitHub Pages and have local data enabled
@@ -578,25 +594,10 @@ class HanuAPI {
   // ===== PUBLIC ENDPOINTS (No Auth Required) =====
 
   async getPublicFeeds() {
-    try {
-      // If the static dashboard is configured to use local data, prefer the generated JSON files
-      if (this.localDataEnabled) {
-        try {
-          const localFeeds = await this.loadDataSmart('/api/public/feeds', 'feeds.json');
-          const localMeta = await this.loadDataSmart('/api/public/meta', 'meta.json');
-          // Normalize shape expected by callers
-          return {
-            feeds: localFeeds?.feeds || localFeeds || [],
-            mappings: localFeeds?.mappings || {},
-            metadata: localMeta || {},
-            groups: (localMeta && localMeta.groups) || {}
-          };
-        } catch (err) {
-          console.warn('Failed to load local dashboard data, falling back to API:', err);
-        }
-      }
+    const url = `${this.baseUrl}/api/public/feeds`;
+    let remoteError = null;
 
-      const url = `${this.baseUrl}/api/public/feeds`;
+    try {
       const response = await fetch(url, {
         headers: { 'Content-Type': 'application/json' }
       });
@@ -605,11 +606,41 @@ class HanuAPI {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json();
+      const payload = await response.json();
+      if (payload && (Array.isArray(payload.feeds) || payload.feeds === undefined)) {
+        return payload;
+      }
     } catch (error) {
-      console.warn('Public feeds endpoint not available:', error);
-      return { feeds: [] };
+      remoteError = error;
+      console.warn('Public feeds API fetch failed, evaluating local fallback:', error);
     }
+
+    if (this.localDataEnabled) {
+      try {
+        const [localFeeds, localMeta] = await Promise.all([
+          this.fetchLocalJson('feeds.json'),
+          this.fetchLocalJson('meta.json')
+        ]);
+
+        if (localFeeds || localMeta) {
+          return {
+            feeds: localFeeds?.feeds || localFeeds || [],
+            mappings: localFeeds?.mappings || localFeeds?.map || {},
+            metadata: localFeeds?.metadata || localMeta?.metadata || localMeta || {},
+            groups: localFeeds?.groups || localMeta?.groups || {},
+            channels: localMeta?.channels || localFeeds?.channels || []
+          };
+        }
+      } catch (err) {
+        console.warn('Failed to load local dashboard data:', err);
+      }
+    }
+
+    if (remoteError) {
+      throw remoteError;
+    }
+
+    return { feeds: [] };
   }
 
   async getPublicStats() {

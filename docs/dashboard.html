@@ -495,22 +495,23 @@
         const data = await HanuAPI.getPublicFeeds();
         console.log('📥 Public data received:', data);
         // Unpack data
-        feedsData = data.feeds || [];
+        feedsData = Array.isArray(data.feeds) ? data.feeds : [];
         // Fetch channels (with names) via admin API
         try {
           const chRes = await HanuAPI.getChannels();
-          channelsData = chRes.channels || [];
+          channelsData = (chRes.channels || []).map(ch => ({ ...ch, id: String(ch.id) }));
         } catch (err) {
           console.warn('Failed to load channels for names:', err);
-          channelsData = data.channels || [];
+          channelsData = (data.channels || []).map(ch => ({ ...ch, id: String(ch.id) }));
         }
-        mappingsMap = data.mappings || {};
+        mappingsMap = Object.fromEntries(Object.entries(data.mappings || {}).map(([url, cid]) => [url, cid === undefined || cid === null ? '' : String(cid)]));
         metadataMap = data.metadata || {};
         groupsMap = data.groups || {};
         // Apply mappings to feed objects
         feedsData.forEach(feed => {
-          feed.channelId = mappingsMap[feed.url] || '';
-          feed.groupName = '';
+          const existingChannel = feed.channelId || (typeof feed.channel === 'object' ? feed.channel?.id : feed.channel);
+          feed.channelId = existingChannel ? String(existingChannel) : (mappingsMap[feed.url] || '');
+          feed.groupName = feed.group || '';
           for (const [gName, urls] of Object.entries(groupsMap)) {
             if (Array.isArray(urls) && urls.includes(feed.url)) {
               feed.groupName = gName;
@@ -519,6 +520,14 @@
           }
           if (metadataMap[feed.url]?.title) {
             feed.title = metadataMap[feed.url].title;
+          }
+          if (feed.channelId && (!channelsData || !channelsData.some(ch => String(ch.id) === String(feed.channelId)))) {
+            const chanSource = typeof feed.channel === 'object' && feed.channel !== null ? feed.channel : null;
+            channelsData.push({
+              id: feed.channelId,
+              name: chanSource?.name || `Channel-${feed.channelId.slice(-4)}`,
+              type: chanSource?.type || 'text'
+            });
           }
         });
         // Derive group list
