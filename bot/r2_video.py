@@ -9,7 +9,7 @@ import asyncio
 import hashlib
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 from bot.config import r2_client, SEEN_R2_BUCKET
 
 # R2 video storage configuration
@@ -37,13 +37,15 @@ def generate_video_filename(post_title: str, extension: str = "mp4") -> str:
     
     return f"videos/{date_str}_{clean_title}_{hash_suffix}.{extension}"
 
-def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
-    """Upload video to R2 bucket and return public URL"""
+def upload_video_to_r2(video_data: bytes, post_title: str, client: Any = None) -> Optional[str]:
+    """Upload video to R2 bucket and return public URL."""
     if not R2_VIDEO_BUCKET:
         print("❌ R2 bucket not configured for video upload")
         return None
-        
-    client = r2_client()
+    # Allow caller to provide a prepared client so we reuse connections during async flows
+    if callable(client):
+        client = client()
+    client = client or r2_client()
     if not client:
         print("❌ R2 client not available")
         return None
@@ -86,21 +88,25 @@ def upload_video_to_r2(video_data: bytes, post_title: str) -> Optional[str]:
         traceback.print_exc()
         return None
 
-async def upload_video_to_r2_async(video_data: bytes, post_title: str, r2_client=None, bucket_name: Optional[str] = None) -> Optional[str]:
-    """Async wrapper for R2 video upload with storage management"""
-    if r2_client and bucket_name:
+async def upload_video_to_r2_async(video_data: bytes, post_title: str, client: Any = None, bucket_name: Optional[str] = None) -> Optional[str]:
+    """Async wrapper for R2 video upload with optional storage management."""
+    prepared_client = client() if callable(client) else client
+    if prepared_client and bucket_name:
         # Check storage before upload
-        await check_and_cleanup_r2_storage(r2_client, bucket_name)
-    
-    # Perform the upload
-    return await asyncio.to_thread(upload_video_to_r2, video_data, post_title)
+        await check_and_cleanup_r2_storage(prepared_client, bucket_name)
+
+    # Perform the upload using the same client instance when available
+    return await asyncio.to_thread(upload_video_to_r2, video_data, post_title, prepared_client)
 
 def create_video_embed_message(video_url: str, post_title: str, post_url: Optional[str] = None) -> str:
-    """Create a simple markdown video link instead of embed."""
+    """Return a Discord-friendly message with a bare video URL for auto-embed."""
+    parts = []
+    if post_title:
+        parts.append(f"**{post_title.strip()}**")
+    parts.append(video_url)
     if post_url:
-        return f"(video)[{video_url}]({post_url})"
-    else:
-        return f"(video)[{video_url}]"
+        parts.append(f"Original: {post_url}")
+    return "\n".join(parts)
 
 def get_video_size_limit() -> int:
     """Get the size limit for direct Discord uploads (8MB)"""
@@ -110,18 +116,29 @@ def should_use_r2_storage(file_size: int) -> bool:
     """Determine if a video should be stored in R2 instead of direct upload"""
     return file_size > get_video_size_limit()
 
-async def check_and_cleanup_r2_storage(r2_client, bucket_name: str, max_storage_gb: float = 4.9):
+async def check_and_cleanup_r2_storage(client: Any, bucket_name: str, max_storage_gb: float = 4.9):
     """Check R2 storage usage and delete old files if approaching limit."""
     max_storage_bytes = max_storage_gb * 1024 * 1024 * 1024  # Convert GB to bytes
     
     try:
-        # List all objects in bucket
-        objects = []
-        paginator = r2_client.get_paginator('list_objects_v2')
-        
-        async for page in paginator.paginate(Bucket=bucket_name):
-            if 'Contents' in page:
-                objects.extend(page['Contents'])
+        if not bucket_name:
+            return
+        if callable(client):
+            client = client()
+        if not client:
+            print("⚠️ Skipping R2 storage check; client unavailable.")
+            return
+
+        # List all objects in bucket on a thread to avoid blocking the event loop
+        def _collect_objects():
+            paginator = client.get_paginator('list_objects_v2')
+            collected = []
+            for page in paginator.paginate(Bucket=bucket_name):
+                if 'Contents' in page:
+                    collected.extend(page['Contents'])
+            return collected
+
+        objects = await asyncio.to_thread(_collect_objects)
         
         if not objects:
             print(f"📊 R2 Storage: 0GB / {max_storage_gb}GB (0%)")
@@ -150,7 +167,7 @@ async def check_and_cleanup_r2_storage(r2_client, bucket_name: str, max_storage_
                     
                 try:
                     await asyncio.to_thread(
-                        r2_client.delete_object,
+                        client.delete_object,
                         Bucket=bucket_name,
                         Key=obj['Key']
                     )

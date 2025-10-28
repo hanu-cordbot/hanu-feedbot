@@ -88,7 +88,7 @@ from bot.dispatcher import (
     FACEBOOK_REACTIONS,
 )
 from bot.avatar_cache import maybe_update, avatar_for
-from bot.config import SEEN_R2_BUCKET, r2_client
+from bot.config import SEEN_R2_BUCKET, r2_client as get_r2_client
 from bot.facebook_downloader import download_video_ytdlp, normalize_url
 from bot.r2_video import (
     upload_video_to_r2_async,
@@ -149,7 +149,7 @@ def load_seen_guids():
         pass
     # If R2 is configured, try to download seen.json from R2 first
     try:
-        client = r2_client()
+        client = get_r2_client()
         if client:
             try:
                 import io, gzip
@@ -219,7 +219,7 @@ def save_seen_guids(guids):
 
     # If R2 is configured, also upload the seen.json to R2 for persistent state across runners
     try:
-        client = r2_client()
+        client = get_r2_client()
         if client:
             import io
             buf = io.BytesIO()
@@ -354,6 +354,7 @@ async def process_media(entry, channel):
     media_urls = entry.get('media_all', []) or []
     media_files = []
     video_processed = False
+    r2_storage_client = get_r2_client()
     
     # Create a manual temp directory instead of using context manager
     temp_dir = tempfile.mkdtemp(prefix="hanu_feedbot_")
@@ -390,7 +391,7 @@ async def process_media(entry, channel):
                         
                         # Try R2 first
                         post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                        r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
+                        r2_url = await upload_video_to_r2_async(file_data, post_title, r2_storage_client, R2_VIDEO_BUCKET)
                         
                         if r2_url:
                             print(f"✅ Uploaded to R2: {r2_url}")
@@ -439,7 +440,7 @@ async def process_media(entry, channel):
                             if should_use_r2_storage(file_size):
                                 # Try R2 first
                                 post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                                r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
+                                r2_url = await upload_video_to_r2_async(file_data, post_title, r2_storage_client, R2_VIDEO_BUCKET)
                                 
                                 if r2_url:
                                     video_message = create_video_embed_message(r2_url, post_title, post_url)
@@ -492,7 +493,7 @@ async def process_media(entry, channel):
                                     if should_use_r2_storage(file_size):
                                         # Try R2 first
                                         post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                                        r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
+                                        r2_url = await upload_video_to_r2_async(file_data, post_title, r2_storage_client, R2_VIDEO_BUCKET)
                                         
                                         if r2_url:
                                             video_message = create_video_embed_message(r2_url, post_title, video_norm)
@@ -603,6 +604,7 @@ async def process_entry_in_forum(client, entry, forum_channel):
     video_files: list[discord.File] = []
     image_files: list[discord.File] = []
     video_links = []  # For R2/external video links
+    r2_storage_client = get_r2_client()
     
     # Create temp directory for video downloads
     temp_dir = tempfile.mkdtemp(prefix="forum_video_")
@@ -631,7 +633,7 @@ async def process_entry_in_forum(client, entry, forum_channel):
                         
                         if should_use_r2_storage(file_size):
                             post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                            r2_url = await upload_video_to_r2_async(file_data, post_title, r2_client, R2_VIDEO_BUCKET)
+                            r2_url = await upload_video_to_r2_async(file_data, post_title, r2_storage_client, R2_VIDEO_BUCKET)
                             
                             if r2_url:
                                 video_message = create_video_embed_message(r2_url, post_title, post_url)

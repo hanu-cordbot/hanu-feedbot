@@ -27,7 +27,7 @@ from bot.r2_video import (
     get_video_size_limit,
     R2_VIDEO_BUCKET
 )
-from bot.config import r2_client
+from bot.config import r2_client as get_r2_client
 import redis
 import json
 from typing import Any, Optional
@@ -193,6 +193,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
     print(f"🖼️ Final avatar: {avatar[:50] if avatar else 'None'}")
     
     files_to_upload, video_links = [], []  # Renamed for clarity: includes both R2 and Catbox links
+    r2_storage_client = get_r2_client()
 
     # --- Media Processing Logic ---
     # First check for our known target post ID anywhere in the entry
@@ -227,7 +228,7 @@ async def push(client: discord.Client, target: discord.TextChannel | discord.For
                                 video_data = f.read()
                             
                             post_title = entry.get('title', entry.get('page_name', 'Facebook Video'))
-                            r2_url = await upload_video_to_r2_async(video_data, post_title, r2_client, R2_VIDEO_BUCKET)
+                            r2_url = await upload_video_to_r2_async(video_data, post_title, r2_storage_client, R2_VIDEO_BUCKET)
                             
                             if r2_url:
                                 # Create embed message for R2 video (no original post link)
@@ -650,6 +651,7 @@ async def process_special_posts(client, config):
         return
         
     print(f"🌟 Found {len(special_posts)} special posts to process")
+    r2_storage_client = get_r2_client()
     
     for post in special_posts:
         print(f"🌟 Processing special post: {post['title']}")
@@ -688,7 +690,7 @@ async def process_special_posts(client, config):
                     with open(video_path, 'rb') as f:
                         video_data = f.read()
                     
-                    r2_url = await upload_video_to_r2_async(video_data, post['title'], r2_client, R2_VIDEO_BUCKET)
+                    r2_url = await upload_video_to_r2_async(video_data, post['title'], r2_storage_client, R2_VIDEO_BUCKET)
                     
                     if r2_url:
                         video_message = create_video_embed_message(r2_url, post['title'])

@@ -22,11 +22,11 @@ videos/
 **Filename Format**: `videos/{YYYYMMDD}_{clean_title}_{8_char_hash}.mp4`
 
 ### Discord Embedding
-R2 videos are embedded in Discord with rich formatting:
+Discord now receives the raw video URL on its own line so the client auto-embeds the mp4 preview. The post title and original source link are included above and below the mirror:
 ```
-🎥 **Video Title**
+**Video Title**
 https://pub-xxxxx.r2.dev/videos/20250824_Video_Title_12345678.mp4
-📱 [Original Post](https://facebook.com/post/12345)
+Original: https://facebook.com/post/12345
 ```
 
 ## Configuration
@@ -85,15 +85,11 @@ Videos are automatically organized by date, making it easy to:
 
 ## Maintenance
 
-### Cleanup (Optional)
-The system includes an optional cleanup function:
-```python
-from bot.r2_video import cleanup_old_videos
-cleanup_old_videos(days_old=30)  # Remove videos older than 30 days
-```
+### Automatic Storage Guardrail
+Before each upload, the bot checks total usage with the R2 `list_objects_v2` paginator. When usage exceeds 90% of the configured 4.9GB soft cap, it automatically deletes the oldest objects until usage drops below 70%. This keeps the mirror operational without manual intervention.
 
 ### Storage Monitoring
-Monitor your R2 bucket usage in the Cloudflare dashboard to ensure you stay within your storage limits.
+Monitor your R2 bucket usage in the Cloudflare dashboard to ensure you stay within your storage limits. The automatic cleanup is intentionally conservative; raise or lower the threshold in `bot/r2_video.py` if your bucket allows more or less headroom.
 
 ## Benefits
 
