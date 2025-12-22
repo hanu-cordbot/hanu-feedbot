@@ -55,11 +55,13 @@ for var in ('GEMINI_API_KEY', 'DISCORD_WEBHOOK_URL'):
 
 # Load optional settings
 MAX_AGE_HOURS = int(os.getenv("MAX_AGE_HOURS", "36"))
+print(f"⚙️ Config: MAX_AGE_HOURS = {MAX_AGE_HOURS}")
 SHORT_POST_WORD_THRESHOLD = 40
 SUMMARY_CHANNEL_ID = os.getenv('SUMMARY_CHANNEL_ID')
 if SUMMARY_CHANNEL_ID:
     SUMMARY_CHANNEL_ID = int(SUMMARY_CHANNEL_ID)
 FALLBACK_ENABLED = os.getenv('FALLBACK_ENABLED', 'true').lower() in ('1', 'true', 'yes')
+print(f"⚙️ Config: FALLBACK_ENABLED = {FALLBACK_ENABLED}")
 
 # --- FILE PATHS ---
 if os.path.exists("/data"):
@@ -1046,7 +1048,15 @@ async def run_bot_job():
             if HTTP_SESSION and not HTTP_SESSION.closed:
                 await HTTP_SESSION.close()
 
-    await client.start(BOT_TOKEN)
+    try:
+        await client.start(BOT_TOKEN)
+    except discord.LoginFailure:
+        print("🚨 ERROR: DISCORD_BOT_TOKEN is invalid! Please check your GitHub Secrets.")
+        print("💡 TIP: Verify you copied the 'Bot Token' from Discord portal, not the Client Secret.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"🚨 FAILED to start Discord client: {e}")
+        sys.exit(1)
 
 # === STANDALONE EXECUTION ===
 if __name__ == "__main__":

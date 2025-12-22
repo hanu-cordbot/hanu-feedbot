@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       max_age_hours:
-        description: 'Maximum age of posts to process (hours)'
+        description: 'Max age of posts to process in hours (e.g., 36 for normal, 200 for 9-day recovery)'
         required: false
         default: '36'
         type: string
