@@ -1,5 +1,8 @@
 name: HANU Feed Bot
 
+# Scheduled runs execute under the context of the last user who modified this file.
+# Ensure that user has a verified email address to avoid "verify your email" errors.
+
 permissions:
   contents: write
   pages: write
