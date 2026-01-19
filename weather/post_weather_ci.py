@@ -5,6 +5,7 @@ Runs via GitHub Actions to post weather at 5am Vietnam time.
 """
 
 import asyncio
+import json
 import os
 import sys
 from datetime import datetime
@@ -76,22 +77,27 @@ async def post_weather():
         print(f"   Channel: #{channel_name} (type {channel_type})")
 
         thread_id = None
+        today_image.seek(0)
+        today_bytes = today_image.read()
 
         # Create thread based on channel type
         if channel_type == 15:  # Forum channel
             print("📌 Creating forum thread...")
-            today_image.seek(0)
-            today_bytes = today_image.read()
 
-            # Forum thread with file attachment
+            # Forum channels use POST /channels/{id}/threads with multipart
+            # The message object must be in payload_json
+            payload = {
+                "name": thread_title,
+                "auto_archive_duration": 1440,
+                "message": {
+                    "content": f"## 🌤️ Today's Weather — {weather.location}"
+                }
+            }
+
             thread_resp = await client.post(
                 f"{DISCORD_API}/channels/{WEATHER_CHANNEL_ID}/threads",
                 headers=headers,
-                data={
-                    "name": thread_title,
-                    "auto_archive_duration": "1440",
-                    "payload_json": f'{{"content": "## 🌤️ Today\'s Weather — {weather.location}"}}'
-                },
+                data={"payload_json": json.dumps(payload)},
                 files={"files[0]": ("weather_today.png", today_bytes, "image/png")}
             )
 
@@ -101,7 +107,7 @@ async def post_weather():
                 print(f"   ✅ Forum thread created: {thread_id}")
             else:
                 print(f"   ❌ Forum thread failed: {thread_resp.status_code}")
-                print(f"   Response: {thread_resp.text[:300]}")
+                print(f"   Response: {thread_resp.text[:500]}")
                 return False
 
         else:  # Text channel (type 0)
@@ -123,13 +129,10 @@ async def post_weather():
 
                 # Post today's image in thread
                 print("📤 Posting today's weather...")
-                today_image.seek(0)
-                today_bytes = today_image.read()
-
                 msg_resp = await client.post(
                     f"{DISCORD_API}/channels/{thread_id}/messages",
                     headers=headers,
-                    data={"payload_json": f'{{"content": "## 🌤️ Today\'s Weather — {weather.location}"}}'},
+                    data={"payload_json": json.dumps({"content": f"## 🌤️ Today's Weather — {weather.location}"})},
                     files={"files[0]": ("weather_today.png", today_bytes, "image/png")}
                 )
 
@@ -152,14 +155,14 @@ async def post_weather():
         week_resp = await client.post(
             f"{DISCORD_API}/channels/{thread_id}/messages",
             headers=headers,
-            data={"payload_json": '{"content": "## 📅 7-Day Forecast"}'},
+            data={"payload_json": json.dumps({"content": "## 📅 7-Day Forecast"})},
             files={"files[0]": ("weather_week.png", week_bytes, "image/png")}
         )
 
         if week_resp.status_code in (200, 201):
             print("   ✅ 7-day forecast posted!")
         else:
-            print(f"   ⚠️ Week forecast issue: {week_resp.status_code}")
+            print(f"   ⚠️ Week forecast issue: {week_resp.status_code} - {week_resp.text[:200]}")
 
         # Post footer message
         print("📤 Posting footer...")
