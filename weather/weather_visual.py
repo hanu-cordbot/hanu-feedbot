@@ -45,6 +45,7 @@ class WeatherVisualConfig:
     """Configuration for weather visuals."""
     dark_mode: bool = True
     width: int = 800
+    scale: int = 4  # Render at 4x for crisp, sharp images
 
     # Dark mode colors
     bg_color: Tuple[int, int, int] = (24, 26, 31)
@@ -83,9 +84,15 @@ class WeatherVisualGenerator:
         if not PIL_AVAILABLE:
             raise ImportError("PIL (Pillow) is required for weather visuals")
         self.config = config or WeatherVisualConfig()
+        self.scale = self.config.scale  # Scale factor for high-DPI rendering
+
+    def _s(self, value: int) -> int:
+        """Scale a value by the scale factor."""
+        return int(value * self.scale)
 
     def _get_font(self, size: int, bold: bool = False) -> "ImageFont.FreeTypeFont":
-        """Get a font at the specified size."""
+        """Get a font at the specified size (scaled)."""
+        scaled_size = self._s(size)
         font_names = [
             "seguisb.ttf" if bold else "segoeui.ttf",
             "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
@@ -93,7 +100,7 @@ class WeatherVisualGenerator:
         ]
         for font_name in font_names:
             try:
-                return ImageFont.truetype(font_name, size)
+                return ImageFont.truetype(font_name, scaled_size)
             except (OSError, IOError):
                 continue
         try:
@@ -102,46 +109,49 @@ class WeatherVisualGenerator:
             return None
 
     def _get_italic_font(self, size: int) -> "ImageFont.FreeTypeFont":
-        """Get an italic font for quotes."""
+        """Get an italic font for quotes (scaled)."""
+        scaled_size = self._s(size)
         font_names = ["segoeuii.ttf", "segoeui.ttf", "DejaVuSans-Oblique.ttf", "georgia.ttf"]
         for font_name in font_names:
             try:
-                return ImageFont.truetype(font_name, size)
+                return ImageFont.truetype(font_name, scaled_size)
             except (OSError, IOError):
                 continue
         return self._get_font(size, bold=False)
 
     def generate_today_image(self, weather: WeatherData) -> io.BytesIO:
-        """Generate today's weather image."""
+        """Generate today's weather image at high resolution."""
         cfg = self.config
+        s = self._s  # Shorthand for scaling
 
-        # Calculate dimensions
-        hero_height = 120
-        badges_height = 50
-        chart_height = 220
-        quote_height = 70
-        footer_height = 35
-        padding = 20
+        # Calculate dimensions (base values, will be scaled)
+        hero_height = s(120)
+        badges_height = s(50)
+        chart_height = s(220)
+        quote_height = s(70)
+        footer_height = s(35)
+        padding = s(20)
 
+        width = s(cfg.width)
         height = hero_height + badges_height + chart_height + quote_height + footer_height + padding * 3
 
-        img = Image.new('RGBA', (cfg.width, height), cfg.bg_color + (255,))
+        img = Image.new('RGBA', (width, height), cfg.bg_color + (255,))
         draw = ImageDraw.Draw(img, 'RGBA')
 
         current_y = padding
 
         # Hero header
         current_y = self._draw_hero_header(draw, weather, current_y, hero_height)
-        current_y += 15
+        current_y += s(15)
 
         # Condition badges
         current_y = self._draw_condition_badges(draw, weather, current_y, badges_height)
-        current_y += 10
+        current_y += s(10)
 
         # Chart (full 24h)
         if weather.hourly:
             current_y = self._draw_combined_chart(draw, img, weather, current_y, chart_height)
-        current_y += 15
+        current_y += s(15)
 
         # Quote
         current_y = self._draw_quote(draw, current_y, quote_height)
@@ -161,44 +171,45 @@ class WeatherVisualGenerator:
     def _draw_hero_header(self, draw, weather: WeatherData, y: int, height: int) -> int:
         """Draw split hero header - temp+desc spanning left, AQI on right."""
         cfg = self.config
-        padding = 20
+        s = self._s
+        padding = s(20)
 
         # AQI card is fixed width on right
-        aqi_width = 160
-        weather_width = cfg.width - aqi_width - padding * 3
+        aqi_width = s(160)
+        weather_width = s(cfg.width) - aqi_width - padding * 3
 
         # === LEFT: Weather Card (spans most of width) ===
         weather_card_x = padding
         draw.rounded_rectangle(
             [weather_card_x, y, weather_card_x + weather_width, y + height],
-            radius=16,
+            radius=s(16),
             fill=cfg.card_bg
         )
 
         # Big temperature on left
         temp_font = self._get_font(52, bold=True)
         temp_text = f"{weather.current.temperature:.0f}°C"
-        draw.text((weather_card_x + 25, y + 25), temp_text, fill=cfg.text_color, font=temp_font)
+        draw.text((weather_card_x + s(25), y + s(25)), temp_text, fill=cfg.text_color, font=temp_font)
 
         # Get temp text width for positioning desc to the right
         try:
             bbox = draw.textbbox((0, 0), temp_text, font=temp_font)
             temp_width = bbox[2] - bbox[0]
         except:
-            temp_width = 100
+            temp_width = s(100)
 
         # Description and location to the RIGHT of temperature
-        desc_x = weather_card_x + 45 + temp_width
+        desc_x = weather_card_x + s(45) + temp_width
         desc_font = self._get_font(16)
         loc_font = self._get_font(13)
 
         # Weather description
         desc_text = weather.current.weather_description
-        draw.text((desc_x, y + 25), desc_text, fill=cfg.text_secondary, font=desc_font)
+        draw.text((desc_x, y + s(25)), desc_text, fill=cfg.text_secondary, font=desc_font)
 
         # Feels like
         feels_text = f"Feels like {weather.current.apparent_temperature:.0f}°C"
-        draw.text((desc_x, y + 50), feels_text, fill=cfg.text_secondary, font=desc_font)
+        draw.text((desc_x, y + s(50)), feels_text, fill=cfg.text_secondary, font=desc_font)
 
         # Location - at far right of weather card
         loc_text = weather.location
@@ -206,9 +217,9 @@ class WeatherVisualGenerator:
             bbox = draw.textbbox((0, 0), loc_text, font=loc_font)
             loc_width = bbox[2] - bbox[0]
         except:
-            loc_width = 120
-        loc_x = weather_card_x + weather_width - loc_width - 20
-        draw.text((loc_x, y + 80), loc_text, fill=cfg.text_muted, font=loc_font)
+            loc_width = s(120)
+        loc_x = weather_card_x + weather_width - loc_width - s(20)
+        draw.text((loc_x, y + s(80)), loc_text, fill=cfg.text_muted, font=loc_font)
 
         # === RIGHT: AQI Card ===
         aqi_card_x = weather_card_x + weather_width + padding
@@ -223,7 +234,7 @@ class WeatherVisualGenerator:
 
         draw.rounded_rectangle(
             [aqi_card_x, y, aqi_card_x + aqi_width, y + height],
-            radius=16,
+            radius=s(16),
             fill=aqi_bg
         )
 
@@ -234,21 +245,21 @@ class WeatherVisualGenerator:
                 bbox = draw.textbbox((0, 0), aqi_text, font=aqi_font)
                 text_width = bbox[2] - bbox[0]
             except:
-                text_width = 50
-            aqi_x = aqi_card_x + (aqi_width - text_width - 35) // 2
-            draw.text((aqi_x, y + 12), aqi_text, fill=(255, 255, 255), font=aqi_font)
+                text_width = s(50)
+            aqi_x = aqi_card_x + (aqi_width - text_width - s(35)) // 2
+            draw.text((aqi_x, y + s(12)), aqi_text, fill=(255, 255, 255), font=aqi_font)
 
             label_font = self._get_font(14, bold=True)
-            draw.text((aqi_x + text_width + 6, y + 32), "AQI", fill=(255, 255, 255), font=label_font)
+            draw.text((aqi_x + text_width + s(6), y + s(32)), "AQI", fill=(255, 255, 255), font=label_font)
 
             msg_font = self._get_font(13, bold=True)
             try:
                 bbox = draw.textbbox((0, 0), aqi_msg, font=msg_font)
                 msg_width = bbox[2] - bbox[0]
             except:
-                msg_width = 80
+                msg_width = s(80)
             msg_x = aqi_card_x + (aqi_width - msg_width) // 2
-            draw.text((msg_x, y + 65), aqi_msg, fill=(255, 255, 255), font=msg_font)
+            draw.text((msg_x, y + s(65)), aqi_msg, fill=(255, 255, 255), font=msg_font)
 
             if weather.air_quality:
                 pm_font = self._get_font(11)
@@ -257,12 +268,12 @@ class WeatherVisualGenerator:
                     bbox = draw.textbbox((0, 0), pm_text, font=pm_font)
                     pm_width = bbox[2] - bbox[0]
                 except:
-                    pm_width = 70
+                    pm_width = s(70)
                 pm_x = aqi_card_x + (aqi_width - pm_width) // 2
-                draw.text((pm_x, y + 90), pm_text, fill=(255, 255, 255, 200), font=pm_font)
+                draw.text((pm_x, y + s(90)), pm_text, fill=(255, 255, 255, 200), font=pm_font)
         else:
             na_font = self._get_font(18, bold=True)
-            draw.text((aqi_card_x + 25, y + 45), "AQI N/A", fill=cfg.text_secondary, font=na_font)
+            draw.text((aqi_card_x + s(25), y + s(45)), "AQI N/A", fill=cfg.text_secondary, font=na_font)
 
         return y + height
 
@@ -285,7 +296,8 @@ class WeatherVisualGenerator:
     def _draw_condition_badges(self, draw, weather: WeatherData, y: int, height: int) -> int:
         """Draw condition badges."""
         cfg = self.config
-        padding = 20
+        s = self._s
+        padding = s(20)
 
         badges = []
         today = weather.today
@@ -325,7 +337,7 @@ class WeatherVisualGenerator:
         detail_font = self._get_font(11)
 
         badge_x = padding
-        badge_height = 32
+        badge_height = s(32)
         badge_y = y + (height - badge_height) // 2
 
         for label, color, detail in badges:
@@ -335,36 +347,37 @@ class WeatherVisualGenerator:
                 label_width = label_bbox[2] - label_bbox[0]
                 detail_width = detail_bbox[2] - detail_bbox[0]
             except:
-                label_width = len(label) * 8
-                detail_width = len(detail) * 7
+                label_width = len(label) * s(8)
+                detail_width = len(detail) * s(7)
 
-            badge_width = label_width + detail_width + 30
+            badge_width = label_width + detail_width + s(30)
 
-            if badge_x + badge_width > cfg.width - padding:
+            if badge_x + badge_width > s(cfg.width) - padding:
                 break
 
             draw.rounded_rectangle(
                 [badge_x, badge_y, badge_x + badge_width, badge_y + badge_height],
-                radius=8,
+                radius=s(8),
                 fill=color
             )
-            draw.text((badge_x + 10, badge_y + 8), label, fill=(255, 255, 255), font=badge_font)
-            draw.text((badge_x + 15 + label_width, badge_y + 9), detail, fill=(255, 255, 255, 200), font=detail_font)
+            draw.text((badge_x + s(10), badge_y + s(8)), label, fill=(255, 255, 255), font=badge_font)
+            draw.text((badge_x + s(15) + label_width, badge_y + s(9)), detail, fill=(255, 255, 255, 200), font=detail_font)
 
-            badge_x += badge_width + 10
+            badge_x += badge_width + s(10)
 
         return y + height
 
     def _draw_combined_chart(self, draw, img, weather: WeatherData, y: int, height: int) -> int:
         """Draw combined chart with full 24h, temp numbers above markers."""
         cfg = self.config
+        s = self._s
         hourly = weather.hourly
-        padding = 20
+        padding = s(20)
 
-        chart_left = padding + 35
-        chart_right = cfg.width - padding - 10
-        chart_top = y + 55  # More space for temp labels above
-        chart_bottom = y + height - 30
+        chart_left = padding + s(35)
+        chart_right = s(cfg.width) - padding - s(10)
+        chart_top = y + s(55)  # More space for temp labels above
+        chart_bottom = y + height - s(30)
         chart_width = chart_right - chart_left
         chart_height = chart_bottom - chart_top
 
@@ -400,42 +413,42 @@ class WeatherVisualGenerator:
         title_font = self._get_font(14, bold=True)
         legend_font = self._get_font(11)
 
-        draw.text((padding, y + 10), "Today's Forecast", fill=cfg.text_color, font=title_font)
+        draw.text((padding, y + s(10)), "Today's Forecast", fill=cfg.text_color, font=title_font)
 
         # Legends on right side - Rain tile next to Temp
-        legend_right = cfg.width - padding
+        legend_right = s(cfg.width) - padding
 
         # Temperature legend (rightmost)
-        temp_legend_x = legend_right - 50
-        draw.rectangle([temp_legend_x, y + 12, temp_legend_x + 10, y + 18], fill=cfg.temp_color)
-        draw.text((temp_legend_x + 14, y + 9), "Temp", fill=cfg.text_secondary, font=legend_font)
+        temp_legend_x = legend_right - s(50)
+        draw.rectangle([temp_legend_x, y + s(12), temp_legend_x + s(10), y + s(18)], fill=cfg.temp_color)
+        draw.text((temp_legend_x + s(14), y + s(9)), "Temp", fill=cfg.text_secondary, font=legend_font)
 
         # Rain tile next to Temp legend
-        rain_tile_w = 85
-        rain_tile_h = 18
-        rain_tile_x = temp_legend_x - rain_tile_w - 15
-        rain_tile_y = y + 8
+        rain_tile_w = s(85)
+        rain_tile_h = s(18)
+        rain_tile_x = temp_legend_x - rain_tile_w - s(15)
+        rain_tile_y = y + s(8)
 
         if has_significant_rain:
             # Solid colored rain indicator
             draw.rounded_rectangle(
                 [rain_tile_x, rain_tile_y, rain_tile_x + rain_tile_w, rain_tile_y + rain_tile_h],
-                radius=4,
+                radius=s(4),
                 fill=cfg.rain_color
             )
             rain_text = f"Rain {max_rain}%"
-            draw.text((rain_tile_x + 10, rain_tile_y + 2), rain_text, fill=(255, 255, 255), font=legend_font)
+            draw.text((rain_tile_x + s(10), rain_tile_y + s(2)), rain_text, fill=(255, 255, 255), font=legend_font)
         else:
             # Striped tile for < 10% rain - create stripe pattern
             # Draw base
             draw.rounded_rectangle(
                 [rain_tile_x, rain_tile_y, rain_tile_x + rain_tile_w, rain_tile_y + rain_tile_h],
-                radius=4,
+                radius=s(4),
                 fill=(45, 50, 58)
             )
             # Draw diagonal stripes using a clipping approach
             stripe_color = (70, 75, 85)
-            for i in range(-rain_tile_h, rain_tile_w + rain_tile_h, 5):
+            for i in range(-rain_tile_h, rain_tile_w + rain_tile_h, s(5)):
                 x1 = rain_tile_x + i
                 y1 = rain_tile_y
                 x2 = rain_tile_x + i + rain_tile_h
@@ -448,14 +461,14 @@ class WeatherVisualGenerator:
                     y2 = rain_tile_y + rain_tile_h - (x2 - rain_tile_x - rain_tile_w)
                     x2 = rain_tile_x + rain_tile_w
                 if y1 < rain_tile_y + rain_tile_h and y2 > rain_tile_y:
-                    draw.line([(x1, y1), (x2, y2)], fill=stripe_color, width=2)
+                    draw.line([(x1, y1), (x2, y2)], fill=stripe_color, width=s(2))
             rain_text = "Rain <10%"
             try:
                 bbox = draw.textbbox((0, 0), rain_text, font=legend_font)
                 tw = bbox[2] - bbox[0]
             except:
-                tw = 55
-            draw.text((rain_tile_x + (rain_tile_w - tw) // 2, rain_tile_y + 2), rain_text, fill=cfg.text_secondary, font=legend_font)
+                tw = s(55)
+            draw.text((rain_tile_x + (rain_tile_w - tw) // 2, rain_tile_y + s(2)), rain_text, fill=cfg.text_secondary, font=legend_font)
 
         # Calculate temp range with padding
         temp_min = min(temps_24h) - 2
@@ -468,13 +481,13 @@ class WeatherVisualGenerator:
         # Draw grid lines
         for i in range(5):
             grid_y = chart_top + (chart_height * i / 4)
-            draw.line([(chart_left, grid_y), (chart_right, grid_y)], fill=cfg.grid_color, width=1)
+            draw.line([(chart_left, grid_y), (chart_right, grid_y)], fill=cfg.grid_color, width=s(1))
             temp_val = temp_max - (temp_range * i / 4)
-            draw.text((padding, grid_y - 6), f"{temp_val:.0f}°", fill=cfg.text_muted, font=label_font)
+            draw.text((padding, grid_y - s(6)), f"{temp_val:.0f}°", fill=cfg.text_muted, font=label_font)
 
         # Draw rain bars if significant
         if has_significant_rain:
-            bar_width = max(4, chart_width // 24 - 2)
+            bar_width = max(s(4), chart_width // 24 - s(2))
             for i, rain in enumerate(rains_24h):
                 if rain > 0:
                     x = chart_left + (chart_width * i / 23)
@@ -500,16 +513,18 @@ class WeatherVisualGenerator:
                 alpha = int(20 * (1 - (fill_y - chart_top) / chart_height))
                 draw.line([(chart_left, fill_y), (chart_right, fill_y)], fill=cfg.temp_color + (alpha,), width=1)
 
-        # Draw line
+        # Draw line with thicker width for high-DPI
         if len(temp_points) >= 2:
             line_points = [(p[0], p[1]) for p in temp_points]
-            draw.line(line_points, fill=cfg.temp_color, width=2)
+            draw.line(line_points, fill=cfg.temp_color, width=s(2))
 
         # Draw points and temp labels every 3 hours
+        point_radius = s(3)
+        inner_radius = s(1.5)
         for i, (px, py, temp) in enumerate(temp_points):
             # Draw point
-            draw.ellipse([px - 3, py - 3, px + 3, py + 3], fill=cfg.temp_color)
-            draw.ellipse([px - 1.5, py - 1.5, px + 1.5, py + 1.5], fill=(255, 255, 255))
+            draw.ellipse([px - point_radius, py - point_radius, px + point_radius, py + point_radius], fill=cfg.temp_color)
+            draw.ellipse([px - inner_radius, py - inner_radius, px + inner_radius, py + inner_radius], fill=(255, 255, 255))
 
             # Temperature label above point every 3 hours
             if i % 3 == 0:
@@ -518,8 +533,8 @@ class WeatherVisualGenerator:
                     bbox = draw.textbbox((0, 0), temp_text, font=temp_label_font)
                     tw = bbox[2] - bbox[0]
                 except:
-                    tw = 15
-                draw.text((px - tw // 2, py - 18), temp_text, fill=cfg.text_secondary, font=temp_label_font)
+                    tw = s(15)
+                draw.text((px - tw // 2, py - s(18)), temp_text, fill=cfg.text_secondary, font=temp_label_font)
 
         # Hour labels
         for i in range(0, 24, 3):
@@ -529,15 +544,16 @@ class WeatherVisualGenerator:
                 bbox = draw.textbbox((0, 0), hour_text, font=label_font)
                 tw = bbox[2] - bbox[0]
             except:
-                tw = 25
-            draw.text((x - tw // 2, chart_bottom + 8), hour_text, fill=cfg.text_secondary, font=label_font)
+                tw = s(25)
+            draw.text((x - tw // 2, chart_bottom + s(8)), hour_text, fill=cfg.text_secondary, font=label_font)
 
         return y + height
 
     def _draw_quote(self, draw, y: int, height: int) -> int:
         """Draw an inspirational quote with author."""
         cfg = self.config
-        padding = 20
+        s = self._s
+        padding = s(20)
 
         quote, author = random.choice(WEATHER_QUOTES)
 
@@ -552,11 +568,11 @@ class WeatherVisualGenerator:
             bbox = draw.textbbox((0, 0), quote_text, font=quote_font)
             quote_width = bbox[2] - bbox[0]
         except:
-            quote_width = len(quote_text) * 7
+            quote_width = len(quote_text) * s(7)
 
-        max_width = cfg.width - padding * 4
-        quote_x = (cfg.width - min(quote_width, max_width)) // 2
-        quote_y = y + 15
+        max_width = s(cfg.width) - padding * 4
+        quote_x = (s(cfg.width) - min(quote_width, max_width)) // 2
+        quote_y = y + s(15)
 
         draw.text((quote_x, quote_y), quote_text, fill=quote_color, font=quote_font)
 
@@ -565,10 +581,10 @@ class WeatherVisualGenerator:
             bbox = draw.textbbox((0, 0), author_text, font=author_font)
             author_width = bbox[2] - bbox[0]
         except:
-            author_width = len(author_text) * 6
+            author_width = len(author_text) * s(6)
 
-        author_x = (cfg.width - author_width) // 2
-        author_y = quote_y + 25
+        author_x = (s(cfg.width) - author_width) // 2
+        author_y = quote_y + s(25)
 
         draw.text((author_x, author_y), author_text, fill=author_color, font=author_font)
 
@@ -577,34 +593,37 @@ class WeatherVisualGenerator:
     def _draw_footer(self, draw, weather: WeatherData, y: int):
         """Draw footer."""
         cfg = self.config
-        padding = 20
+        s = self._s
+        padding = s(20)
 
         timestamp = weather.fetched_at.strftime("%H:%M %d/%m/%Y")
         footer_font = self._get_font(10)
 
         left_text = f"Data from Open-Meteo · {timestamp}"
-        draw.text((padding, y + 12), left_text, fill=cfg.text_muted, font=footer_font)
+        draw.text((padding, y + s(12)), left_text, fill=cfg.text_muted, font=footer_font)
 
         right_text = "made with <3 by namesn_pe"
         try:
             bbox = draw.textbbox((0, 0), right_text, font=footer_font)
             text_width = bbox[2] - bbox[0]
         except:
-            text_width = 130
-        draw.text((cfg.width - padding - text_width, y + 12), right_text, fill=cfg.text_muted, font=footer_font)
+            text_width = s(130)
+        draw.text((s(cfg.width) - padding - text_width, y + s(12)), right_text, fill=cfg.text_muted, font=footer_font)
 
     def generate_week_image(self, weather: WeatherData) -> io.BytesIO:
         """Generate 7-day forecast - full width tiles, no header."""
         cfg = self.config
+        s = self._s
 
         padding = 0  # Full width
-        day_height = 65
-        footer_height = 30
+        day_height = s(65)
+        footer_height = s(30)
 
         num_days = len(weather.week)
+        width = s(cfg.width)
         height = day_height * num_days + footer_height
 
-        img = Image.new('RGB', (cfg.width, height), cfg.bg_color)
+        img = Image.new('RGB', (width, height), cfg.bg_color)
         draw = ImageDraw.Draw(img)
 
         day_font = self._get_font(14, bold=True)
@@ -614,19 +633,19 @@ class WeatherVisualGenerator:
         current_y = 0
         day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
-        # Layout positions - spread across full width
-        col_day = 15
-        col_temp = 160
-        temp_bar_width = 220
-        col_rain = col_temp + temp_bar_width + 50
-        col_wind = col_rain + 80
-        col_uv = col_wind + 80
-        col_alert = cfg.width - 40
+        # Layout positions - spread across full width (scaled)
+        col_day = s(15)
+        col_temp = s(160)
+        temp_bar_width = s(220)
+        col_rain = col_temp + temp_bar_width + s(50)
+        col_wind = col_rain + s(80)
+        col_uv = col_wind + s(80)
+        col_alert = width - s(40)
 
         for i, day in enumerate(weather.week):
             # Full width alternating rows
             if i % 2 == 0:
-                draw.rectangle([0, current_y, cfg.width, current_y + day_height], fill=cfg.card_bg)
+                draw.rectangle([0, current_y, width, current_y + day_height], fill=cfg.card_bg)
 
             # Day name and date
             day_name = day_names[day.date.weekday()]
@@ -634,33 +653,33 @@ class WeatherVisualGenerator:
             is_today = i == 0
 
             day_label = f"{day_name} {date_str}" + (" (Today)" if is_today else "")
-            draw.text((col_day, current_y + 12), day_label, fill=cfg.text_color, font=day_font)
+            draw.text((col_day, current_y + s(12)), day_label, fill=cfg.text_color, font=day_font)
 
             # Weather description
-            draw.text((col_day, current_y + 35), day.weather_description, fill=cfg.text_secondary, font=label_font)
+            draw.text((col_day, current_y + s(35)), day.weather_description, fill=cfg.text_secondary, font=label_font)
 
             # Temperature bar - wider
-            self._draw_temp_bar(draw, day.temp_min, day.temp_max, col_temp, current_y + 15, temp_bar_width, 28, temp_font, label_font)
+            self._draw_temp_bar(draw, day.temp_min, day.temp_max, col_temp, current_y + s(15), temp_bar_width, s(28), temp_font, label_font)
 
             # Rain
             rain_color = cfg.rain_color if day.precipitation_prob >= 50 else cfg.text_secondary
-            draw.text((col_rain, current_y + 18), f"{day.precipitation_prob}%", fill=rain_color, font=temp_font)
-            draw.text((col_rain, current_y + 40), "rain", fill=cfg.text_muted, font=label_font)
+            draw.text((col_rain, current_y + s(18)), f"{day.precipitation_prob}%", fill=rain_color, font=temp_font)
+            draw.text((col_rain, current_y + s(40)), "rain", fill=cfg.text_muted, font=label_font)
 
             # Wind
             wind_color = cfg.badge_wind_storm if day.wind_speed_max >= 30 else cfg.text_secondary
-            draw.text((col_wind, current_y + 18), f"{day.wind_speed_max:.0f}", fill=wind_color, font=temp_font)
-            draw.text((col_wind, current_y + 40), "km/h", fill=cfg.text_muted, font=label_font)
+            draw.text((col_wind, current_y + s(18)), f"{day.wind_speed_max:.0f}", fill=wind_color, font=temp_font)
+            draw.text((col_wind, current_y + s(40)), "km/h", fill=cfg.text_muted, font=label_font)
 
             # UV
             uv_color = self._get_uv_color(day.uv_index_max)
-            draw.text((col_uv, current_y + 18), f"{day.uv_index_max:.0f}", fill=uv_color, font=temp_font)
-            draw.text((col_uv, current_y + 40), "UV", fill=cfg.text_muted, font=label_font)
+            draw.text((col_uv, current_y + s(18)), f"{day.uv_index_max:.0f}", fill=uv_color, font=temp_font)
+            draw.text((col_uv, current_y + s(40)), "UV", fill=cfg.text_muted, font=label_font)
 
             # Alert at far right
             alerts = day.is_unusual()
             if alerts:
-                draw.text((col_alert, current_y + 22), "!", fill=(255, 200, 100), font=temp_font)
+                draw.text((col_alert, current_y + s(22)), "!", fill=(255, 200, 100), font=temp_font)
 
             current_y += day_height
 
@@ -677,27 +696,28 @@ class WeatherVisualGenerator:
                        temp_font, label_font):
         """Draw a temperature range bar."""
         cfg = self.config
+        s = self._s
 
         global_min = 10
         global_max = 40
         global_range = global_max - global_min
 
-        bar_y = y + 8
-        bar_height = 8
+        bar_y = y + s(8)
+        bar_height = s(8)
 
         min_pos = max(0, (temp_min - global_min) / global_range)
         max_pos = min(1, (temp_max - global_min) / global_range)
 
-        draw.rounded_rectangle([x, bar_y, x + width, bar_y + bar_height], radius=4, fill=cfg.grid_color)
+        draw.rounded_rectangle([x, bar_y, x + width, bar_y + bar_height], radius=s(4), fill=cfg.grid_color)
 
         bar_start = x + int(width * min_pos)
         bar_end = x + int(width * max_pos)
         end_color = self._temp_to_color(temp_max)
 
-        draw.rounded_rectangle([bar_start, bar_y, bar_end, bar_y + bar_height], radius=4, fill=end_color)
+        draw.rounded_rectangle([bar_start, bar_y, bar_end, bar_y + bar_height], radius=s(4), fill=end_color)
 
-        draw.text((bar_start - 25, bar_y - 2), f"{temp_min:.0f}°", fill=cfg.text_secondary, font=label_font)
-        draw.text((bar_end + 5, bar_y - 2), f"{temp_max:.0f}°", fill=cfg.text_color, font=label_font)
+        draw.text((bar_start - s(25), bar_y - s(2)), f"{temp_min:.0f}°", fill=cfg.text_secondary, font=label_font)
+        draw.text((bar_end + s(5), bar_y - s(2)), f"{temp_max:.0f}°", fill=cfg.text_color, font=label_font)
 
     def _temp_to_color(self, temp: float) -> Tuple[int, int, int]:
         if temp <= 15:
