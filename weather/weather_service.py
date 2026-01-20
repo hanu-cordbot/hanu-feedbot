@@ -11,6 +11,11 @@ from datetime import datetime, timedelta
 from typing import Optional
 import asyncio
 
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
+
 # HANU campus coordinates (Nguyen Trai, Thanh Xuan, Hanoi)
 HANU_LAT = 21.0375
 HANU_LON = 105.8341
@@ -271,8 +276,9 @@ async def fetch_weather() -> WeatherData:
         try:
             hourly = weather_data.get("hourly", {})
             if hourly.get("time"):
-                # Get today's date
-                today_str = datetime.now().strftime("%Y-%m-%d")
+                # Get today's date in Vietnam timezone (matches API timezone)
+                vietnam_tz = ZoneInfo("Asia/Ho_Chi_Minh")
+                today_str = datetime.now(vietnam_tz).strftime("%Y-%m-%d")
 
                 # Filter to today's hours (5am to 11pm = indices 5-23)
                 hours = []
@@ -318,7 +324,7 @@ async def fetch_weather() -> WeatherData:
             week=forecasts,
             hourly=hourly_data,
             air_quality=air_quality,
-            fetched_at=datetime.now(),
+            fetched_at=datetime.now(ZoneInfo("Asia/Ho_Chi_Minh")),
         )
 
 
