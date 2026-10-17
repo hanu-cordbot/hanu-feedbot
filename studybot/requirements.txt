@@ -1,0 +1,5 @@
+discord.py>=2.4
+google-genai>=1.0
+python-dotenv
+pypdf
+python-docx

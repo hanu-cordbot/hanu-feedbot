@@ -1,0 +1,15 @@
+# Run from the repo root:  docker compose -f studybot/docker-compose.yml up -d --build
+services:
+  studybot:
+    build:
+      context: ..
+      dockerfile: studybot/Dockerfile
+    env_file: ../.env
+    volumes:
+      - studybot-data:/data
+    # Restarts after crashes and reboots. The bot caps its own daily logins so a
+    # crash loop can't trip Discord's automatic token reset.
+    restart: unless-stopped
+
+volumes:
+  studybot-data:
