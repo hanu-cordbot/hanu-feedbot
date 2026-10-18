@@ -156,6 +156,22 @@ class Store:
         self.conn.commit()
         return cur.lastrowid
 
+    def get_deck(self, deck_id: int) -> Optional[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM decks WHERE id = ?", (deck_id,)).fetchone()
+
+    def set_deck_subject(self, deck_id: int, subject: str) -> None:
+        self.conn.execute("UPDATE decks SET subject = ? WHERE id = ?", (subject.strip().lower() or "general", deck_id))
+        self.conn.commit()
+
+    def rename_deck(self, deck_id: int, name: str) -> bool:
+        """False if another set in the server already has that name."""
+        try:
+            self.conn.execute("UPDATE decks SET name = ? WHERE id = ?", (name.strip().lower(), deck_id))
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
+
     def subjects(self, guild_id: int, prefix: str = "") -> list[str]:
         rows = self.conn.execute(
             "SELECT DISTINCT subject FROM decks WHERE guild_id = ? AND subject LIKE ? ORDER BY subject LIMIT 25",

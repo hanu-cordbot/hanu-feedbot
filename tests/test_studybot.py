@@ -3,6 +3,8 @@ import json
 import random
 import sys
 import time
+
+import discord
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -712,3 +714,77 @@ def test_quiz_panel_fits_discord_limits():
     store.set_prefs(1, {"length": 25, "shuffle": True})
     again = play.QuizPicker(store, 9, owner=1)
     assert again.settings.length == 25 and again.settings.shuffle
+
+
+def _count_components(items):
+    return sum(1 + _count_components(c.get("components", [])) + (1 if "accessory" in c else 0) for c in items)
+
+
+def test_library_organises_subjects_and_adds_files():
+    import types
+    from studybot import library
+    from studybot.bot import StudyBot, StudyCog
+
+    async def scenario():
+        bot = StudyBot(Store(":memory:"))
+        cog = StudyCog(bot)
+        store = bot.store
+        for i in range(14):
+            store.get_or_create_deck(9, f"set {i}", subject=f"subject {i}")
+        panel = library.LibraryPanel(cog, 9, owner=1)
+        assert _count_components(panel.to_components()) <= 40
+
+        bank = json.dumps([{"q": f"Question {i}?", "options": ["a", "b", "c"], "correctIndex": 1} for i in range(3)]).encode()
+        sent = []
+
+        async def defer(**kw):
+            pass
+
+        async def followup(text, **kw):
+            sent.append(text)
+
+        class Att:
+            def __init__(self, name, data):
+                self.filename, self._data = name, data
+
+            async def read(self):
+                return self._data
+
+        # A brand-new subject, one new set named in the form, two files.
+        modal = library.AddFilesModal(cog, 9, None)
+        modal.subject_input._value = "Tư tưởng HCM"
+        modal.files._values = [Att("week1.json", bank), Att("week2.json", bank.replace(b"Question", b"Cau"))]
+        modal.target._values = [library.NEW_NAMED]
+        modal.set_name._value = "Review"
+        inter = types.SimpleNamespace(user=types.SimpleNamespace(id=1),
+                                      response=types.SimpleNamespace(defer=defer),
+                                      followup=types.SimpleNamespace(send=followup))
+        await modal.on_submit(inter)
+        deck = store.find_deck(9, "review")
+        assert deck and store.deck_subject(deck) == "tư tưởng hcm" and len(store.deck_questions(deck)) == 6
+        assert all("Found **3**" in t for t in sent)
+
+        # Move and rename it from its set panel.
+        edits = []
+
+        async def edit_message(**kw):
+            edits.append(kw)
+
+        inter2 = types.SimpleNamespace(user=types.SimpleNamespace(id=1), response=types.SimpleNamespace(edit_message=edit_message))
+        set_panel = library.SetPanel(cog, 9, 1, deck)
+        await set_panel._apply_subject(inter2, "history")
+        assert store.deck_subject(deck) == "history"
+        assert store.rename_deck(deck, "Week reviews") and store.find_deck(9, "week reviews") == deck
+        assert not store.rename_deck(deck, "set 1")  # name taken
+        await bot.close()
+
+    asyncio.run(scenario())
+
+
+def test_live_game_checks_channel_permissions():
+    from studybot import play
+
+    perms = discord.Permissions(view_channel=True, send_messages=True)
+    assert play.missing_live_permissions(perms) == ["Embed Links", "Attach Files", "Read Message History"]
+    assert play.missing_live_permissions(discord.Permissions.all()) == []
+    assert "Edit Channel" in play.permission_help(["View Channel"])

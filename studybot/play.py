@@ -491,19 +491,44 @@ def live_controls(game: LiveGame, revealed: bool) -> discord.ui.View:
     return view
 
 
+# A live game posts in the channel as the bot itself, which slash commands alone don't need.
+LIVE_PERMISSIONS = {
+    "view_channel": "View Channel", "send_messages": "Send Messages", "embed_links": "Embed Links",
+    "attach_files": "Attach Files", "read_message_history": "Read Message History",
+}
+
+
+def missing_live_permissions(perms: Optional[discord.Permissions]) -> list[str]:
+    if perms is None:
+        return []
+    return [label for attr, label in LIVE_PERMISSIONS.items() if not getattr(perms, attr, False)]
+
+
+def permission_help(missing: list[str]) -> str:
+    return (
+        f"⚠️ I can't run a live game in this channel: I'm missing **{', '.join(missing)}** here.\n"
+        "Fix: right-click the channel → **Edit Channel** → **Permissions** → add the bot (or its role) and allow "
+        f"{', '.join(missing)}. Or start the live game in a channel I can post in. Solo quizzes work anywhere."
+    )
+
+
 async def start_live(interaction: discord.Interaction, question_ids: list[int], settings: QuizSettings) -> None:
     bot = interaction.client
     game = LiveGame(next(_game_ids), interaction.user.id, interaction.channel, question_ids, settings.live_timer, settings)
-    bot.live_games[game.id] = game  # type: ignore[attr-defined]
-    await interaction.response.edit_message(view=started_panel("🎮 **Live game started** in the channel."))
     rules = [f"{game.total} questions", f"{game.time_limit}s each"]
     rules.append("faster = more points" if settings.speed else "1,000 per right answer")
     if settings.streak:
         rules.append("🔥 streak bonus")
-    await interaction.channel.send(
-        f"🎮 **Live quiz** hosted by {interaction.user.mention}: {', '.join(rules)}. "
-        "Press **✋ Answer** on each question. Your pick and your score stay private."
-    )
+    await interaction.response.edit_message(view=started_panel("🎮 **Live game started** in the channel."))
+    try:
+        await interaction.channel.send(
+            f"🎮 **Live quiz** hosted by {interaction.user.mention}: {', '.join(rules)}. "
+            "Press **✋ Answer** on each question. Your pick and your score stay private."
+        )
+    except discord.Forbidden:
+        await interaction.edit_original_response(view=started_panel(permission_help(list(LIVE_PERMISSIONS.values()))))
+        return
+    bot.live_games[game.id] = game  # type: ignore[attr-defined]
     await ask_next(bot, game)
 
 
@@ -948,6 +973,10 @@ class QuizPicker(discord.ui.LayoutView):
         await start_solo(interaction, ids, self.settings)
 
     async def on_live(self, interaction: discord.Interaction) -> None:
+        missing = missing_live_permissions(getattr(interaction, "app_permissions", None))
+        if missing:
+            await interaction.response.send_message(permission_help(missing), ephemeral=True)
+            return
         ids = self.draw(personal=False)
         if not ids:
             await interaction.response.send_message("No questions match those settings yet.", ephemeral=True)
