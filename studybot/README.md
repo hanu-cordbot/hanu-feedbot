@@ -6,6 +6,7 @@ An always-on Discord bot that turns your documents into a question bank people c
 - **`/generate deck [count] [focus]`**: writes multiple-choice questions and vets each one before it's saved (see below).
 - **`/quiz deck [count]`**: one question at a time, with A–D buttons. After each answer you see why it's right, *why each wrong option is wrong*, and the line from your material that backs it. Unseen questions come first, then ones you missed.
 - **`/interview deck [focus] [rubric] [questions]`**: opens a thread and asks open-ended questions. Answer **by typing or with a Discord voice message** (hold the 🎤 button). Each answer is graded against your rubric (or a default one), with evidence for each score, what to fix, a full-marks model answer, and a follow-up question. Ends with a session summary.
+- **`/share deck`**: posts the deck as a **standalone study pack** that anyone can use without the bot (details below).
 - **`/decks`**, **`/stats [deck]`**, and a 🚩 button on every answered question. Two flags from different people pull a question from rotation.
 
 ## How questions are kept high quality
@@ -19,6 +20,21 @@ Each `/generate` runs a pipeline (`questions.py`) that is designed to discard dr
 5. Options are **shuffled by code**, not by the model, so the key's position never carries a signal.
 
 `/generate` reports how many drafts were written, how many survived, and sample reasons for rejections.
+
+## Sharing material without the bot
+
+Writing and vetting questions is the expensive part, and it only has to happen once. After that, a deck can live on its own as files:
+
+- **`<deck>.html`** is a single self-contained page that works offline and on phones. It has an interactive quiz (missed questions come back first, and progress is saved in that browser) and a **review sheet** tab that prints cleanly as a paper handout.
+- **`<deck>.anki.txt`** is a flashcard deck. Import it via Anki's *File → Import* for spaced repetition.
+
+Get them with `/share deck` in Discord. To publish every deck on the existing GitHub Pages site with an index page, run:
+
+```
+python -m studybot.export --guild <server id> --out docs/study
+```
+
+Then commit `docs/study/`. The packs are served at `https://hanu-cordbot.github.io/hanu-feedbot/study/`. People can keep learning from them even while the bot is offline.
 
 ## Running it so it stays up
 

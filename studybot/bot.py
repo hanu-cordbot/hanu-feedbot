@@ -1,5 +1,6 @@
 """Discord front end: slash commands, quiz buttons and interview threads."""
 import asyncio
+import io
 import logging
 import math
 import random
@@ -10,7 +11,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import config, ingest, interview, questions
+from . import config, export, ingest, interview, questions
 from .db import Store
 
 log = logging.getLogger(__name__)
@@ -347,6 +348,32 @@ class StudyCog(commands.Cog):
 
     @quiz_cmd.autocomplete("deck")
     async def _quiz_ac(self, interaction, current):
+        return await self.deck_autocomplete(interaction, current)
+
+    @app_commands.command(name="share", description="Get a deck as a standalone study pack (HTML quiz + review sheet) and Anki file")
+    @app_commands.describe(deck="Which deck")
+    @app_commands.guild_only()
+    async def share_cmd(self, interaction: discord.Interaction, deck: str):
+        deck_id = self._deck(interaction, deck)
+        if not deck_id:
+            await interaction.response.send_message(f"No deck called **{deck}**.", ephemeral=True)
+            return
+        data = export.pack_data(self.store, deck_id, deck.strip().lower())
+        if not data["questions"]:
+            await interaction.response.send_message(f"**{deck}** has no questions yet. Run `/generate` first.", ephemeral=True)
+            return
+        files = [
+            discord.File(io.BytesIO(export.render_html(data).encode()), filename=f"{data['slug']}.html"),
+            discord.File(io.BytesIO(export.render_anki(data).encode()), filename=f"{data['slug']}.anki.txt"),
+        ]
+        await interaction.response.send_message(
+            f"📦 **{deck}** study pack: {len(data['questions'])} questions. Open the `.html` in any browser "
+            "(works offline, on phones, and prints as a review sheet). Import the `.anki.txt` into Anki for flashcards.",
+            files=files,
+        )
+
+    @share_cmd.autocomplete("deck")
+    async def _share_ac(self, interaction, current):
         return await self.deck_autocomplete(interaction, current)
 
     @app_commands.command(name="decks", description="List study decks in this server")

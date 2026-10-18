@@ -234,6 +234,20 @@ class Store:
         ).fetchall()
         return [_question_dict(r) for r in rows]
 
+    def deck_questions(self, deck_id: int) -> list[dict]:
+        """Every question still in rotation, best-reviewed first, for exporting."""
+        rows = self.conn.execute(
+            "SELECT * FROM questions WHERE deck_id = ? AND retired = 0 ORDER BY review_score DESC, id",
+            (deck_id,),
+        ).fetchall()
+        return [_question_dict(r) for r in rows]
+
+    def deck_sources(self, deck_id: int) -> list[str]:
+        rows = self.conn.execute(
+            "SELECT filename FROM documents WHERE deck_id = ? ORDER BY added_at", (deck_id,)
+        ).fetchall()
+        return [r["filename"] for r in rows]
+
     def record_attempt(self, question_id: int, user_id: int, chosen: int, correct: bool) -> None:
         self.conn.execute(
             """INSERT INTO attempts (question_id, user_id, chosen_index, correct, answered_at)

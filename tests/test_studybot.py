@@ -148,3 +148,39 @@ def test_login_budget(tmp_path, monkeypatch):
     stale = [time.time() - 25 * 3600] * 3
     (tmp_path / "logins.json").write_text(json.dumps(stale))
     assert entry.take_login_slot() == 0
+
+
+def _deck_with_questions(n=3):
+    store = Store(":memory:")
+    deck = store.get_or_create_deck(9, "Enzymes 101")
+    store.add_document(deck, "bio-notes.pdf", "h", [PASSAGE], user_id=1)
+    for i in range(n):
+        q = draft(stem=f"Question {i}: what happens to inhibition when substrate rises?")
+        if i == 0:
+            q["explanation"] = "Watch out: </script><script>alert(1)</script> is just text."
+        store.add_question(deck, None, questions.shuffle_options(q, random.Random(i)))
+    return store, deck
+
+
+def test_export_html_embeds_questions_safely():
+    from studybot import export
+
+    store, deck = _deck_with_questions()
+    data = export.pack_data(store, deck, "enzymes 101")
+    page = export.render_html(data)
+    assert data["sources"] == ["bio-notes.pdf"] and len(data["questions"]) == 3
+    assert "</script><script>alert" not in page  # document text can't break out of the data block
+    embedded = page.split('type="application/json">', 1)[1].split("</script>", 1)[0]
+    assert json.loads(embedded)["questions"][0]["options"] == data["questions"][0]["options"]
+
+
+def test_export_anki_and_index(tmp_path):
+    from studybot import export
+
+    store, _ = _deck_with_questions(2)
+    written = export.export_guild(store, 9, tmp_path)
+    assert sorted(p.name for p in written) == ["enzymes-101.anki.txt", "enzymes-101.html", "index.html"]
+    notes = (tmp_path / "enzymes-101.anki.txt").read_text().splitlines()
+    assert notes[:2] == ["#separator:tab", "#html:true"]
+    assert all(len(line.split("\t")) == 3 for line in notes[3:])
+    assert 'href="enzymes-101.html"' in (tmp_path / "index.html").read_text()
