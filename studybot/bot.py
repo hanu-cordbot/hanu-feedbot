@@ -275,7 +275,7 @@ class StudyCog(commands.Cog):
         if not picker.visible_sets():
             await interaction.response.send_message("No questions yet. Add a file with `/upload` first.", ephemeral=True)
             return
-        await interaction.response.send_message(embed=picker.embed(), view=picker, ephemeral=True)
+        await interaction.response.send_message(view=picker, ephemeral=True)
 
     @app_commands.command(name="share", description="Get a deck as a standalone study pack (HTML quiz + review sheet) and Anki file")
     @app_commands.describe(deck="Which deck")

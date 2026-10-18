@@ -9,10 +9,12 @@ An always-on Discord bot that turns the files you already have into quizzes peop
    - **Answers come from the file** wherever it puts them: `Answer: B` lines, an *Answer key* section at the end, a starred `*` / `(correct)` option, or a **bold or highlighted** option in Word files.
    - **No answer in the file?** AI suggests one, and that question is marked **⚠️ answer suggested by AI** everywhere it appears.
    - **No questions in the file at all?** It's saved as study material, and the bot warns that AI-written questions can be wrong. You choose whether to have AI write some; those are marked **⚠️ AI-written**.
-2. **`/quiz`**: opens a private picker. Choose a **subject**, one or more **question sets**, a length, and a timer, then:
-   - **🧑‍🎓 Solo (private)**: only you see the questions, your picks and your score. Questions you missed come up more often. Solo quizzes keep working after a bot restart.
-   - **🎮 Live for everyone** (Quizizz-style): each question is posted publicly with a countdown and **"🙋 N answered"**. Nobody's picks or reaction counts show. Press **✋ Answer** and the options pop up privately. Faster correct answers score more (500–1000 points, plus a streak bonus 🔥). When time runs out, or the host presses ⏭, the message reveals the answer, how everyone voted, the explanation, and a leaderboard. The game ends with a 🥇🥈🥉 podium. Only the host can move to the next question or end the game.
-   - Questions are a **random mix** across the chosen sets, weighted toward better ones (below).
+2. **`/quiz`**: opens a private settings panel, and remembers your last settings:
+   - **What to play:** subject, question sets, which questions (all / only answers from the file / skip AI-written), order (🧠 smart mix / 🎲 random / 📑 file order), length (5–50 or every question) and timer (none, or 5–120 s).
+   - **Options (on/off):** 🔀 shuffle answer choices · 👀 show the answer after each question (solo; off = review at the end) · 🏆 leaderboard after each question (live) · ⚡ faster answers score more (live; off = 1,000 per right answer) · 🔥 streak bonus (live) · 🖼️ Quizizz-style cards.
+   - **🧑‍🎓 Solo (private)**: only you see the questions, your picks and your score. With a timer, late answers count as missed. Questions you missed come up more often. Solo quizzes keep working after a bot restart.
+   - **🎮 Live for everyone** (Quizizz-style): the channel message is the shared screen: the question card, a countdown and **"🙋 N answered"**, with nobody's picks shown. **✋ Answer** opens your private "phone": the same card with *your* score and rank, and after you pick, your own result. When time runs out (or the host presses ⏭) the card reveals the answer and how many picked each tile, plus a leaderboard; **📊 My result** shows you your own pick, points and rank. The game ends with a podium. Only the host can move on or end the game.
+   - **Cards:** each question is drawn as a Quizizz-style picture (coloured answer tiles, with buttons in matching colours). Very long questions also appear as text. Turn cards off for plain text.
 3. **`/library`**: every subject and question set, with label counts.
 4. **`/share deck`**: a standalone study page and an Anki file anyone can use without the bot.
 

@@ -462,7 +462,7 @@ def test_bot_commands_and_custom_ids():
     assert asyncio.run(build()) == ["generate", "interview", "library", "quiz", "share", "stats", "upload"]
     big = 10**18
     for item in (play.SoloAnswer(big, 24, 5), play.SoloNext(big), play.LiveJoin(big, 24), play.LivePick(big, 24, 5),
-                 play.LiveHost(big, "reveal"), play.RateButton(big, False), play.FlagButton(big)):
+                 play.LiveHost(big, "reveal"), play.LiveMine(big, 24), play.RateButton(big, False), play.FlagButton(big)):
         cid = item.item.custom_id
         assert len(cid) <= 100 and _re.fullmatch(type(item).__discord_ui_compiled_template__, cid)
 
@@ -560,3 +560,155 @@ def test_json_question_banks_are_read_without_ai():
     assert found.questions[0].explanation == "It is Paris."
     assert "Capital of France?" in ingest.extract_text("bank.json", data)
     assert ingest.extract_text("broken.json", b"{not json") == "{not json"
+
+
+def test_quiz_settings_selection_and_shuffle():
+    from studybot import play
+
+    s = play.QuizSettings.from_dict({"length": 3, "order": "bogus", "sources": "file", "unknown": 1})
+    assert s.order == "smart" and s.sources == "file" and s.length == 3
+    assert play.QuizSettings.from_dict(s.to_dict()) == s and play.QuizSettings(timer=0).live_timer == play.LIVE_DEFAULT_TIMER
+
+    def q(i, origin, source):
+        return {"id": i, "origin": origin, "answer_source": source, "net_rating": 0, "flags": 0}
+
+    pool = [q(1, "extracted", "document"), q(2, "extracted", "ai"), q(3, "generated", "ai"), q(4, "extracted", "document")]
+    assert [x["id"] for x in play.filter_sources(pool, "file")] == [1, 4]
+    assert [x["id"] for x in play.filter_sources(pool, "no_ai_written")] == [1, 2, 4]
+    rng = random.Random(3)
+    assert [x["id"] for x in play.choose_questions(pool, play.QuizSettings(length=0, order="file"), rng, False)] == [1, 2, 3, 4]
+    assert len(play.choose_questions(pool, play.QuizSettings(length=2, order="random"), rng, False)) == 2
+    assert len(play.choose_questions(pool, play.QuizSettings(length=50), rng, False)) == 4
+
+    assert play.option_order(4, False, "x") == [0, 1, 2, 3]
+    shuffled = play.option_order(6, True, "solo:1:0")
+    assert sorted(shuffled) == list(range(6)) and shuffled == play.option_order(6, True, "solo:1:0")
+    assert play.points_for(True, 0, 20, 3, speed=False, streak_bonus=False) == 1000
+
+
+def test_cards_render_every_screen():
+    from studybot import cards
+
+    q = {"stem": "Hồ Chí Minh đã tiếp thu những giá trị tích cực nào của Phật giáo? 🙏",
+         "options": ["Tư tưởng từ bi", "Bình đẳng", "Vô vi", "Lễ giáo", "x" * 400], "correct_index": 2}
+    for png in (cards.question_card(q, 1, 10, right="1,200 pts · #1/3", timer="20s"),
+                cards.reveal_card(q, 1, 10, order=[4, 3, 2, 1, 0], chosen=0, counts=[1, 0, 5, 0, 2], banner="Answer: C"),
+                cards.podium_card([("Ada 🌸", 3000), ("Bo", 2000)]), cards.score_card(7, 10)):
+        assert png[:8] == b"\x89PNG\r\n\x1a\n" and len(png) < 1_500_000
+    assert cards.clean("Lan Anh 🌸✨") == "Lan Anh"
+
+
+def test_solo_run_with_timer_and_hidden_answers(tmp_path):
+    import types
+    from studybot import play
+
+    store, deck = _deck_with_questions(2)
+    ids = [r["id"] for r in store.deck_questions(deck)]
+    settings = play.QuizSettings(timer=10, show_answers=False, shuffle=True, cards=False)
+    run_id = store.create_run(7, ids, settings.to_dict())
+    log = []
+
+    async def edit_message(**kw):
+        log.append(kw)
+
+    inter = types.SimpleNamespace(client=types.SimpleNamespace(store=store), user=types.SimpleNamespace(id=7),
+                                  response=types.SimpleNamespace(edit_message=edit_message, send_message=edit_message))
+
+    async def scenario():
+        run = store.get_run(run_id)
+        await play.solo_question(store, run)
+        q = store.get_question(ids[0])
+        shown = play.run_order(run, q, 0).index(q["correct_index"])
+        await play.SoloAnswer(run_id, 0, shown).callback(inter)  # right answer, on time, shuffled tile
+        assert "Locked in" in log[-1]["embed"].description and log[-1]["attachments"] == []
+        run = store.get_run(run_id)
+        await play.solo_question(store, run)
+        store.mark_asked(run_id, time.time() - 60)  # pretend the timer ran out
+        await play.SoloAnswer(run_id, 1, 0).callback(inter)
+        assert "Too slow" in log[-1]["embed"].description
+        run = store.get_run(run_id)
+        assert run["correct"] == 1 and run["picks"] == [q["correct_index"], None]
+        embed, files = await play.solo_summary(store, run)
+        assert "1/2 correct" in embed.title and "⏰ no answer" in embed.description and files == []
+
+    asyncio.run(scenario())
+
+
+def test_live_shuffle_scoring_and_personal_results():
+    import types
+    from studybot import play
+
+    store, deck = _deck_with_questions(1)
+    qid = store.deck_questions(deck)[0]["id"]
+    q = store.get_question(qid)
+    sent = []
+
+    class Msg:
+        embeds = []
+
+        async def edit(self, **kw):
+            pass
+
+    class Channel:
+        async def send(self, *a, **kw):
+            sent.append(kw)
+            return Msg()
+
+    client = types.SimpleNamespace(store=store, live_games={})
+    replies = []
+
+    async def reply(**kw):
+        replies.append(kw)
+
+    def inter(uid):
+        return types.SimpleNamespace(client=client, user=types.SimpleNamespace(id=uid, display_name=f"p{uid}"),
+                                     response=types.SimpleNamespace(edit_message=reply, send_message=reply))
+
+    async def scenario():
+        s = play.QuizSettings(shuffle=True, speed=False, streak=False, cards=True)
+        game = play.LiveGame(5, host_id=1, channel=Channel(), question_ids=[qid], time_limit=30, settings=s)
+        client.live_games[5] = game
+        await play.ask_next(client, game)
+        assert sent[-1]["files"] and sent[-1]["embed"].image.url == "attachment://card.png"
+        right = game.order.index(q["correct_index"])
+        await play.LiveJoin(5, 0).callback(inter(2))
+        assert replies[-1]["ephemeral"] and replies[-1]["files"]  # the player's own card
+        await play.LivePick(5, 0, right).callback(inter(2))
+        await play.LivePick(5, 0, (right + 1) % len(game.order)).callback(inter(3))
+        assert game.scores == {2: 1000, 3: 0} and "#1 of 1" in replies[-2]["content"] and "#2 of 2" in replies[-1]["content"]
+        await play.reveal(game, 0)
+        await play.LiveMine(5, 0).callback(inter(3))
+        assert "no points" in replies[-1]["embed"].description and "#2 of 2" in replies[-1]["embed"].description
+        await play.LiveMine(5, 0).callback(inter(4))
+        assert "didn't answer" in replies[-1]["embed"].description
+        await play.ask_next(client, game)
+        assert "🥇 **p2**" in sent[-1]["embed"].description and sent[-1]["files"]
+
+    asyncio.run(scenario())
+
+
+def test_quiz_panel_fits_discord_limits():
+    from studybot import play
+
+    store, deck = _deck_with_questions(3)
+    for i in range(30):
+        store.get_or_create_deck(9, f"extra set {i}", subject=f"subject {i % 30}")
+    picker = play.QuizPicker(store, 9, owner=1)
+
+    def count(items):
+        n = 0
+        for c in items:
+            n += 1
+            for key in ("components",):
+                n += count(c.get(key, []))
+            if "accessory" in c:
+                n += 1
+        return n
+
+    payload = picker.to_components()
+    assert count(payload) <= 40
+    texts = json.dumps(payload)
+    assert "Shuffle answer choices" in texts and "Quizizz-style cards" in texts
+    store.set_prefs(1, {"length": 25, "shuffle": True})
+    again = play.QuizPicker(store, 9, owner=1)
+    assert again.settings.length == 25 and again.settings.shuffle
