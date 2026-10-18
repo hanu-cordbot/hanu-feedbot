@@ -91,7 +91,7 @@ GitHub Actions can't host this: jobs are capped at 6 hours, and the existing fee
 ### Setup
 
 1. In the [Discord developer portal](https://discord.com/developers/applications): open your application, go to **Bot**, and enable **Message Content Intent**. You can reuse the feed bot's application or make a new one.
-2. Invite it with the `bot` and `applications.commands` scopes, plus these permissions: Send Messages, Embed Links, Read Message History, Create Public Threads, Send Messages in Threads.
+2. Invite it with the `bot` and `applications.commands` scopes, plus these permissions: Send Messages, Embed Links, Attach Files, Read Message History, Create Public Threads, Send Messages in Threads.
 3. Set the following in `.env` (see `.env.example`):
    - nothing for the model by default: it runs GPT Luna through the Codex CLI (see **Models**). For Gemini instead, set `STUDYBOT_PROVIDER=gemini` and `GEMINI_API_KEY`.
    - `STUDYBOT_TOKEN` (falls back to `DISCORD_BOT_TOKEN`)
