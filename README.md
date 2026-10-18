@@ -6,6 +6,9 @@ Automated RSS feed monitoring system with web dashboard for Discord communities.
 - **Public Tracker**: https://hanu-cordbot.github.io/hanu-feedbot/
 - **Admin Dashboard**: https://hanu-cordbot.github.io/hanu-feedbot/dashboard.html
 
+## Study bot
+An always-on companion bot in [`studybot/`](studybot/README.md) that turns uploaded documents into vetted multiple-choice quizzes and rubric-graded interview practice (text or voice messages).
+
 ## Features
 - Hourly automated feed scanning
 - Discord channel integration

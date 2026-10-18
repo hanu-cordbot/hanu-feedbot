@@ -1,0 +1,25 @@
+# systemd unit for a VM / Raspberry Pi / home server.
+#   sudo cp studybot/deploy/studybot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now studybot
+#   journalctl -u studybot -f
+[Unit]
+Description=Study bot (Discord quiz + interview practice)
+After=network-online.target
+Wants=network-online.target
+# Never more than 10 restarts in 10 minutes; then systemd stops and waits for you.
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+# Adjust these two paths and the user to match your machine.
+WorkingDirectory=/opt/hanu-feedbot
+ExecStart=/opt/hanu-feedbot/.venv/bin/python -m studybot
+EnvironmentFile=/opt/hanu-feedbot/.env
+Environment=STUDYBOT_DATA_DIR=/var/lib/studybot
+StateDirectory=studybot
+User=studybot
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
