@@ -94,7 +94,7 @@ class StudyCog(commands.Cog):
 
     @app_commands.command(name="upload", description="Add any file: existing questions in it are pulled out, the rest is kept as study material")
     @app_commands.describe(
-        file="PDF, Word, PowerPoint, text, or a photo/screenshot of a worksheet",
+        file="PDF, Word, PowerPoint, text, JSON question bank, or a photo/screenshot of a worksheet",
         deck="Question set to add it to (defaults to the file name)",
         subject="Subject it belongs to, e.g. biology (used to group sets in /library and /quiz)",
     )

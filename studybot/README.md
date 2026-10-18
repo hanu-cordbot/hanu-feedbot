@@ -40,7 +40,7 @@ Also available: `/interview` (answer out loud with a voice message and get grade
 | Messy layouts the parser can't fully account for (tables, odd formatting) | Gemini *copies* the questions out, with explicit instructions not to write or fix anything. Every copied question is then **checked against the file's own text**, and anything that doesn't match is discarded. |
 | Photos, screenshots, scanned PDFs (no text layer) | Gemini reads the image and copies the questions out. These can't be checked against text, so give them a quick look. |
 
-Supported files: PDF, DOCX, PPTX, TXT/MD/CSV/HTML, PNG/JPG/WEBP/HEIC. Questions with 2–6 options are supported.
+Supported files: PDF, DOCX, PPTX, TXT/MD/CSV/HTML, JSON, PNG/JPG/WEBP/HEIC. JSON question banks (any object with a question, a list of options and, optionally, an answer such as `{"q", "options", "correctIndex", "explanation"}`, at any depth) are read directly with no AI; other JSON is read as text. Questions with 2–6 options are supported.
 
 ## How AI-written questions are vetted (`/generate`)
 

@@ -537,3 +537,26 @@ def test_bot_never_pings_from_uploaded_text():
             await bot.close()
 
     assert asyncio.run(build()) == (False, False, False)
+
+
+def test_json_question_banks_are_read_without_ai():
+    from studybot import extract
+
+    bank = [
+        {"title": "Week 1", "mcqs": [
+            {"q": "Capital of France?", "options": ["Berlin", "Paris", "Rome"], "correctIndex": 1, "explanation": "It is Paris."},
+            {"question": "2 + 2?", "choices": {"A": "3", "B": "4"}, "answer": "B"},
+            {"stem": "Largest planet?", "options": [{"text": "Mars"}, {"text": "Jupiter", "correct": True}]},
+            {"q": "Ambiguous answer number", "options": ["x", "y", "z"], "answer": 2},
+        ]},
+        {"notes": "not a question", "options": "nope"},
+    ]
+    data = json.dumps(bank).encode()
+    found = asyncio.run(extract.find_questions("bank.json", data, ingest.extract_text("bank.json", data)))
+    assert found.method == "parser"
+    assert [(q.stem, q.answer) for q in found.questions] == [
+        ("Capital of France?", 1), ("2 + 2?", 1), ("Largest planet?", 1), ("Ambiguous answer number", None)
+    ]
+    assert found.questions[0].explanation == "It is Paris."
+    assert "Capital of France?" in ingest.extract_text("bank.json", data)
+    assert ingest.extract_text("broken.json", b"{not json") == "{not json"

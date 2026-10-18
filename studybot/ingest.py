@@ -1,6 +1,7 @@
 """Turns uploaded files into clean text chunks the question writer can cite from."""
 import hashlib
 import io
+import json
 import re
 from pathlib import PurePath
 
@@ -10,7 +11,7 @@ TEXT_EXTENSIONS = {".txt", ".md", ".markdown", ".rst", ".csv", ".html", ".htm"}
 # Read by Gemini directly (photos of worksheets, screenshots), since there's no text layer.
 IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
                ".heic": "image/heic", ".heif": "image/heif"}
-SUPPORTED_EXTENSIONS = TEXT_EXTENSIONS | set(IMAGE_TYPES) | {".pdf", ".docx", ".pptx"}
+SUPPORTED_EXTENSIONS = TEXT_EXTENSIONS | set(IMAGE_TYPES) | {".pdf", ".docx", ".pptx", ".json"}
 OPTION_LIKE = re.compile(r"^\s*[\(\[]?[A-Fa-f][\)\]\.:]\s+\S")
 
 
@@ -64,6 +65,8 @@ def extract_text(filename: str, data: bytes) -> str:
                     parts += [cell.text for row in shape.table.rows for cell in row.cells]
             slides.append("\n".join(parts))
         text = "\n\n".join(slides)
+    elif ext == ".json":
+        text = json_text(data)
     elif ext in IMAGE_TYPES:
         return ""
     elif ext in TEXT_EXTENSIONS:
@@ -76,6 +79,26 @@ def extract_text(filename: str, data: bytes) -> str:
             f"Can't read `{ext or filename}` files. Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
         )
     return normalize(text)
+
+
+def json_text(data: bytes) -> str:
+    """Every string value in a JSON file, one per line, so notes and question banks read as text.
+    Invalid JSON is read as plain text."""
+    raw = data.decode("utf-8-sig", errors="replace")
+    try:
+        root = json.loads(raw)
+    except (json.JSONDecodeError, RecursionError):
+        return raw
+    out, stack = [], [root]
+    while stack:  # iterative, so deeply nested files can't overflow the stack
+        node = stack.pop()
+        if isinstance(node, dict):
+            stack.extend(reversed(list(node.values())))
+        elif isinstance(node, list):
+            stack.extend(reversed(node))
+        elif isinstance(node, str) and node.strip():
+            out.append(node.strip())
+    return "\n".join(out)
 
 
 def _docx_text(data: bytes) -> str:
