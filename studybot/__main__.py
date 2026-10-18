@@ -10,6 +10,7 @@ The last one is guarded against here with a small login budget.
 import asyncio
 import json
 import logging
+import shutil
 import sys
 import time
 
@@ -44,8 +45,13 @@ async def main() -> int:
     if not config.BOT_TOKEN:
         log.error("Set STUDYBOT_TOKEN (or DISCORD_BOT_TOKEN).")
         return 2
-    if not config.GEMINI_API_KEY:
-        log.error("Set GEMINI_API_KEY.")
+    if config.PROVIDER == "codex":
+        if not shutil.which(config.CODEX_BIN):
+            log.error("STUDYBOT_PROVIDER=codex but %r is not on PATH. Install the Codex CLI and run `codex login`.", config.CODEX_BIN)
+            return 2
+        log.info("Using %s via Codex CLI%s", config.CODEX_MODEL, "" if config.GEMINI_API_KEY else " (voice answers off: no GEMINI_API_KEY)")
+    elif not config.GEMINI_API_KEY:
+        log.error("Set GEMINI_API_KEY (or STUDYBOT_PROVIDER=codex).")
         return 2
     wait = take_login_slot()
     if wait > 0:

@@ -93,14 +93,16 @@ GitHub Actions can't host this: jobs are capped at 6 hours, and the existing fee
 1. In the [Discord developer portal](https://discord.com/developers/applications): open your application, go to **Bot**, and enable **Message Content Intent**. You can reuse the feed bot's application or make a new one.
 2. Invite it with the `bot` and `applications.commands` scopes, plus these permissions: Send Messages, Embed Links, Read Message History, Create Public Threads, Send Messages in Threads.
 3. Set the following in `.env` (see `.env.example`):
-   - `GEMINI_API_KEY`
+   - nothing for the model by default: it runs GPT Luna through the Codex CLI (see **Models**). For Gemini instead, set `STUDYBOT_PROVIDER=gemini` and `GEMINI_API_KEY`.
    - `STUDYBOT_TOKEN` (falls back to `DISCORD_BOT_TOKEN`)
    - optionally `STUDYBOT_GUILD_ID`, so slash commands appear instantly in your server instead of within about an hour.
 4. To limit who can `/upload` or `/generate` (these cost API calls), use **Server Settings → Integrations → your bot**.
 
 ### Models
 
-`STUDYBOT_GENERATION_MODEL` (default `gemini-2.5-pro`) writes, solves, reviews and grades. `STUDYBOT_FALLBACK_MODEL` (default `gemini-2.5-flash`) is used when the first model is rate limited. Quality is noticeably better on the larger model, and the pipeline makes 3 calls per passage.
+By default (`STUDYBOT_PROVIDER=codex`) every model call runs `codex exec -m gpt-6-luna` using the Codex CLI's ChatGPT login, so no API key is needed. The catch is that the bot has to run on a machine where `codex login` has been done, and every call counts against that account's Codex quota. Each call runs in an empty temp dir with a read-only sandbox, with hooks and memories turned off. Images go to Luna directly; scanned PDFs are rendered to page images first (`pdftoppm`, from poppler-utils). Luna can't hear audio, so interview voice answers use Gemini when `GEMINI_API_KEY` is set and are refused otherwise (text answers always work). Options: `STUDYBOT_CODEX_MODEL` (default `gpt-6-luna`), `STUDYBOT_CODEX_EFFORT` (default `medium`), `STUDYBOT_CODEX_TIMEOUT` (seconds, default 300), and `STUDYBOT_CODEX_MAX_PAGES` (default 20). A three-question `/generate` pass takes about 30 s on Luna.
+
+With `STUDYBOT_PROVIDER=gemini`, `STUDYBOT_GENERATION_MODEL` (default `gemini-2.5-pro`) writes, solves, reviews and grades. `STUDYBOT_FALLBACK_MODEL` (default `gemini-2.5-flash`) is used when the first model is rate limited. Quality is noticeably better on the larger model, and the pipeline makes 3 calls per passage.
 
 ## Limits / next steps
 

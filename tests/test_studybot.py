@@ -465,3 +465,31 @@ def test_bot_commands_and_custom_ids():
                  play.LiveHost(big, "reveal"), play.RateButton(big, False), play.FlagButton(big)):
         cid = item.item.custom_id
         assert len(cid) <= 100 and _re.fullmatch(type(item).__discord_ui_compiled_template__, cid)
+
+
+def test_codex_provider_routes_text_images_and_audio(monkeypatch):
+    from studybot import config, llm
+
+    monkeypatch.setattr(config, "PROVIDER", "codex")
+    monkeypatch.setattr(config, "GEMINI_API_KEY", None)
+    seen = []
+
+    async def fake_run(prompt, attachment=None):
+        seen.append((prompt, attachment))
+        return '```json\n{"ok": true}\n```'
+
+    monkeypatch.setattr(llm, "_run_codex", fake_run)
+    assert asyncio.run(llm.generate_json("task text", system="be terse")) == {"ok": True}
+    assert "be terse" in seen[0][0] and "task text" in seen[0][0] and seen[0][1] is None
+
+    image = (b"\x89PNG", "image/png")
+    asyncio.run(llm.generate_json("read it", system="s", audio=image))
+    assert seen[1][1] == image
+
+    try:
+        asyncio.run(llm.generate_json("grade", system="s", audio=(b"ogg", "audio/ogg")))
+    except llm.LLMError as exc:
+        assert "GEMINI_API_KEY" in str(exc)
+    else:
+        raise AssertionError("audio should need Gemini")
+    assert len(seen) == 2

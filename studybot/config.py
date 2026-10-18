@@ -10,7 +10,16 @@ load_dotenv()
 BOT_TOKEN = os.getenv("STUDYBOT_TOKEN") or os.getenv("DISCORD_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Question writing and grading get the strongest model; it is the whole point.
+# "codex" runs GPT Luna through the local Codex CLI login (no API key); "gemini" uses GEMINI_API_KEY.
+PROVIDER = os.getenv("STUDYBOT_PROVIDER", "codex").strip().lower()
+CODEX_BIN = os.getenv("STUDYBOT_CODEX_BIN", "codex")
+CODEX_MODEL = os.getenv("STUDYBOT_CODEX_MODEL", "gpt-6-luna")
+CODEX_EFFORT = os.getenv("STUDYBOT_CODEX_EFFORT", "medium")
+CODEX_TIMEOUT = int(os.getenv("STUDYBOT_CODEX_TIMEOUT", "300"))
+# Scanned PDFs are sent to Codex as page images; pages past this are skipped.
+CODEX_MAX_PAGES = int(os.getenv("STUDYBOT_CODEX_MAX_PAGES", "20"))
+
+# Gemini only: question writing and grading get the strongest model; it is the whole point.
 GENERATION_MODEL = os.getenv("STUDYBOT_GENERATION_MODEL", "gemini-2.5-pro")
 # Cheaper model used if the generation model is rate limited or unavailable.
 FALLBACK_MODEL = os.getenv("STUDYBOT_FALLBACK_MODEL", "gemini-2.5-flash")
