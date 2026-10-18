@@ -493,3 +493,47 @@ def test_codex_provider_routes_text_images_and_audio(monkeypatch):
     else:
         raise AssertionError("audio should need Gemini")
     assert len(seen) == 2
+
+
+def test_codex_lockdown_turns_off_every_tool():
+    from studybot import llm
+
+    args = " ".join(llm.LOCKDOWN)
+    for feature in ("shell_tool", "unified_exec", "browser_use", "computer_use", "apps", "plugins", "hooks", "memories"):
+        assert f"features.{feature}=false" in args
+    assert "mcp_servers={}" in args and 'web_search="disabled"' in args
+
+
+def test_zip_bombs_and_huge_files_are_refused():
+    import io as _io
+    import zipfile
+
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("word/document.xml", b"\0" * (ingest.MAX_UNZIPPED_BYTES + 1))
+    try:
+        ingest.extract_text("bomb.docx", buf.getvalue())
+    except ingest.UnsupportedFile:
+        pass
+    else:
+        raise AssertionError("zip bomb was parsed")
+    try:
+        ingest.extract_text("broken.pptx", b"not a zip")
+    except ingest.UnsupportedFile:
+        pass
+    else:
+        raise AssertionError("broken Office file was parsed")
+
+
+def test_bot_never_pings_from_uploaded_text():
+    from studybot.bot import StudyBot
+
+    async def build():
+        bot = StudyBot(Store(":memory:"))
+        try:
+            m = bot.allowed_mentions
+            return m.everyone, m.roles, m.users
+        finally:
+            await bot.close()
+
+    assert asyncio.run(build()) == (False, False, False)

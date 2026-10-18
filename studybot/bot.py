@@ -27,7 +27,10 @@ class StudyBot(commands.Bot):
     def __init__(self, store: Store):
         intents = discord.Intents.default()
         intents.message_content = True  # read typed interview answers
-        super().__init__(command_prefix=commands.when_mentioned, intents=intents)
+        # Question text comes from uploaded files, so it must never be able to ping @everyone, roles or users.
+        super().__init__(
+            command_prefix=commands.when_mentioned, intents=intents, allowed_mentions=discord.AllowedMentions.none()
+        )
         self.store = store
         self.interviews: dict[int, interview.InterviewSession] = {}
         self.live_games: dict[int, play.LiveGame] = {}

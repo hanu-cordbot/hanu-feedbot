@@ -18,12 +18,35 @@ class UnsupportedFile(ValueError):
     pass
 
 
+# Limits for untrusted uploads: a 25 MB .docx/.pptx can unzip to gigabytes (a "zip bomb"),
+# and a PDF can declare thousands of pages.
+MAX_UNZIPPED_BYTES = 200 * 1024 * 1024
+MAX_ZIP_ENTRIES = 5000
+MAX_PDF_PAGES = 500
+
+
+def check_zip(data: bytes) -> None:
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            infos = z.infolist()
+    except zipfile.BadZipFile as exc:
+        raise UnsupportedFile("That file looks damaged (not a valid Office file).") from exc
+    if len(infos) > MAX_ZIP_ENTRIES or sum(i.file_size for i in infos) > MAX_UNZIPPED_BYTES:
+        raise UnsupportedFile("That file unpacks to something far too large to read safely.")
+
+
 def extract_text(filename: str, data: bytes) -> str:
     ext = PurePath(filename).suffix.lower()
+    if ext in {".docx", ".pptx"}:
+        check_zip(data)
     if ext == ".pdf":
         from pypdf import PdfReader
 
         reader = PdfReader(io.BytesIO(data))
+        if len(reader.pages) > MAX_PDF_PAGES:
+            raise UnsupportedFile(f"That PDF has {len(reader.pages)} pages; the limit is {MAX_PDF_PAGES}.")
         pages = [page.extract_text() or "" for page in reader.pages]
         text = "\n\n".join(pages)
     elif ext == ".docx":
