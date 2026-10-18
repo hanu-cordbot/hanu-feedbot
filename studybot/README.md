@@ -1,15 +1,30 @@
 # Study bot
 
-An always-on Discord bot that turns your documents into a question bank people can learn from:
+An always-on Discord bot that turns the files you already have into quizzes people can learn from.
 
-- **`/ingest deck file`**: upload a PDF, DOCX, TXT or MD. It's split into passages and stored in SQLite.
-- **`/generate deck [count] [focus]`**: writes multiple-choice questions and vets each one before it's saved (see below).
-- **`/quiz deck [count]`**: one question at a time, with A–D buttons. After each answer you see why it's right, *why each wrong option is wrong*, and the line from your material that backs it. Unseen questions come first, then ones you missed.
-- **`/interview deck [focus] [rubric] [questions]`**: opens a thread and asks open-ended questions. Answer **by typing or with a Discord voice message** (hold the 🎤 button). Each answer is graded against your rubric (or a default one), with evidence for each score, what to fix, a full-marks model answer, and a follow-up question. Ends with a session summary.
-- **`/share deck`**: posts the deck as a **standalone study pack** that anyone can use without the bot (details below).
-- **`/decks`**, **`/stats [deck]`**, and a 🚩 button on every answered question. Two flags from different people pull a question from rotation.
+## The simple version
 
-## How questions are kept high quality
+1. **`/upload file`**: drop in a past paper, worksheet, slide deck, notes, or a photo of a printed quiz.
+   - **Questions already in the file are pulled out as written.** Nothing is rewritten, and the deck is named after the file unless you choose a name.
+   - **Answers come from the file** wherever it puts them: `Answer: B` lines, an *Answer key* section at the end, a starred `*` / `(correct)` option, or a **bold or highlighted** option in Word files.
+   - **No answer in the file?** AI suggests one, and that question is marked **⚠️ answer suggested by AI** everywhere it appears.
+   - **No questions in the file at all?** It's saved as study material, and the bot warns that AI-written questions can be wrong. You choose whether to have AI write some; those are marked **⚠️ AI-written**.
+2. **`/quiz deck`**: practise with buttons and explanations. Missed questions come back first.
+3. **`/share deck`**: get a standalone study page and an Anki file anyone can use without the bot.
+
+Also available: `/interview` (answer out loud with a voice message and get graded on a rubric), `/generate` (ask AI for more questions), `/decks` and `/stats`. A 🚩 button on every answered question lets people flag bad ones, and two flags from different people pull a question from rotation.
+
+### How questions are found in a file
+
+| File | What happens |
+|---|---|
+| Clean layouts (numbered or not, `A.` `a)` `(A)` options, options on one line, answer lines, answer keys) | Read by a plain parser. No AI involved, and nothing can be invented. |
+| Messy layouts the parser can't fully account for (tables, odd formatting) | Gemini *copies* the questions out, with explicit instructions not to write or fix anything. Every copied question is then **checked against the file's own text**, and anything that doesn't match is discarded. |
+| Photos, screenshots, scanned PDFs (no text layer) | Gemini reads the image and copies the questions out. These can't be checked against text, so give them a quick look. |
+
+Supported files: PDF, DOCX, PPTX, TXT/MD/CSV/HTML, PNG/JPG/WEBP/HEIC. Questions with 2–6 options are supported.
+
+## How AI-written questions are vetted (`/generate`)
 
 Each `/generate` runs a pipeline (`questions.py`) that is designed to discard drafts:
 
@@ -63,7 +78,7 @@ GitHub Actions can't host this: jobs are capped at 6 hours, and the existing fee
    - `GEMINI_API_KEY`
    - `STUDYBOT_TOKEN` (falls back to `DISCORD_BOT_TOKEN`)
    - optionally `STUDYBOT_GUILD_ID`, so slash commands appear instantly in your server instead of within about an hour.
-4. To limit who can `/ingest` or `/generate` (these cost API calls), use **Server Settings → Integrations → your bot**.
+4. To limit who can `/upload` or `/generate` (these cost API calls), use **Server Settings → Integrations → your bot**.
 
 ### Models
 
@@ -72,5 +87,4 @@ GitHub Actions can't host this: jobs are capped at 6 hours, and the existing fee
 ## Limits / next steps
 
 - Interview sessions live in memory. A restart ends any interview in progress, but decks, questions and quiz scores are on disk, and quiz buttons keep working across restarts.
-- Scanned PDFs (images only) need OCR before upload.
 - **Live voice-channel mode** (the bot listens in VC and talks back) isn't built yet. discord.py can't receive voice audio natively, so it needs `discord-ext-voice-recv` plus a text-to-speech engine. Voice messages in the interview thread cover the speak-and-get-graded loop today.

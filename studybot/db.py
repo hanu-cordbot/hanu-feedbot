@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS questions (
     difficulty TEXT,
     cognitive_level TEXT,
     review_score REAL,
+    origin TEXT NOT NULL DEFAULT 'generated',
+    answer_source TEXT NOT NULL DEFAULT 'ai',
+    document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL,
     flags INTEGER NOT NULL DEFAULT 0,
     retired INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL
@@ -88,6 +91,18 @@ class Store:
         self.conn.execute("PRAGMA foreign_keys = ON")
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(questions)")}
+        for name, ddl in (
+            ("origin", "origin TEXT NOT NULL DEFAULT 'generated'"),
+            ("answer_source", "answer_source TEXT NOT NULL DEFAULT 'ai'"),
+            ("document_id", "document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL"),
+        ):
+            if name not in cols:
+                self.conn.execute(f"ALTER TABLE questions ADD COLUMN {ddl}")
+        self.conn.commit()
 
     # --- decks -----------------------------------------------------------
     def get_or_create_deck(self, guild_id: int, name: str, user_id: Optional[int] = None) -> int:
@@ -116,7 +131,9 @@ class Store:
             """
             SELECT d.id, d.name,
                    (SELECT COUNT(*) FROM documents WHERE deck_id = d.id) AS docs,
-                   (SELECT COUNT(*) FROM questions WHERE deck_id = d.id AND retired = 0) AS questions
+                   (SELECT COUNT(*) FROM questions WHERE deck_id = d.id AND retired = 0) AS questions,
+                   (SELECT COUNT(*) FROM questions WHERE deck_id = d.id AND retired = 0
+                    AND (origin = 'generated' OR answer_source = 'ai')) AS ai_questions
             FROM decks d WHERE d.guild_id = ? ORDER BY d.name
             """,
             (guild_id,),
@@ -182,12 +199,14 @@ class Store:
         return [r["stem"] for r in rows]
 
     # --- questions -------------------------------------------------------
-    def add_question(self, deck_id: int, chunk_id: Optional[int], q: dict) -> int:
+    def add_question(
+        self, deck_id: int, chunk_id: Optional[int], q: dict, document_id: Optional[int] = None
+    ) -> int:
         cur = self.conn.execute(
             """INSERT INTO questions (deck_id, chunk_id, stem, options_json, correct_index,
                    explanation, rationales_json, source_quote, difficulty, cognitive_level,
-                   review_score, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   review_score, origin, answer_source, document_id, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 deck_id,
                 chunk_id,
@@ -200,6 +219,9 @@ class Store:
                 q.get("difficulty"),
                 q.get("cognitive_level"),
                 q.get("review_score"),
+                q.get("origin", "generated"),
+                q.get("answer_source", "ai"),
+                document_id,
                 time.time(),
             ),
         )

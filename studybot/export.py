@@ -18,6 +18,10 @@ from typing import Optional
 
 from . import config
 from .db import Store
+from .questions import caution
+
+
+LABELS = "ABCDEF"
 
 
 def slugify(name: str) -> str:
@@ -40,6 +44,7 @@ def pack_data(store: Store, deck_id: int, name: str) -> dict:
                 "rationales": q["rationales"],
                 "quote": q.get("source_quote") or "",
                 "level": " · ".join(x for x in (q.get("difficulty"), q.get("cognitive_level")) if x),
+                "caution": caution(q),
             }
             for q in store.deck_questions(deck_id)
         ],
@@ -56,10 +61,14 @@ def render_anki(data: dict) -> str:
     """Tab-separated notes with HTML, importable via Anki's File → Import."""
     esc = lambda s: html.escape(s).replace("\t", " ").replace("\n", "<br>")  # noqa: E731
     lines = ["#separator:tab", "#html:true", "#tags column:3"]
-    tag = data["slug"]
     for q in data["questions"]:
-        front = esc(q["stem"]) + "<br><br>" + "<br>".join(f"{'ABCD'[i]}. {esc(o)}" for i, o in enumerate(q["options"]))
-        back = f"<b>{'ABCD'[q['correct']]}. {esc(q['options'][q['correct']])}</b><br><br>{esc(q['explanation'])}"
+        tag = data["slug"] + (" ai-unverified" if q["caution"] else "")
+        front = esc(q["stem"]) + "<br><br>" + "<br>".join(f"{LABELS[i]}. {esc(o)}" for i, o in enumerate(q["options"]))
+        back = f"<b>{LABELS[q['correct']]}. {esc(q['options'][q['correct']])}</b>"
+        if q["explanation"]:
+            back += f"<br><br>{esc(q['explanation'])}"
+        if q["caution"]:
+            back += f"<br><br><small>{esc(q['caution'])}</small>"
         if q["quote"]:
             back += f"<br><br><i>“{esc(q['quote'])}”</i>"
         lines.append(f"{front}\t{back}\t{tag}")
@@ -102,12 +111,12 @@ TEMPLATE = r"""<!doctype html>
 <style>
 :root {
   --bg: #f7f7f5; --card: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e3e3e0;
-  --accent: #4f46e5; --on-accent: #ffffff; --good: #15803d; --good-bg: #e8f5ec; --bad: #b91c1c; --bad-bg: #fbeaea;
+  --accent: #4f46e5; --on-accent: #ffffff; --warn: #92400e; --warn-bg: #fdf3e1; --good: #15803d; --good-bg: #e8f5ec; --bad: #b91c1c; --bad-bg: #fbeaea;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #141416; --card: #1d1d20; --ink: #ececef; --muted: #9a9aa2; --line: #2e2e33;
-    --accent: #8b85ff; --on-accent: #141416; --good: #4ade80; --good-bg: #13291b; --bad: #f87171; --bad-bg: #2d1717;
+    --accent: #8b85ff; --on-accent: #141416; --warn: #fbbf24; --warn-bg: #2c2312; --good: #4ade80; --good-bg: #13291b; --bad: #f87171; --bad-bg: #2d1717;
   }
 }
 * { box-sizing: border-box; }
@@ -140,6 +149,8 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
 .bar div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
 .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
 .answer { color: var(--good); font-weight: 600; }
+.caution { font-size: .85rem; padding: 8px 12px; border-radius: 8px; margin-top: 12px;
+  background: var(--warn-bg); color: var(--warn); }
 .hint { color: var(--muted); font-size: .8rem; text-align: center; }
 @media print {
   nav, #quiz, .hint { display: none !important; }
@@ -161,14 +172,15 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
   </nav>
   <section id="quiz"></section>
   <section id="review" hidden></section>
-  <p class="hint">Keys: 1–4 to answer, Enter for next. Print this page for a paper review sheet.</p>
+  <p class="hint">Keys: 1–6 or A–F to answer, Enter for next. Print this page for a paper review sheet.</p>
 </main>
 <script id="data" type="application/json">__DATA__</script>
 <script>
 (function () {
   var D = JSON.parse(document.getElementById("data").textContent);
-  var L = "ABCD";
+  var L = "ABCDEF";
   var KEY = "studypack:" + D.slug;
+  var aiCount = D.questions.filter(function (q) { return q.caution; }).length;
   var history = load();
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
@@ -183,7 +195,8 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
   document.title = D.deck.replace(/\b\w/g, function (c) { return c.toUpperCase(); }) + " · Study pack";
   document.getElementById("title").textContent = document.title.replace(" · Study pack", "");
   document.getElementById("subtitle").textContent =
-    D.questions.length + " questions" + (D.sources.length ? " · from " + D.sources.join(", ") : "") + " · exported " + D.exported;
+    D.questions.length + " questions" + (D.sources.length ? " · from " + D.sources.join(", ") : "") + " · exported " + D.exported
+    + (aiCount ? " · ⚠️ " + aiCount + " marked as AI-assisted" : "");
 
   // Missed questions first, then unseen, then ones already answered correctly.
   function order(ids) {
@@ -210,7 +223,8 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
     });
     var card = el("div", { class: "card" }, [
       el("div", { class: "meta", text: "Question " + (pos + 1) + " of " + queue.length + (q.level ? " · " + q.level : "") }),
-      el("div", { class: "stem", text: q.stem }), opts
+      el("div", { class: "stem", text: q.stem }), opts,
+      q.caution ? el("div", { class: "caution", text: q.caution }) : null
     ]);
     quiz.appendChild(bar); quiz.appendChild(card);
   }
@@ -226,7 +240,7 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
     });
     var fb = el("div", { class: "feedback" }, [
       el("h3", { class: "verdict " + (ok ? "right" : "wrong"), text: ok ? "Correct" : "Not quite — the answer is " + L[q.correct] }),
-      el("p", { text: q.explanation })
+      q.explanation ? el("p", { text: q.explanation }) : null
     ]);
     var others = q.options.map(function (_, j) { return j; })
       .filter(function (j) { return j !== q.correct && q.rationales[j]; })
@@ -261,7 +275,8 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
 
   document.addEventListener("keydown", function (e) {
     if (document.getElementById("quiz").hidden) return;
-    var n = "1234".indexOf(e.key); if (n < 0) n = "abcd".indexOf(e.key.toLowerCase());
+    var n = e.key.length === 1 ? "123456".indexOf(e.key) : -1;
+    if (n < 0 && e.key.length === 1) n = "abcdef".indexOf(e.key.toLowerCase());
     var btns = quiz.querySelectorAll(".options button");
     if (n >= 0 && btns[n] && !answered) btns[n].click();
     else if (e.key === "Enter" && answered) { var nx = quiz.querySelector(".row button.primary"); if (nx) nx.click(); }
@@ -275,9 +290,10 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
       el("ul", {}, q.options.map(function (o, i) {
         return el("li", { class: i === q.correct ? "answer" : "", text: L[i] + ". " + o });
       })),
-      el("p", { text: q.explanation })
+      q.explanation ? el("p", { text: q.explanation }) : null
     ];
     if (q.quote) kids.push(el("blockquote", { text: "“" + q.quote + "”" }));
+    if (q.caution) kids.push(el("div", { class: "caution", text: q.caution }));
     review.appendChild(el("div", { class: "card" }, kids));
   });
 

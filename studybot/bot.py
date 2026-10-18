@@ -11,12 +11,12 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import config, export, ingest, interview, questions
+from . import config, export, extract, ingest, interview, questions
 from .db import Store
 
 log = logging.getLogger(__name__)
 
-LETTERS = "ABCD"
+LETTERS = "ABCDEF"
 EMBED_LIMIT = 4000
 FIELD_LIMIT = 1000
 QUESTIONS_PER_PASSAGE = 3
@@ -55,9 +55,11 @@ class StudyBot(commands.Bot):
 def question_embed(q: dict, number: int, total: int) -> discord.Embed:
     body = f"**{q['stem']}**\n\n" + "\n".join(f"**{LETTERS[i]}.** {opt}" for i, opt in enumerate(q["options"]))
     embed = discord.Embed(title=f"Question {number} of {total}", description=clip(body, EMBED_LIMIT), colour=0x5865F2)
-    meta = " · ".join(x for x in (q.get("difficulty"), q.get("cognitive_level")) if x)
+    meta = [x for x in (q.get("difficulty"), q.get("cognitive_level")) if x]
+    if questions.caution(q):
+        meta.insert(0, "⚠️ AI-written question" if q.get("origin") == "generated" else "⚠️ answer suggested by AI")
     if meta:
-        embed.set_footer(text=meta)
+        embed.set_footer(text=" · ".join(meta))
     return embed
 
 
@@ -73,7 +75,8 @@ def answered_embed(q: dict, chosen: int, number: int, total: int) -> discord.Emb
         description=clip(body, EMBED_LIMIT),
         colour=0x57F287 if correct else 0xED4245,
     )
-    embed.add_field(name="Why", value=clip(q["explanation"], FIELD_LIMIT), inline=False)
+    if q.get("explanation"):
+        embed.add_field(name="Why", value=clip(q["explanation"], FIELD_LIMIT), inline=False)
     wrong = [
         f"**{LETTERS[i]}** — {q['rationales'][i]}"
         for i in range(len(q["options"]))
@@ -86,6 +89,8 @@ def answered_embed(q: dict, chosen: int, number: int, total: int) -> discord.Emb
         embed.add_field(name="Why the others are wrong", value=clip("\n".join(wrong), FIELD_LIMIT), inline=False)
     if q.get("source_quote"):
         embed.add_field(name="From your material", value=clip(f"> {q['source_quote']}", FIELD_LIMIT), inline=False)
+    if questions.caution(q):
+        embed.add_field(name="Heads up", value=questions.caution(q), inline=False)
     return embed
 
 
@@ -207,6 +212,34 @@ class FlagButton(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:f:(?P<
         await interaction.response.send_message(msg, ephemeral=True)
 
 
+class GenerateOffer(discord.ui.View):
+    """Shown when an upload has no questions: the uploader opts in to AI-written ones."""
+
+    def __init__(self, cog: "StudyCog", owner: int, deck_id: int, deck: str):
+        super().__init__(timeout=3600)
+        self.cog, self.owner, self.deck_id, self.deck = cog, owner, deck_id, deck
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner:
+            await interaction.response.send_message("Only the person who uploaded the file can choose this.", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="Write 6 questions with AI", emoji="⚠️", style=discord.ButtonStyle.primary)
+    async def write(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.message.edit(view=None)
+        await self.cog.run_generation(interaction, self.deck_id, self.deck, 6)
+
+    @discord.ui.button(label="No thanks", style=discord.ButtonStyle.secondary)
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.stop()
+        await interaction.response.edit_message(view=None)
+        await interaction.followup.send(
+            f"OK. The file is still in **{self.deck}** for `/interview`, and you can run `/generate` later.", ephemeral=True
+        )
+
+
 # --- commands ----------------------------------------------------------------
 
 class StudyCog(commands.Cog):
@@ -222,13 +255,17 @@ class StudyCog(commands.Cog):
     def _deck(self, interaction: discord.Interaction, name: str) -> Optional[int]:
         return self.store.find_deck(interaction.guild_id or 0, name)
 
-    @app_commands.command(name="ingest", description="Add a document (PDF, DOCX, TXT, MD) to a study deck")
-    @app_commands.describe(deck="Deck name, e.g. 'biology-unit-3' (created if new)", file="The document to learn from")
+    @app_commands.command(name="upload", description="Add any file: existing questions in it are pulled out, the rest is kept as study material")
+    @app_commands.describe(
+        file="PDF, Word, PowerPoint, text, or a photo/screenshot of a worksheet",
+        deck="Deck to add it to (defaults to the file name)",
+    )
     @app_commands.guild_only()
-    async def ingest_cmd(self, interaction: discord.Interaction, deck: str, file: discord.Attachment):
+    async def upload_cmd(self, interaction: discord.Interaction, file: discord.Attachment, deck: Optional[str] = None):
         if file.size > config.MAX_UPLOAD_BYTES:
             await interaction.response.send_message("That file is over 25MB.", ephemeral=True)
             return
+        deck = (deck or export.slugify(file.filename.rsplit(".", 1)[0])).strip().lower()
         await interaction.response.defer(thinking=True)
         data = await file.read()
         try:
@@ -240,28 +277,80 @@ class StudyCog(commands.Cog):
             log.exception("Failed to read %s", file.filename)
             await interaction.followup.send(f"Couldn't read `{file.filename}`: {exc}")
             return
-        if len(text) < 200:
-            await interaction.followup.send(
-                f"Only found {len(text)} characters of text in `{file.filename}`. "
-                "If it's a scanned PDF, it needs OCR first."
-            )
-            return
-        chunks = ingest.chunk_text(text)
+
         deck_id = self.store.get_or_create_deck(interaction.guild_id, deck, interaction.user.id)
+        chunks = ingest.chunk_text(text) if len(text) >= 200 else []
         doc_id = self.store.add_document(deck_id, file.filename, ingest.sha256(data), chunks, interaction.user.id)
         if doc_id is None:
             await interaction.followup.send(f"`{file.filename}` is already in **{deck}**.")
             return
+
+        try:
+            found = await extract.find_questions(file.filename, data, text)
+        except Exception:
+            log.exception("Question extraction failed for %s", file.filename)
+            found = extract.ExtractionResult(extract.parse_mcqs(text), "parser")
+        items = found.questions
+        suggestions: dict[int, dict] = {}
+        if any(q.answer is None for q in items):
+            try:
+                suggestions = await extract.suggest_answers(items, text)
+            except Exception:
+                log.exception("Answer suggestion failed")
+
+        existing = {extract._norm(s) for s in self.store.existing_stems(deck_id, limit=100000)}
+        from_file = ai_answer = no_answer = duplicate = 0
+        for i, q in enumerate(items):
+            stored = extract.to_stored(q, suggestions.get(i))
+            if stored is None:
+                no_answer += 1
+                continue
+            if extract._norm(q.stem) in existing:
+                duplicate += 1
+                continue
+            existing.add(extract._norm(q.stem))
+            self.store.add_question(deck_id, None, stored, document_id=doc_id)
+            if stored["answer_source"] == "document":
+                from_file += 1
+            else:
+                ai_answer += 1
+
+        added = from_file + ai_answer
+        if added:
+            how = "read directly from the file" if found.method == "parser" else "copied out with AI help, each one checked against the file's text"
+            lines = [f"📚 Found **{added}** question(s) in `{file.filename}` → deck **{deck}** ({how})."]
+            if from_file:
+                lines.append(f"✅ {from_file} with answers from the file itself.")
+            if ai_answer:
+                lines.append(f"⚠️ {ai_answer} had no answer in the file, so AI suggested one. These are marked in the quiz; please flag any that look wrong.")
+            if no_answer:
+                lines.append(f"Skipped {no_answer} with no answer in the file that AI couldn't answer.")
+            if duplicate:
+                lines.append(f"Skipped {duplicate} already in the deck.")
+            if found.dropped:
+                lines.append(f"Ignored {found.dropped} that didn't match the file's text.")
+            lines.append(f"Start with `/quiz deck:{deck}` or share it with `/share deck:{deck}`.")
+            await interaction.followup.send(clip("\n".join(lines), 1990))
+            return
+
+        if not chunks:
+            await interaction.followup.send(
+                f"I couldn't find any multiple-choice questions or enough readable text in `{file.filename}`. "
+                "If it's a photo, try a clearer, straight-on shot."
+            )
+            return
         await interaction.followup.send(
-            f"📚 Added `{file.filename}` to **{deck}**: {len(text):,} characters in {len(chunks)} passages.\n"
-            f"Next: `/generate deck:{deck}` to write questions, or `/interview deck:{deck}` to practise out loud."
+            f"📄 Saved `{file.filename}` to **{deck}** as study material. **I didn't find any multiple-choice questions in it.**\n"
+            "I can write some from it, but **AI-written questions can be wrong or ambiguous**. They'll be labelled ⚠️ "
+            "everywhere they appear, and anyone can flag them. Questions from real past papers or worksheets are always better.",
+            view=GenerateOffer(self, interaction.user.id, deck_id, deck),
         )
 
-    @ingest_cmd.autocomplete("deck")
-    async def _ingest_ac(self, interaction, current):
+    @upload_cmd.autocomplete("deck")
+    async def _upload_ac(self, interaction, current):
         return await self.deck_autocomplete(interaction, current)
 
-    @app_commands.command(name="generate", description="Write and vet new multiple-choice questions from a deck")
+    @app_commands.command(name="generate", description="⚠️ Have AI write questions from a deck's notes (when the files had none)")
     @app_commands.describe(
         deck="Which deck to draw from",
         count="How many questions to add (each goes through a write → blind-solve → review pipeline)",
@@ -277,15 +366,21 @@ class StudyCog(commands.Cog):
     ):
         deck_id = self._deck(interaction, deck)
         if not deck_id:
-            await interaction.response.send_message(f"No deck called **{deck}**. Add material with `/ingest` first.", ephemeral=True)
+            await interaction.response.send_message(f"No deck called **{deck}**. Add material with `/upload` first.", ephemeral=True)
             return
+        await self.run_generation(interaction, deck_id, deck, count, focus)
+
+    async def run_generation(
+        self, interaction: discord.Interaction, deck_id: int, deck: str, count: int, focus: Optional[str] = None
+    ) -> None:
         passages = self.store.pick_chunks(deck_id, math.ceil(count / QUESTIONS_PER_PASSAGE) + 1, focus)
         if not passages:
             await interaction.response.send_message(f"**{deck}** has no material yet.", ephemeral=True)
             return
         await interaction.response.send_message(
             f"✍️ Writing questions for **{deck}** from {len(passages)} passages. Each one is drafted, "
-            "answered blind by a second pass, then reviewed. This takes a minute or two…"
+            "answered blind by a second pass, then reviewed, and weak ones are thrown out. They'll still be "
+            "marked ⚠️ AI-written. This takes a minute or two…"
         )
         existing = self.store.existing_stems(deck_id)
         per = max(1, math.ceil(count / len(passages)))
@@ -313,7 +408,7 @@ class StudyCog(commands.Cog):
                 self.store.add_question(deck_id, passage["id"], q)
                 accepted += 1
 
-        lines = [f"✅ Added **{accepted}** question(s) to **{deck}** (from {written} drafts)."]
+        lines = [f"✅ Added **{accepted}** ⚠️ AI-written question(s) to **{deck}** (from {written} drafts)."]
         if rejected:
             lines.append(f"Rejected {len(rejected)} that didn't meet the bar, e.g.:")
             lines += [f"• _{clip(stem, 80)}_ — {clip(reason, 120)}" for stem, reason in rejected[:4]]
@@ -381,9 +476,10 @@ class StudyCog(commands.Cog):
     async def decks_cmd(self, interaction: discord.Interaction):
         rows = self.store.list_decks(interaction.guild_id)
         if not rows:
-            await interaction.response.send_message("No decks yet. Start with `/ingest`.", ephemeral=True)
+            await interaction.response.send_message("No decks yet. Start with `/upload`.", ephemeral=True)
             return
-        lines = [f"**{r['name']}** — {r['docs']} document(s), {r['questions']} question(s)" for r in rows]
+        lines = [f"**{r['name']}** — {r['docs']} file(s), {r['questions']} question(s)"
+                 + (f" ({r['ai_questions']} ⚠️ AI)" if r["ai_questions"] else "") for r in rows]
         await interaction.response.send_message(clip("\n".join(lines), 1990), ephemeral=True)
 
     @app_commands.command(name="stats", description="Your quiz accuracy")

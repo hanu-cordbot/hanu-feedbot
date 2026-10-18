@@ -117,6 +117,15 @@ Return JSON: {{"reviews": [{{
 }}]}}"""
 
 
+def caution(q: dict) -> str:
+    """Warning to show learners when a question or its answer came from AI, not people."""
+    if q.get("origin", "generated") == "generated":
+        return "⚠️ AI-written question: it may be wrong or ambiguous. Flag it if something's off."
+    if q.get("answer_source") == "ai":
+        return "⚠️ The file didn't include an answer for this one; the answer shown was suggested by AI."
+    return ""
+
+
 @dataclass
 class GenerationReport:
     written: int = 0

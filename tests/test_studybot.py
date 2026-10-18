@@ -184,3 +184,118 @@ def test_export_anki_and_index(tmp_path):
     assert notes[:2] == ["#separator:tab", "#html:true"]
     assert all(len(line.split("\t")) == 3 for line in notes[3:])
     assert 'href="enzymes-101.html"' in (tmp_path / "index.html").read_text()
+
+
+# --- extracting existing questions -------------------------------------------
+
+def test_parser_handles_common_layouts():
+    from studybot.extract import parse_mcqs
+
+    text = """Unit 3 Quiz
+Choose the best answer.
+
+1. Which organelle produces ATP?
+A. Nucleus
+B. Mitochondrion
+C. Ribosome
+D. Golgi body
+Answer: B
+Explanation: Mitochondria run
+oxidative phosphorylation.
+
+Q2) Capital of France? (A) Berlin (B) Paris (C) Rome
+
+Which molecule carries amino acids to the ribosome?
+a) mRNA
+b) tRNA *
+c) rRNA
+
+4. Who wrote Faust?
+A. Goethe
+B. Schiller
+
+Answer Key
+2. B
+"""
+    qs = parse_mcqs(text)
+    assert [q.stem for q in qs] == [
+        "Which organelle produces ATP?",
+        "Capital of France?",
+        "Which molecule carries amino acids to the ribosome?",
+        "Who wrote Faust?",
+    ]
+    assert [q.answer for q in qs] == [1, 1, 1, None]  # answer line, key section, star, none given
+    assert qs[0].explanation == "Mitochondria run oxidative phosphorylation."
+    assert qs[1].options == ["Berlin", "Paris", "Rome"]
+    assert parse_mcqs("Enzymes speed reactions. A. Smith wrote about it. B. Jones agreed.") == []
+
+
+def test_docx_bold_option_marks_the_answer(tmp_path):
+    import docx
+    from studybot.extract import parse_mcqs
+
+    d = docx.Document()
+    d.add_paragraph("1. Which gas do plants absorb?")
+    d.add_paragraph("A. Oxygen")
+    d.add_paragraph().add_run("B. Carbon dioxide").bold = True
+    d.add_paragraph("C. Nitrogen")
+    path = tmp_path / "q.docx"
+    d.save(path)
+    qs = parse_mcqs(ingest.extract_text("q.docx", path.read_bytes()))
+    assert len(qs) == 1 and qs[0].answer == 1 and qs[0].options[1] == "Carbon dioxide"
+
+
+def test_ai_copy_drops_questions_not_in_the_file(monkeypatch):
+    from studybot import extract
+
+    source = "| 1 | What is the boiling point of water at sea level? | 90 C | 100 C | 110 C |\n" * 2
+
+    async def fake(prompt, *, system, audio=None, temperature=0.7, tries=3):
+        return {"questions": [
+            {"number": 1, "stem": "What is the boiling point of water at sea level?", "options": ["90 C", "100 C", "110 C"], "answer_position": None},
+            {"number": 2, "stem": "What is the freezing point of mercury?", "options": ["-39 C", "0 C", "12 C"], "answer_position": 1},
+        ]}
+
+    monkeypatch.setattr(extract.llm, "generate_json", fake)
+    found, dropped = asyncio.run(extract.copy_with_ai(source))
+    assert [q.stem for q in found] == ["What is the boiling point of water at sea level?"] and dropped == 1
+
+
+def test_find_questions_skips_the_model_when_not_needed(monkeypatch):
+    from studybot import extract
+
+    async def boom(*a, **k):
+        raise AssertionError("model should not be called")
+
+    monkeypatch.setattr(extract.llm, "generate_json", boom)
+    clean = "1. Pick one?\nA. x\nB. y\nAnswer: A\n"
+    assert asyncio.run(extract.find_questions("q.txt", clean.encode(), clean)).method == "parser"
+    notes = "Plain lecture notes about enzymes. " * 20
+    assert asyncio.run(extract.find_questions("n.txt", notes.encode(), notes)).questions == []
+
+
+def test_ai_answers_are_labelled():
+    from studybot import extract
+
+    q = extract.Extracted("Who wrote Hamlet?", ["Marlowe", "Shakespeare"], answer=None)
+    assert extract.to_stored(q) is None
+    stored = extract.to_stored(q, {"index": 1, "confidence": "high", "reason": "He did."})
+    assert stored["answer_source"] == "ai" and stored["correct_index"] == 1
+    assert "suggested by AI" in questions.caution(stored)
+    assert questions.caution(extract.to_stored(extract.Extracted("Q?", ["a", "b"], answer=0))) == ""
+    assert "AI-written" in questions.caution({"origin": "generated"})
+
+
+def test_old_database_gets_new_columns(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE questions (id INTEGER PRIMARY KEY, deck_id INTEGER, chunk_id INTEGER, stem TEXT, "
+                 "options_json TEXT, correct_index INTEGER, explanation TEXT, rationales_json TEXT, source_quote TEXT, "
+                 "difficulty TEXT, cognitive_level TEXT, review_score REAL, flags INTEGER DEFAULT 0, "
+                 "retired INTEGER DEFAULT 0, created_at REAL)")
+    conn.commit()
+    conn.close()
+    cols = {r["name"] for r in Store(path).conn.execute("PRAGMA table_info(questions)")}
+    assert {"origin", "answer_source", "document_id"} <= cols
