@@ -9,10 +9,28 @@ An always-on Discord bot that turns the files you already have into quizzes peop
    - **Answers come from the file** wherever it puts them: `Answer: B` lines, an *Answer key* section at the end, a starred `*` / `(correct)` option, or a **bold or highlighted** option in Word files.
    - **No answer in the file?** AI suggests one, and that question is marked **⚠️ answer suggested by AI** everywhere it appears.
    - **No questions in the file at all?** It's saved as study material, and the bot warns that AI-written questions can be wrong. You choose whether to have AI write some; those are marked **⚠️ AI-written**.
-2. **`/quiz deck`**: practise with buttons and explanations. Missed questions come back first.
-3. **`/share deck`**: get a standalone study page and an Anki file anyone can use without the bot.
+2. **`/quiz`**: opens a private picker. Choose a **subject**, one or more **question sets**, a length, and a timer, then:
+   - **🧑‍🎓 Solo (private)**: only you see the questions, your picks and your score. Questions you missed come up more often. Solo quizzes keep working after a bot restart.
+   - **🎮 Live for everyone** (Quizizz-style): each question is posted publicly with a countdown and **"🙋 N answered"**. Nobody's picks or reaction counts show. Press **✋ Answer** and the options pop up privately. Faster correct answers score more (500–1000 points, plus a streak bonus 🔥). When time runs out, or the host presses ⏭, the message reveals the answer, how everyone voted, the explanation, and a leaderboard. The game ends with a 🥇🥈🥉 podium. Only the host can move to the next question or end the game.
+   - Questions are a **random mix** across the chosen sets, weighted toward better ones (below).
+3. **`/library`**: every subject and question set, with label counts.
+4. **`/share deck`**: a standalone study page and an Anki file anyone can use without the bot.
 
-Also available: `/interview` (answer out loud with a voice message and get graded on a rubric), `/generate` (ask AI for more questions), `/decks` and `/stats`. A 🚩 button on every answered question lets people flag bad ones, and two flags from different people pull a question from rotation.
+### Labels and "better questions first"
+
+| Label | Meaning |
+|---|---|
+| 📄 | Question and answer both from your file |
+| 🤖 | Question from your file, answer suggested by AI |
+| ✨ | Question written by AI |
+| ⭐ | Community favourite (net 👍 of 2 or more) |
+| 🚩 | Someone flagged it (two flags pull it from rotation) |
+
+After every answer you can rate the question 👍 / 👎 or flag it 🚩. Each question's score is +2 for 📄, 0 for 🤖 and −1 for ✨, plus its net rating, minus 2 per flag. Higher-scoring questions are drawn more often. Negative ones are only used when a set would otherwise run short.
+
+Subjects are set with `/upload file subject:biology`. Uploading again with a different subject moves the set. Each subject gets an emoji automatically: 🧬 ⚗️ ⚛️ 📐 🏛️ 📖 💻 🌍 📈 🗣️ 🎨 🎵 ⚖️ 🩺 🧠, or 📚 when no keyword matches.
+
+Also available: `/interview` (answer out loud with a voice message and get graded on a rubric), `/generate` (ask AI for more questions), and `/stats`.
 
 ### How questions are found in a file
 
@@ -86,5 +104,5 @@ GitHub Actions can't host this: jobs are capped at 6 hours, and the existing fee
 
 ## Limits / next steps
 
-- Interview sessions live in memory. A restart ends any interview in progress, but decks, questions and quiz scores are on disk, and quiz buttons keep working across restarts.
+- Interviews and live games live in memory, so a restart ends any that are in progress (old live buttons then say the game has ended). Sets, questions, ratings, scores and solo quizzes are on disk and survive restarts.
 - **Live voice-channel mode** (the bot listens in VC and talks back) isn't built yet. discord.py can't receive voice audio natively, so it needs `discord-ext-voice-recv` plus a text-to-speech engine. Voice messages in the interview thread cover the speak-and-get-graded loop today.

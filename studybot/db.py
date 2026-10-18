@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS decks (
     id INTEGER PRIMARY KEY,
     guild_id INTEGER NOT NULL,
     name TEXT NOT NULL,
+    subject TEXT NOT NULL DEFAULT 'general',
     created_by INTEGER,
     created_at REAL NOT NULL,
     UNIQUE (guild_id, name)
@@ -70,6 +71,20 @@ CREATE TABLE IF NOT EXISTS attempts (
     answered_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS attempts_user ON attempts(user_id, question_id);
+CREATE TABLE IF NOT EXISTS question_ratings (
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL,
+    value INTEGER NOT NULL,
+    PRIMARY KEY (question_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS quiz_runs (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    question_ids TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    correct INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS question_flags (
     question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL,
@@ -94,6 +109,9 @@ class Store:
         self._migrate()
 
     def _migrate(self) -> None:
+        deck_cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(decks)")}
+        if "subject" not in deck_cols:
+            self.conn.execute("ALTER TABLE decks ADD COLUMN subject TEXT NOT NULL DEFAULT 'general'")
         cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(questions)")}
         for name, ddl in (
             ("origin", "origin TEXT NOT NULL DEFAULT 'generated'"),
@@ -105,19 +123,51 @@ class Store:
         self.conn.commit()
 
     # --- decks -----------------------------------------------------------
-    def get_or_create_deck(self, guild_id: int, name: str, user_id: Optional[int] = None) -> int:
+    def get_or_create_deck(
+        self, guild_id: int, name: str, user_id: Optional[int] = None, subject: Optional[str] = None
+    ) -> int:
+        """Finds or creates a question set. A given subject is applied to existing sets too."""
         name = name.strip().lower()
+        subject = subject.strip().lower() if subject and subject.strip() else None
         row = self.conn.execute(
             "SELECT id FROM decks WHERE guild_id = ? AND name = ?", (guild_id, name)
         ).fetchone()
         if row:
+            if subject:
+                self.conn.execute("UPDATE decks SET subject = ? WHERE id = ?", (subject, row["id"]))
+                self.conn.commit()
             return row["id"]
         cur = self.conn.execute(
-            "INSERT INTO decks (guild_id, name, created_by, created_at) VALUES (?, ?, ?, ?)",
-            (guild_id, name, user_id, time.time()),
+            "INSERT INTO decks (guild_id, name, subject, created_by, created_at) VALUES (?, ?, ?, ?, ?)",
+            (guild_id, name, subject or "general", user_id, time.time()),
         )
         self.conn.commit()
         return cur.lastrowid
+
+    def subjects(self, guild_id: int, prefix: str = "") -> list[str]:
+        rows = self.conn.execute(
+            "SELECT DISTINCT subject FROM decks WHERE guild_id = ? AND subject LIKE ? ORDER BY subject LIMIT 25",
+            (guild_id, prefix.lower() + "%"),
+        ).fetchall()
+        return [r["subject"] for r in rows]
+
+    def library(self, guild_id: int) -> list[sqlite3.Row]:
+        """Every question set with counts for each provenance label, grouped by subject."""
+        return self.conn.execute(
+            """
+            SELECT d.id, d.name, d.subject,
+                   COUNT(q.id) AS questions,
+                   COALESCE(SUM(q.origin = 'extracted' AND q.answer_source = 'document'), 0) AS from_file,
+                   COALESCE(SUM(q.origin = 'extracted' AND q.answer_source = 'ai'), 0) AS ai_answer,
+                   COALESCE(SUM(q.origin = 'generated'), 0) AS ai_written,
+                   COALESCE(SUM((SELECT COALESCE(SUM(value), 0) FROM question_ratings r
+                                 WHERE r.question_id = q.id) >= 2), 0) AS favourites
+            FROM decks d LEFT JOIN questions q ON q.deck_id = d.id AND q.retired = 0
+            WHERE d.guild_id = ?
+            GROUP BY d.id ORDER BY d.subject, d.name
+            """,
+            (guild_id,),
+        ).fetchall()
 
     def find_deck(self, guild_id: int, name: str) -> Optional[int]:
         row = self.conn.execute(
@@ -256,13 +306,69 @@ class Store:
         ).fetchall()
         return [_question_dict(r) for r in rows]
 
-    def deck_questions(self, deck_id: int) -> list[dict]:
-        """Every question still in rotation, best-reviewed first, for exporting."""
+    def question_pool(self, deck_ids: list[int], user_id: Optional[int] = None) -> list[dict]:
+        """Questions in rotation from these sets, with ratings, and this user's last result."""
+        if not deck_ids:
+            return []
+        marks = ",".join("?" * len(deck_ids))
         rows = self.conn.execute(
-            "SELECT * FROM questions WHERE deck_id = ? AND retired = 0 ORDER BY review_score DESC, id",
-            (deck_id,),
+            f"""
+            SELECT q.*,
+                   (SELECT COALESCE(SUM(value), 0) FROM question_ratings r WHERE r.question_id = q.id) AS net_rating,
+                   (SELECT a.correct FROM attempts a WHERE a.question_id = q.id AND a.user_id = ?
+                    ORDER BY a.answered_at DESC LIMIT 1) AS last_correct
+            FROM questions q
+            WHERE q.deck_id IN ({marks}) AND q.retired = 0
+            ORDER BY q.id
+            """,
+            (user_id or 0, *deck_ids),
         ).fetchall()
         return [_question_dict(r) for r in rows]
+
+    def deck_questions(self, deck_id: int) -> list[dict]:
+        """Every question still in rotation, for exporting."""
+        return self.question_pool([deck_id])
+
+    def deck_subject(self, deck_id: int) -> str:
+        row = self.conn.execute("SELECT subject FROM decks WHERE id = ?", (deck_id,)).fetchone()
+        return row["subject"] if row else "general"
+
+    def rate_question(self, question_id: int, user_id: int, value: int) -> int:
+        """Records a 👍 (+1) or 👎 (-1), replacing this user's earlier vote. Returns the net rating."""
+        self.conn.execute(
+            "INSERT OR REPLACE INTO question_ratings (question_id, user_id, value) VALUES (?, ?, ?)",
+            (question_id, user_id, 1 if value > 0 else -1),
+        )
+        self.conn.commit()
+        return self.conn.execute(
+            "SELECT COALESCE(SUM(value), 0) FROM question_ratings WHERE question_id = ?", (question_id,)
+        ).fetchone()[0]
+
+    # --- solo quiz runs (persisted so private quizzes survive restarts) ---
+    def create_run(self, user_id: int, question_ids: list[int]) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO quiz_runs (user_id, question_ids, created_at) VALUES (?, ?, ?)",
+            (user_id, json.dumps(question_ids), time.time()),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def get_run(self, run_id: int) -> Optional[dict]:
+        row = self.conn.execute("SELECT * FROM quiz_runs WHERE id = ?", (run_id,)).fetchone()
+        if not row:
+            return None
+        run = dict(row)
+        run["question_ids"] = json.loads(run["question_ids"])
+        return run
+
+    def advance_run(self, run_id: int, expected_position: int, correct: bool) -> bool:
+        """Moves a run past one answer. False if that position was already answered (double click)."""
+        cur = self.conn.execute(
+            "UPDATE quiz_runs SET position = position + 1, correct = correct + ? WHERE id = ? AND position = ?",
+            (int(correct), run_id, expected_position),
+        )
+        self.conn.commit()
+        return cur.rowcount == 1
 
     def deck_sources(self, deck_id: int) -> list[str]:
         rows = self.conn.execute(

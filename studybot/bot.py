@@ -11,21 +11,16 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import config, export, extract, ingest, interview, questions
+from . import config, export, extract, ingest, interview, play, quality, questions
 from .db import Store
+from .render import EMBED_LIMIT, FIELD_LIMIT, clip
 
 log = logging.getLogger(__name__)
 
-LETTERS = "ABCDEF"
-EMBED_LIMIT = 4000
-FIELD_LIMIT = 1000
 QUESTIONS_PER_PASSAGE = 3
+COMMON_SUBJECTS = ["biology", "chemistry", "physics", "mathematics", "history", "english", "computer science",
+                   "geography", "economics", "business", "psychology", "languages", "art", "music"]
 MAX_AUDIO_BYTES = 18 * 1024 * 1024  # Gemini's inline request limit is 20MB
-
-
-def clip(text: str, limit: int) -> str:
-    text = text or ""
-    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 class StudyBot(commands.Bot):
@@ -35,9 +30,10 @@ class StudyBot(commands.Bot):
         super().__init__(command_prefix=commands.when_mentioned, intents=intents)
         self.store = store
         self.interviews: dict[int, interview.InterviewSession] = {}
+        self.live_games: dict[int, play.LiveGame] = {}
 
     async def setup_hook(self) -> None:
-        self.add_dynamic_items(AnswerButton, NextButton, FlagButton)
+        self.add_dynamic_items(*play.DYNAMIC_ITEMS)
         await self.add_cog(StudyCog(self))
         if config.DEV_GUILD_ID:
             guild = discord.Object(id=config.DEV_GUILD_ID)
@@ -48,168 +44,6 @@ class StudyBot(commands.Bot):
 
     async def on_ready(self) -> None:
         log.info("Study bot ready as %s in %d server(s)", self.user, len(self.guilds))
-
-
-# --- quiz rendering ----------------------------------------------------------
-
-def question_embed(q: dict, number: int, total: int) -> discord.Embed:
-    body = f"**{q['stem']}**\n\n" + "\n".join(f"**{LETTERS[i]}.** {opt}" for i, opt in enumerate(q["options"]))
-    embed = discord.Embed(title=f"Question {number} of {total}", description=clip(body, EMBED_LIMIT), colour=0x5865F2)
-    meta = [x for x in (q.get("difficulty"), q.get("cognitive_level")) if x]
-    if questions.caution(q):
-        meta.insert(0, "⚠️ AI-written question" if q.get("origin") == "generated" else "⚠️ answer suggested by AI")
-    if meta:
-        embed.set_footer(text=" · ".join(meta))
-    return embed
-
-
-def answered_embed(q: dict, chosen: int, number: int, total: int) -> discord.Embed:
-    correct = chosen == q["correct_index"]
-    lines = []
-    for i, opt in enumerate(q["options"]):
-        mark = "✅" if i == q["correct_index"] else ("❌" if i == chosen else "▫️")
-        lines.append(f"{mark} **{LETTERS[i]}.** {opt}")
-    body = f"**{q['stem']}**\n\n" + "\n".join(lines)
-    embed = discord.Embed(
-        title=f"Question {number} of {total} — {'Correct!' if correct else 'Not quite'}",
-        description=clip(body, EMBED_LIMIT),
-        colour=0x57F287 if correct else 0xED4245,
-    )
-    if q.get("explanation"):
-        embed.add_field(name="Why", value=clip(q["explanation"], FIELD_LIMIT), inline=False)
-    wrong = [
-        f"**{LETTERS[i]}** — {q['rationales'][i]}"
-        for i in range(len(q["options"]))
-        if i != q["correct_index"] and q["rationales"][i]
-    ]
-    if wrong:
-        # Lead with the option they picked: that is the misconception they need to hear about.
-        if not correct:
-            wrong.sort(key=lambda line: not line.startswith(f"**{LETTERS[chosen]}**"))
-        embed.add_field(name="Why the others are wrong", value=clip("\n".join(wrong), FIELD_LIMIT), inline=False)
-    if q.get("source_quote"):
-        embed.add_field(name="From your material", value=clip(f"> {q['source_quote']}", FIELD_LIMIT), inline=False)
-    if questions.caution(q):
-        embed.add_field(name="Heads up", value=questions.caution(q), inline=False)
-    return embed
-
-
-def question_view(q: dict, owner: int, left: int, right: int, done: int) -> discord.ui.View:
-    view = discord.ui.View(timeout=None)
-    for i in range(len(q["options"])):
-        view.add_item(AnswerButton(q["id"], i, owner, left, right, done))
-    return view
-
-
-async def send_next_question(
-    interaction: discord.Interaction, deck_id: int, owner: int, left: int, right: int, done: int
-) -> None:
-    store: Store = interaction.client.store  # type: ignore[attr-defined]
-    picks = store.next_questions(deck_id, owner, 1, skip_recent_seconds=1800)
-    total = left + done
-    if not picks:
-        await interaction.followup.send(
-            f"That's every question in this deck for now. You scored **{right}/{done}**. "
-            "Run `/generate` to add more.",
-        )
-        return
-    q = picks[0]
-    await interaction.followup.send(
-        embed=question_embed(q, done + 1, total), view=question_view(q, owner, left - 1, right, done)
-    )
-
-
-class AnswerButton(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:a:(?P<q>\d+):(?P<c>\d):(?P<o>\d+):(?P<l>\d+):(?P<r>\d+):(?P<d>\d+)"):
-    """All quiz state lives in the custom_id, so buttons keep working across restarts."""
-
-    def __init__(self, qid: int, choice: int, owner: int, left: int, right: int, done: int):
-        self.qid, self.choice, self.owner = qid, choice, owner
-        self.left, self.right, self.done = left, right, done
-        super().__init__(
-            discord.ui.Button(
-                label=LETTERS[choice],
-                style=discord.ButtonStyle.secondary,
-                custom_id=f"sb:a:{qid}:{choice}:{owner}:{left}:{right}:{done}",
-            )
-        )
-
-    @classmethod
-    async def from_custom_id(cls, interaction, item, match: re.Match[str]):
-        g = {k: int(v) for k, v in match.groupdict().items()}
-        return cls(g["q"], g["c"], g["o"], g["l"], g["r"], g["d"])
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if interaction.user.id != self.owner:
-            await interaction.response.send_message("This is someone else's quiz. Start your own with `/quiz`.", ephemeral=True)
-            return
-        store: Store = interaction.client.store  # type: ignore[attr-defined]
-        q = store.get_question(self.qid)
-        if not q:
-            await interaction.response.send_message("That question was deleted.", ephemeral=True)
-            return
-        correct = self.choice == q["correct_index"]
-        store.record_attempt(self.qid, self.owner, self.choice, correct)
-        right, done = self.right + int(correct), self.done + 1
-        total = self.left + done
-
-        view = discord.ui.View(timeout=None)
-        if self.left > 0:
-            view.add_item(NextButton(q["deck_id"], self.owner, self.left, right, done))
-        view.add_item(FlagButton(self.qid))
-        await interaction.response.edit_message(embed=answered_embed(q, self.choice, done, total), view=view)
-        if self.left == 0:
-            pct = round(100 * right / done)
-            await interaction.followup.send(f"🏁 Quiz finished: **{right}/{done}** ({pct}%). `/quiz` again to keep going — missed questions come back first.")
-
-
-class NextButton(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:n:(?P<k>\d+):(?P<o>\d+):(?P<l>\d+):(?P<r>\d+):(?P<d>\d+)"):
-    def __init__(self, deck_id: int, owner: int, left: int, right: int, done: int):
-        self.deck_id, self.owner, self.left, self.right, self.done = deck_id, owner, left, right, done
-        super().__init__(
-            discord.ui.Button(
-                label=f"Next ({left} left)",
-                style=discord.ButtonStyle.primary,
-                custom_id=f"sb:n:{deck_id}:{owner}:{left}:{right}:{done}",
-            )
-        )
-
-    @classmethod
-    async def from_custom_id(cls, interaction, item, match: re.Match[str]):
-        g = {k: int(v) for k, v in match.groupdict().items()}
-        return cls(g["k"], g["o"], g["l"], g["r"], g["d"])
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        if interaction.user.id != self.owner:
-            await interaction.response.send_message("This is someone else's quiz. Start your own with `/quiz`.", ephemeral=True)
-            return
-        # Drop the Next button from the old message so it can't be pressed twice.
-        view = discord.ui.View.from_message(interaction.message, timeout=None) if interaction.message else None
-        if view:
-            for child in list(view.children):
-                if getattr(child, "custom_id", "").startswith("sb:n:"):
-                    view.remove_item(child)
-        await interaction.response.edit_message(view=view)
-        await send_next_question(interaction, self.deck_id, self.owner, self.left, self.right, self.done)
-
-
-class FlagButton(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:f:(?P<q>\d+)"):
-    def __init__(self, qid: int):
-        self.qid = qid
-        super().__init__(
-            discord.ui.Button(label="Flag question", emoji="🚩", style=discord.ButtonStyle.secondary, custom_id=f"sb:f:{qid}")
-        )
-
-    @classmethod
-    async def from_custom_id(cls, interaction, item, match: re.Match[str]):
-        return cls(int(match["q"]))
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        store: Store = interaction.client.store  # type: ignore[attr-defined]
-        retired = store.flag_question(self.qid, interaction.user.id)
-        msg = "Thanks — flagged for review."
-        if retired:
-            msg += " Enough people flagged it, so it's been pulled from the quiz rotation."
-        await interaction.response.send_message(msg, ephemeral=True)
 
 
 class GenerateOffer(discord.ui.View):
@@ -258,10 +92,13 @@ class StudyCog(commands.Cog):
     @app_commands.command(name="upload", description="Add any file: existing questions in it are pulled out, the rest is kept as study material")
     @app_commands.describe(
         file="PDF, Word, PowerPoint, text, or a photo/screenshot of a worksheet",
-        deck="Deck to add it to (defaults to the file name)",
+        deck="Question set to add it to (defaults to the file name)",
+        subject="Subject it belongs to, e.g. biology (used to group sets in /library and /quiz)",
     )
     @app_commands.guild_only()
-    async def upload_cmd(self, interaction: discord.Interaction, file: discord.Attachment, deck: Optional[str] = None):
+    async def upload_cmd(
+        self, interaction: discord.Interaction, file: discord.Attachment, deck: Optional[str] = None, subject: Optional[str] = None
+    ):
         if file.size > config.MAX_UPLOAD_BYTES:
             await interaction.response.send_message("That file is over 25MB.", ephemeral=True)
             return
@@ -278,7 +115,7 @@ class StudyCog(commands.Cog):
             await interaction.followup.send(f"Couldn't read `{file.filename}`: {exc}")
             return
 
-        deck_id = self.store.get_or_create_deck(interaction.guild_id, deck, interaction.user.id)
+        deck_id = self.store.get_or_create_deck(interaction.guild_id, deck, interaction.user.id, subject)
         chunks = ingest.chunk_text(text) if len(text) >= 200 else []
         doc_id = self.store.add_document(deck_id, file.filename, ingest.sha256(data), chunks, interaction.user.id)
         if doc_id is None:
@@ -329,7 +166,7 @@ class StudyCog(commands.Cog):
                 lines.append(f"Skipped {duplicate} already in the deck.")
             if found.dropped:
                 lines.append(f"Ignored {found.dropped} that didn't match the file's text.")
-            lines.append(f"Start with `/quiz deck:{deck}` or share it with `/share deck:{deck}`.")
+            lines.append(f"Play it with `/quiz`, or share it with `/share deck:{deck}`.")
             await interaction.followup.send(clip("\n".join(lines), 1990))
             return
 
@@ -349,6 +186,12 @@ class StudyCog(commands.Cog):
     @upload_cmd.autocomplete("deck")
     async def _upload_ac(self, interaction, current):
         return await self.deck_autocomplete(interaction, current)
+
+    @upload_cmd.autocomplete("subject")
+    async def _subject_ac(self, interaction, current):
+        known = self.store.subjects(interaction.guild_id or 0, current)
+        common = [s for s in COMMON_SUBJECTS if s.startswith(current.lower()) and s not in known]
+        return [app_commands.Choice(name=f"{quality.subject_emoji(s)} {s}", value=s) for s in (known + common)[:25]]
 
     @app_commands.command(name="generate", description="⚠️ Have AI write questions from a deck's notes (when the files had none)")
     @app_commands.describe(
@@ -415,35 +258,21 @@ class StudyCog(commands.Cog):
         if errors:
             lines.append(f"⚠️ {errors} passage(s) failed (model error or rate limit). Try again shortly.")
         if accepted:
-            lines.append(f"Start with `/quiz deck:{deck}`.")
+            lines.append("Play them with `/quiz`.")
         await interaction.edit_original_response(content=clip("\n".join(lines), 1990))
 
     @generate_cmd.autocomplete("deck")
     async def _generate_ac(self, interaction, current):
         return await self.deck_autocomplete(interaction, current)
 
-    @app_commands.command(name="quiz", description="Take a multiple-choice quiz from a deck")
-    @app_commands.describe(deck="Which deck", count="Number of questions")
+    @app_commands.command(name="quiz", description="Pick subjects and question sets, then play solo (private) or live with everyone")
     @app_commands.guild_only()
-    async def quiz_cmd(self, interaction: discord.Interaction, deck: str, count: app_commands.Range[int, 1, 25] = 5):
-        deck_id = self._deck(interaction, deck)
-        if not deck_id:
-            await interaction.response.send_message(f"No deck called **{deck}**.", ephemeral=True)
+    async def quiz_cmd(self, interaction: discord.Interaction):
+        picker = play.QuizPicker(self.store, interaction.guild_id, interaction.user.id)
+        if not picker.visible_sets():
+            await interaction.response.send_message("No questions yet. Add a file with `/upload` first.", ephemeral=True)
             return
-        picks = self.store.next_questions(deck_id, interaction.user.id, 1)
-        if not picks:
-            await interaction.response.send_message(
-                f"**{deck}** has no questions yet. Run `/generate deck:{deck}` first.", ephemeral=True
-            )
-            return
-        q = picks[0]
-        await interaction.response.send_message(
-            embed=question_embed(q, 1, count), view=question_view(q, interaction.user.id, count - 1, 0, 0)
-        )
-
-    @quiz_cmd.autocomplete("deck")
-    async def _quiz_ac(self, interaction, current):
-        return await self.deck_autocomplete(interaction, current)
+        await interaction.response.send_message(embed=picker.embed(), view=picker, ephemeral=True)
 
     @app_commands.command(name="share", description="Get a deck as a standalone study pack (HTML quiz + review sheet) and Anki file")
     @app_commands.describe(deck="Which deck")
@@ -471,16 +300,24 @@ class StudyCog(commands.Cog):
     async def _share_ac(self, interaction, current):
         return await self.deck_autocomplete(interaction, current)
 
-    @app_commands.command(name="decks", description="List study decks in this server")
+    @app_commands.command(name="library", description="Browse every subject and question set in this server")
     @app_commands.guild_only()
-    async def decks_cmd(self, interaction: discord.Interaction):
-        rows = self.store.list_decks(interaction.guild_id)
+    async def library_cmd(self, interaction: discord.Interaction):
+        rows = self.store.library(interaction.guild_id)
         if not rows:
-            await interaction.response.send_message("No decks yet. Start with `/upload`.", ephemeral=True)
+            await interaction.response.send_message("The library is empty. Start with `/upload`.", ephemeral=True)
             return
-        lines = [f"**{r['name']}** — {r['docs']} file(s), {r['questions']} question(s)"
-                 + (f" ({r['ai_questions']} ⚠️ AI)" if r["ai_questions"] else "") for r in rows]
-        await interaction.response.send_message(clip("\n".join(lines), 1990), ephemeral=True)
+        embed = discord.Embed(title="📚 Library", colour=0x5865F2)
+        by_subject: dict[str, list] = {}
+        for r in rows:
+            by_subject.setdefault(r["subject"], []).append(r)
+        for subject, sets in list(by_subject.items())[:25]:
+            lines = [f"`{r['name']}` — {play.set_summary(r)}" for r in sets]
+            embed.add_field(
+                name=f"{quality.subject_emoji(subject)} {subject.title()}", value=clip("\n".join(lines), FIELD_LIMIT), inline=False
+            )
+        embed.set_footer(text=quality.LEGEND + " · /quiz to play")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     @app_commands.command(name="stats", description="Your quiz accuracy")
     @app_commands.describe(deck="Optional: limit to one deck")

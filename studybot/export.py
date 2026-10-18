@@ -18,6 +18,7 @@ from typing import Optional
 
 from . import config
 from .db import Store
+from . import quality
 from .questions import caution
 
 
@@ -29,8 +30,11 @@ def slugify(name: str) -> str:
 
 
 def pack_data(store: Store, deck_id: int, name: str) -> dict:
+    subject = store.deck_subject(deck_id)
     return {
         "deck": name,
+        "subject": subject,
+        "emoji": quality.subject_emoji(subject),
         "slug": slugify(name),
         "sources": store.deck_sources(deck_id),
         "exported": time.strftime("%Y-%m-%d"),
@@ -45,6 +49,7 @@ def pack_data(store: Store, deck_id: int, name: str) -> dict:
                 "quote": q.get("source_quote") or "",
                 "level": " · ".join(x for x in (q.get("difficulty"), q.get("cognitive_level")) if x),
                 "caution": caution(q),
+                "labels": quality.labels(q),
             }
             for q in store.deck_questions(deck_id)
         ],
@@ -76,12 +81,19 @@ def render_anki(data: dict) -> str:
 
 
 def render_index(packs: list[dict]) -> str:
-    items = "\n".join(
-        f'<li><a href="{html.escape(p["slug"])}.html">{html.escape(p["deck"].title())}</a>'
-        f'<span>{len(p["questions"])} questions</span></li>'
-        for p in sorted(packs, key=lambda p: p["deck"])
-    )
-    return INDEX_TEMPLATE.replace("__ITEMS__", items or "<li>No decks yet.</li>")
+    """Packs grouped under their subject headings."""
+    groups: dict[str, list[dict]] = {}
+    for p in sorted(packs, key=lambda p: (p["subject"], p["deck"])):
+        groups.setdefault(p["subject"], []).append(p)
+    sections = []
+    for subject, items in groups.items():
+        lis = "\n".join(
+            f'<li><a href="{html.escape(p["slug"])}.html">{html.escape(p["deck"].title())}</a>'
+            f'<span>{len(p["questions"])} questions</span></li>'
+            for p in items
+        )
+        sections.append(f"<h2>{quality.subject_emoji(subject)} {html.escape(subject.title())}</h2><ul>{lis}</ul>")
+    return INDEX_TEMPLATE.replace("__LEGEND__", html.escape(quality.LEGEND)).replace("__ITEMS__", "\n".join(sections) or "<p>No question sets yet.</p>")
 
 
 def export_guild(store: Store, guild_id: int, out: Path, deck: Optional[str] = None) -> list[Path]:
@@ -195,7 +207,8 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
   document.title = D.deck.replace(/\b\w/g, function (c) { return c.toUpperCase(); }) + " · Study pack";
   document.getElementById("title").textContent = document.title.replace(" · Study pack", "");
   document.getElementById("subtitle").textContent =
-    D.questions.length + " questions" + (D.sources.length ? " · from " + D.sources.join(", ") : "") + " · exported " + D.exported
+    D.emoji + " " + D.subject.replace(/\b\w/g, function (c) { return c.toUpperCase(); }) + " · "
+    + D.questions.length + " questions" + (D.sources.length ? " · from " + D.sources.join(", ") : "") + " · exported " + D.exported
     + (aiCount ? " · ⚠️ " + aiCount + " marked as AI-assisted" : "");
 
   // Missed questions first, then unseen, then ones already answered correctly.
@@ -222,7 +235,7 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
       opts.appendChild(b);
     });
     var card = el("div", { class: "card" }, [
-      el("div", { class: "meta", text: "Question " + (pos + 1) + " of " + queue.length + (q.level ? " · " + q.level : "") }),
+      el("div", { class: "meta", text: q.labels + "  Question " + (pos + 1) + " of " + queue.length + (q.level ? " · " + q.level : "") }),
       el("div", { class: "stem", text: q.stem }), opts,
       q.caution ? el("div", { class: "caution", text: q.caution }) : null
     ]);
@@ -285,7 +298,7 @@ blockquote { margin: 8px 0 0; padding: 6px 12px; border-left: 3px solid var(--ac
   var review = document.getElementById("review");
   D.questions.forEach(function (q, n) {
     var kids = [
-      el("div", { class: "meta", text: (n + 1) + (q.level ? " · " + q.level : "") }),
+      el("div", { class: "meta", text: q.labels + "  " + (n + 1) + (q.level ? " · " + q.level : "") }),
       el("div", { class: "stem", text: q.stem }),
       el("ul", {}, q.options.map(function (o, i) {
         return el("li", { class: i === q.correct ? "answer" : "", text: L[i] + ". " + o });
@@ -331,12 +344,15 @@ ul { list-style: none; padding: 0; }
 li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
   display: flex; justify-content: space-between; gap: 12px; }
 a { color: var(--accent); font-weight: 600; text-decoration: none; }
-span { color: var(--muted); }
+span, .legend { color: var(--muted); }
+.legend { font-size: .85rem; }
+h2 { font-size: 1.1rem; margin: 24px 0 8px; }
 </style>
 </head>
-<body><main><h1>Study packs</h1><ul>
+<body><main><h1>Study packs</h1>
+<p class="legend">__LEGEND__</p>
 __ITEMS__
-</ul></main></body>
+</main></body>
 </html>
 """
 

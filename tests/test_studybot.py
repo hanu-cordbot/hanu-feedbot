@@ -299,3 +299,169 @@ def test_old_database_gets_new_columns(tmp_path):
     conn.close()
     cols = {r["name"] for r in Store(path).conn.execute("PRAGMA table_info(questions)")}
     assert {"origin", "answer_source", "document_id"} <= cols
+
+
+# --- library, labels, picking, solo runs, live games -------------------------
+
+def _q(origin="extracted", answer_source="document", net=0, flags=0, last=None, qid=1):
+    return {"id": qid, "origin": origin, "answer_source": answer_source, "net_rating": net, "flags": flags, "last_correct": last}
+
+
+def test_labels_and_quality():
+    from studybot import quality
+
+    assert quality.labels(_q()) == "📄"
+    assert quality.labels(_q(answer_source="ai", net=2, flags=1)) == "🤖 ⭐ 🚩"
+    assert quality.labels(_q(origin="generated")) == "✨"
+    assert quality.quality(_q()) == 2 and quality.quality(_q(origin="generated")) == -1
+    assert quality.quality(_q(net=1, flags=1)) == 1
+    assert quality.subject_emoji("Organic Chemistry") == "⚗️" and quality.subject_emoji("Italian") == "📚"
+
+
+def test_pick_prefers_good_questions_and_tops_up_when_short():
+    from studybot import quality
+
+    good = [_q(qid=i) for i in range(10)]
+    weak = [_q(origin="generated", net=-1, qid=100 + i) for i in range(10)]
+    a = quality.pick(good + weak, 5, random.Random(1))
+    assert [q["id"] for q in a] == [q["id"] for q in quality.pick(good + weak, 5, random.Random(1))]  # seeded
+    assert all(q["id"] < 100 for q in a)
+    b = quality.pick(good[:2] + weak, 5, random.Random(2))
+    assert len(b) == 5 and sum(q["id"] < 100 for q in b) == 2
+    assert len({q["id"] for q in quality.pick(good, 50, random.Random(3))}) == 10  # never repeats
+
+
+def test_pick_favours_missed_questions_for_solo():
+    from studybot import quality
+
+    missed = [_q(last=0, qid=i) for i in range(5)]
+    known = [_q(last=1, qid=10 + i) for i in range(5)]
+    rng = random.Random(7)
+    hits = sum(q["last_correct"] == 0 for _ in range(400) for q in quality.pick(missed + known, 1, rng, personal=True))
+    assert hits > 280  # weights 1.8×2.2 vs 0.6×2.2 → missed should win ~75% of draws
+
+
+def test_subjects_library_ratings_and_runs(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.sqlite3"
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE decks (id INTEGER PRIMARY KEY, guild_id INTEGER NOT NULL, name TEXT NOT NULL, "
+                 "created_by INTEGER, created_at REAL NOT NULL, UNIQUE (guild_id, name))")
+    conn.execute("INSERT INTO decks (guild_id, name, created_at) VALUES (1, 'old set', 0)")
+    conn.commit()
+    conn.close()
+    store = Store(path)
+    assert store.deck_subject(1) == "general"
+
+    bio = store.get_or_create_deck(1, "cells", subject="Biology")
+    assert store.get_or_create_deck(1, "cells") == bio and store.deck_subject(bio) == "biology"
+    store.get_or_create_deck(1, "cells", subject="biology 101")
+    assert store.subjects(1) == ["biology 101", "general"]
+
+    from studybot import extract
+
+    q1 = store.add_question(bio, None, extract.to_stored(extract.Extracted("Q one?", ["a", "b"], 0)))
+    q2 = store.add_question(bio, None, extract.to_stored(extract.Extracted("Q two?", ["a", "b"], None), {"index": 1, "confidence": "low", "reason": ""}))
+    assert store.rate_question(q1, 5, 1) == 1 and store.rate_question(q1, 6, 1) == 2
+    assert store.rate_question(q1, 6, -1) == 0  # changing your vote replaces it
+    store.rate_question(q1, 6, 1)
+    row = next(r for r in store.library(1) if r["id"] == bio)
+    assert (row["questions"], row["from_file"], row["ai_answer"], row["favourites"]) == (2, 1, 1, 1)
+    assert {q["id"]: q["net_rating"] for q in store.question_pool([bio])} == {q1: 2, q2: 0}
+
+    run = store.create_run(9, [q1, q2])
+    assert store.advance_run(run, 0, True) and not store.advance_run(run, 0, True)  # double click ignored
+    assert store.get_run(run)["position"] == 1 and store.get_run(run)["correct"] == 1
+
+
+def test_live_scoring():
+    from studybot.play import points_for
+
+    assert points_for(False, 10, 20, 3) == 0
+    assert points_for(True, 20, 20, 0) == 1000 and points_for(True, 0, 20, 0) == 500
+    assert points_for(True, 10, 20, 2) == 850 and points_for(True, 10, 20, 99) == 1000
+
+
+def test_live_game_keeps_picks_private_until_reveal():
+    import types
+    from studybot import play
+
+    store, _ = _deck_with_questions(1)
+    qid = store.deck_questions(store.find_deck(9, "enzymes 101"))[0]["id"]
+    q = store.get_question(qid)
+    edits, sent = [], []
+
+    class Msg:
+        async def edit(self, **kw):
+            edits.append(kw)
+
+    class Channel:
+        async def send(self, *a, **kw):
+            sent.append(kw)
+            return Msg()
+
+    client = types.SimpleNamespace(store=store, live_games={})
+
+    def interaction(uid, name):
+        log = []
+
+        async def edit_message(**kw):
+            log.append(kw)
+
+        return types.SimpleNamespace(
+            client=client, user=types.SimpleNamespace(id=uid, display_name=name),
+            response=types.SimpleNamespace(edit_message=edit_message), log=log,
+        )
+
+    async def scenario():
+        game = play.LiveGame(1, host_id=1, channel=Channel(), question_ids=[qid], time_limit=30)
+        client.live_games[1] = game
+        await play.ask_next(client, game)
+        public = sent[-1]["embed"]
+        assert "🙋 **0** answered" in public.fields[0].value
+        buttons = [getattr(c, "item", c) for c in sent[-1]["view"].children]
+        # Only ✋ Answer and host controls are public: no option buttons, no counts to spoil.
+        assert sorted(b.custom_id.split(":")[1] for b in buttons) == ["lh", "lh", "lj"]
+
+        right, wrong = interaction(2, "Ada"), interaction(3, "Bo")
+        await play.LivePick(1, 0, q["correct_index"]).callback(right)
+        await play.LivePick(1, 0, (q["correct_index"] + 1) % 4).callback(wrong)
+        await play.LivePick(1, 0, 0).callback(right)  # second pick is refused
+        assert "✅ Correct!" in right.log[0]["content"] and "already locked in" in right.log[1]["content"]
+        assert "❌" in wrong.log[0]["content"]
+        assert game.scores[2] > 900 and game.scores[3] == 0
+        await asyncio.sleep(play.COUNTER_EDIT_GAP + 0.1)
+        assert "🙋 **2** answered" in edits[-1]["embed"].fields[0].value
+        assert "answer:" not in edits[-1]["embed"].title  # still hidden before the reveal
+
+        await play.reveal(game, 0)
+        revealed = edits[-1]["embed"]
+        assert f"answer: {'ABCD'[q['correct_index']]}" in revealed.title
+        assert "Ada" in next(f.value for f in revealed.fields if f.name == "Leaderboard")
+        await play.ask_next(client, game)  # past the last question → podium, game removed
+        assert 1 not in client.live_games and "🥇 **Ada**" in sent[-1]["embed"].description
+
+    asyncio.run(scenario())
+
+
+def test_bot_commands_and_custom_ids():
+    import re as _re
+    from studybot import play
+    from studybot.bot import StudyBot, StudyCog
+
+    async def build():
+        bot = StudyBot(Store(":memory:"))
+        await bot.add_cog(StudyCog(bot))
+        names = sorted(c.name for c in bot.tree.get_commands())
+        for c in bot.tree.get_commands():
+            c.to_dict(bot.tree)
+        await bot.close()
+        return names
+
+    assert asyncio.run(build()) == ["generate", "interview", "library", "quiz", "share", "stats", "upload"]
+    big = 10**18
+    for item in (play.SoloAnswer(big, 24, 5), play.SoloNext(big), play.LiveJoin(big, 24), play.LivePick(big, 24, 5),
+                 play.LiveHost(big, "reveal"), play.RateButton(big, False), play.FlagButton(big)):
+        cid = item.item.custom_id
+        assert len(cid) <= 100 and _re.fullmatch(type(item).__discord_ui_compiled_template__, cid)
