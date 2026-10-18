@@ -385,14 +385,14 @@ def test_live_scoring():
     assert points_for(True, 10, 20, 2) == 850 and points_for(True, 10, 20, 99) == 1000
 
 
-def test_live_game_keeps_picks_private_until_reveal():
+def test_live_game_is_one_message_with_private_picks():
     import types
     from studybot import play
 
     store, _ = _deck_with_questions(1)
     qid = store.deck_questions(store.find_deck(9, "enzymes 101"))[0]["id"]
     q = store.get_question(qid)
-    edits, sent = [], []
+    edits, sent, deleted = [], [], []
 
     class Msg:
         async def edit(self, **kw):
@@ -408,30 +408,36 @@ def test_live_game_keeps_picks_private_until_reveal():
     def interaction(uid, name):
         log = []
 
-        async def edit_message(**kw):
-            log.append(kw)
+        async def send_message(text, **kw):
+            log.append((text, kw))
+
+        async def delete_original_response():
+            deleted.append(uid)
 
         return types.SimpleNamespace(
             client=client, user=types.SimpleNamespace(id=uid, display_name=name),
-            response=types.SimpleNamespace(edit_message=edit_message), log=log,
+            response=types.SimpleNamespace(send_message=send_message), log=log,
+            delete_original_response=delete_original_response,
         )
 
     async def scenario():
-        game = play.LiveGame(1, host_id=1, channel=Channel(), question_ids=[qid], time_limit=30)
+        game = play.LiveGame(1, host_id=1, channel=Channel(), question_ids=[qid], time_limit=30,
+                             settings=play.QuizSettings(cards=False))
         client.live_games[1] = game
         await play.ask_next(client, game)
-        public = sent[-1]["embed"]
-        assert "🙋 **0** answered" in public.fields[0].value
-        buttons = [getattr(c, "item", c) for c in sent[-1]["view"].children]
-        # Only ✋ Answer and host controls are public: no option buttons, no counts to spoil.
-        assert sorted(b.custom_id.split(":")[1] for b in buttons) == ["lh", "lh", "lj"]
+        assert len(sent) == 1 and "🙋 **0** answered" in sent[0]["embed"].fields[0].value
+        ids = [getattr(c, "item", c).custom_id for c in sent[0]["view"].children]
+        # A/B/C/D are right on the public message, plus the host's controls.
+        assert [i.split(":")[1] for i in ids] == ["la"] * len(q["options"]) + ["lh", "lh"]
 
         right, wrong = interaction(2, "Ada"), interaction(3, "Bo")
-        await play.LivePick(1, 0, q["correct_index"]).callback(right)
-        await play.LivePick(1, 0, (q["correct_index"] + 1) % 4).callback(wrong)
-        await play.LivePick(1, 0, 0).callback(right)  # second pick is refused
-        assert "✅ Correct!" in right.log[0]["content"] and "already locked in" in right.log[1]["content"]
-        assert "❌" in wrong.log[0]["content"]
+        await play.LiveAnswer(1, 0, q["correct_index"]).callback(right)
+        await play.LiveAnswer(1, 0, (q["correct_index"] + 1) % 4).callback(wrong)
+        await play.LiveAnswer(1, 0, 0).callback(right)  # second pick is refused
+        text, kw = right.log[0]
+        assert kw["ephemeral"] and "Locked in" in text and "✅" in text and "#1 of 1" in text
+        assert "already locked in" in right.log[1][0] and right.log[1][1]["delete_after"]
+        assert "❌" in wrong.log[0][0]
         assert game.scores[2] > 900 and game.scores[3] == 0
         await asyncio.sleep(play.COUNTER_EDIT_GAP + 0.1)
         assert "🙋 **2** answered" in edits[-1]["embed"].fields[0].value
@@ -441,8 +447,10 @@ def test_live_game_keeps_picks_private_until_reveal():
         revealed = edits[-1]["embed"]
         assert f"answer: {'ABCD'[q['correct_index']]}" in revealed.title
         assert "Ada" in next(f.value for f in revealed.fields if f.name == "Leaderboard")
-        await play.ask_next(client, game)  # past the last question → podium, game removed
-        assert 1 not in client.live_games and "🥇 **Ada**" in sent[-1]["embed"].description
+        assert sorted(deleted) == [2, 3]  # private "locked in" replies are cleaned up at the reveal
+        await play.ask_next(client, game)  # past the last question → podium on the same message
+        assert len(sent) == 1 and 1 not in client.live_games and "🥇 **Ada**" in edits[-1]["embed"].description
+        assert edits[-1]["view"] is None
 
     asyncio.run(scenario())
 
@@ -463,7 +471,7 @@ def test_bot_commands_and_custom_ids():
 
     assert asyncio.run(build()) == ["generate", "interview", "library", "quiz", "share", "stats", "upload"]
     big = 10**18
-    for item in (play.SoloAnswer(big, 24, 5), play.SoloNext(big), play.LiveJoin(big, 24), play.LivePick(big, 24, 5),
+    for item in (play.SoloAnswer(big, 24, 5), play.SoloNext(big), play.LiveAnswer(big, 24, 5),
                  play.LiveHost(big, "reveal"), play.LiveMine(big, 24), play.RateButton(big, False), play.FlagButton(big)):
         cid = item.item.custom_id
         assert len(cid) <= 100 and _re.fullmatch(type(item).__discord_ui_compiled_template__, cid)
@@ -622,16 +630,17 @@ def test_solo_run_with_timer_and_hidden_answers(tmp_path):
         q = store.get_question(ids[0])
         shown = play.run_order(run, q, 0).index(q["correct_index"])
         await play.SoloAnswer(run_id, 0, shown).callback(inter)  # right answer, on time, shuffled tile
-        assert "Locked in" in log[-1]["embed"].description and log[-1]["attachments"] == []
+        assert "Locked in" in json.dumps(log[-1]["view"].to_components()) and log[-1]["attachments"] == []
         run = store.get_run(run_id)
         await play.solo_question(store, run)
         store.mark_asked(run_id, time.time() - 60)  # pretend the timer ran out
         await play.SoloAnswer(run_id, 1, 0).callback(inter)
-        assert "Too slow" in log[-1]["embed"].description
+        assert "Too slow" in json.dumps(log[-1]["view"].to_components())
         run = store.get_run(run_id)
         assert run["correct"] == 1 and run["picks"] == [q["correct_index"], None]
-        embed, files = await play.solo_summary(store, run)
-        assert "1/2 correct" in embed.title and "⏰ no answer" in embed.description and files == []
+        view, files = await play.solo_summary(store, run)
+        text = json.dumps(view.to_components(), ensure_ascii=False)
+        assert "1/2 correct" in text and "⏰ no answer" in text and files == []
 
     asyncio.run(scenario())
 
@@ -643,13 +652,13 @@ def test_live_shuffle_scoring_and_personal_results():
     store, deck = _deck_with_questions(1)
     qid = store.deck_questions(deck)[0]["id"]
     q = store.get_question(qid)
-    sent = []
+    sent, edits = [], []
 
     class Msg:
         embeds = []
 
         async def edit(self, **kw):
-            pass
+            edits.append(kw)
 
     class Channel:
         async def send(self, *a, **kw):
@@ -659,32 +668,35 @@ def test_live_shuffle_scoring_and_personal_results():
     client = types.SimpleNamespace(store=store, live_games={})
     replies = []
 
-    async def reply(**kw):
-        replies.append(kw)
-
     def inter(uid):
+        async def send_message(text, **kw):
+            replies.append(text)
+
+        async def delete_original_response():
+            pass
+
         return types.SimpleNamespace(client=client, user=types.SimpleNamespace(id=uid, display_name=f"p{uid}"),
-                                     response=types.SimpleNamespace(edit_message=reply, send_message=reply))
+                                     response=types.SimpleNamespace(send_message=send_message),
+                                     delete_original_response=delete_original_response)
 
     async def scenario():
         s = play.QuizSettings(shuffle=True, speed=False, streak=False, cards=True)
         game = play.LiveGame(5, host_id=1, channel=Channel(), question_ids=[qid], time_limit=30, settings=s)
         client.live_games[5] = game
         await play.ask_next(client, game)
-        assert sent[-1]["files"] and sent[-1]["embed"].image.url == "attachment://card.png"
+        assert sent[-1]["attachments"] and sent[-1]["embed"].image.url == "attachment://card.png"
         right = game.order.index(q["correct_index"])
-        await play.LiveJoin(5, 0).callback(inter(2))
-        assert replies[-1]["ephemeral"] and replies[-1]["files"]  # the player's own card
-        await play.LivePick(5, 0, right).callback(inter(2))
-        await play.LivePick(5, 0, (right + 1) % len(game.order)).callback(inter(3))
-        assert game.scores == {2: 1000, 3: 0} and "#1 of 1" in replies[-2]["content"] and "#2 of 2" in replies[-1]["content"]
+        await play.LiveAnswer(5, 0, right).callback(inter(2))
+        await play.LiveAnswer(5, 0, (right + 1) % len(game.order)).callback(inter(3))
+        assert game.scores == {2: 1000, 3: 0} and "#1 of 1" in replies[0] and "#2 of 2" in replies[1]
         await play.reveal(game, 0)
+        assert edits[-1]["attachments"]  # reveal card replaces the question card on the same message
         await play.LiveMine(5, 0).callback(inter(3))
-        assert "no points" in replies[-1]["embed"].description and "#2 of 2" in replies[-1]["embed"].description
+        assert "no points" in replies[-1] and "#2 of 2" in replies[-1]
         await play.LiveMine(5, 0).callback(inter(4))
-        assert "didn't answer" in replies[-1]["embed"].description
+        assert "didn't answer" in replies[-1]
         await play.ask_next(client, game)
-        assert "🥇 **p2**" in sent[-1]["embed"].description and sent[-1]["files"]
+        assert "🥇 **p2**" in edits[-1]["embed"].description and edits[-1]["attachments"]
 
     asyncio.run(scenario())
 

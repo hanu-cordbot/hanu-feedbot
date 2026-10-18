@@ -28,7 +28,7 @@ import discord
 
 from . import cards, quality
 from .db import Store
-from .render import FIELD_LIMIT, LETTERS, add_teaching_fields, clip
+from .render import FIELD_LIMIT, LETTERS, add_teaching_fields, clip, teaching_parts
 
 log = logging.getLogger(__name__)
 
@@ -219,6 +219,8 @@ def feedback_items(qid: int) -> list[discord.ui.Item]:
 
 
 # --- solo (private) ------------------------------------------------------------
+# Solo uses Discord's newer message layout, so the /quiz panel itself turns into the quiz:
+# one private message from settings to final score.
 
 def run_settings(run: dict) -> QuizSettings:
     return QuizSettings.from_dict(run.get("settings"))
@@ -228,7 +230,24 @@ def run_order(run: dict, q: dict, pos: int) -> list[int]:
     return option_order(len(q["options"]), run_settings(run).shuffle, f"solo:{run['id']}:{pos}")
 
 
-async def solo_question(store: Store, run: dict) -> tuple[discord.Embed, discord.ui.View, list[discord.File]]:
+def solo_layout(colour: int, parts: list, files: list[discord.File]) -> discord.ui.LayoutView:
+    """`parts` are strings (text blocks), "card" (the drawn card, if any) or lists of buttons (one row each)."""
+    view = discord.ui.LayoutView(timeout=None)
+    children: list[discord.ui.Item] = []
+    for part in parts:
+        if part == "card":
+            if files:
+                children.append(discord.ui.MediaGallery(discord.MediaGalleryItem(f"attachment://{CARD}")))
+        elif isinstance(part, list):
+            if part:
+                children.append(discord.ui.ActionRow(*part))
+        elif part:
+            children.append(discord.ui.TextDisplay(clip(part, 3500)))
+    view.add_item(discord.ui.Container(*children, accent_colour=colour))
+    return view
+
+
+async def solo_question(store: Store, run: dict) -> tuple[discord.ui.LayoutView, list[discord.File]]:
     pos = run["position"]
     total = len(run["question_ids"])
     q = store.get_question(run["question_ids"][pos])
@@ -238,27 +257,22 @@ async def solo_question(store: Store, run: dict) -> tuple[discord.Embed, discord
     store.mark_asked(run["id"], now)
     png = await draw(cards.question_card, q, pos + 1, total, order=order, right=f"{run['correct']} correct",
                      timer=f"{s.timer}s" if s.timer else None) if s.cards else None
-    embed = discord.Embed(title=f"Question {pos + 1} of {total}", description=question_body(q, order, png is not None),
-                          colour=PURPLE)
+    files = [card_file(png)] if png else []
+    header = f"### Question {pos + 1} of {total}"
     if s.timer:
-        embed.add_field(name="​", value=f"⏱️ Time's up <t:{int(now + s.timer)}:R>", inline=False)
-    embed.set_footer(text=quality.labels(q) + " · only you can see this")
-    files = []
-    if png:
-        embed.set_image(url=f"attachment://{CARD}")
-        files.append(card_file(png))
-    view = discord.ui.View(timeout=None)
-    for item in answer_buttons(lambda i: SoloAnswer(run["id"], pos, i), len(order)):
-        view.add_item(item)
-    return embed, view, files
+        header += f" · ⏱️ time's up <t:{int(now + s.timer)}:R>"
+    buttons = answer_buttons(lambda i: SoloAnswer(run["id"], pos, i), len(order))
+    rows = [buttons[:5], buttons[5:]]
+    parts = [header, "card", question_body(q, order, png is not None), *rows,
+             f"-# {quality.labels(q)} · only you can see this"]
+    return solo_layout(PURPLE, parts, files), files
 
 
-async def solo_summary(store: Store, run: dict) -> tuple[discord.Embed, list[discord.File]]:
+async def solo_summary(store: Store, run: dict) -> tuple[discord.ui.LayoutView, list[discord.File]]:
     total, right = len(run["question_ids"]), run["correct"]
     pct = round(100 * right / total) if total else 0
     medal = "🏆" if pct >= 90 else "🎉" if pct >= 70 else "💪"
     s = run_settings(run)
-    embed = discord.Embed(title=f"{medal} {right}/{total} correct ({pct}%)", colour=0xFEE75C)
     lines = []
     if not s.show_answers:
         for i, qid in enumerate(run["question_ids"]):
@@ -268,26 +282,18 @@ async def solo_summary(store: Store, run: dict) -> tuple[discord.Embed, list[dis
             yours = "⏰ no answer" if pick is None else clip(q["options"][pick], 60)
             fix = "" if ok else f" → **{clip(q['options'][q['correct_index']], 80)}**"
             lines.append(f"{'✅' if ok else '❌'} {clip(q['stem'], 90)}\n  you: {yours}{fix}")
-    review = "\n".join(lines)
-    embed.description = clip(
-        (review + "\n\n" if review else "") + "Run `/quiz` again for a fresh mix. Questions you missed come up more often.", 4000
-    )
-    files = []
     png = await draw(cards.score_card, right, total) if s.cards else None
-    if png:
-        embed.set_image(url=f"attachment://{CARD}")
-        files.append(card_file(png))
-    return embed, files
+    files = [card_file(png)] if png else []
+    parts = [f"## {medal} {right}/{total} correct ({pct}%)", "card", "\n".join(lines),
+             "-# Run `/quiz` again for a fresh mix. Questions you missed come up more often."]
+    return solo_layout(0xFEE75C, parts, files), files
 
 
 async def start_solo(interaction: discord.Interaction, question_ids: list[int], settings: QuizSettings) -> None:
     store = store_of(interaction)
     run = store.get_run(store.create_run(interaction.user.id, question_ids, settings.to_dict()))
-    await interaction.response.edit_message(view=started_panel(
-        f"🧑‍🎓 **Solo quiz started** · {len(question_ids)} questions. It's below, and only you can see it."
-    ))
-    embed, view, files = await solo_question(store, run)
-    await interaction.followup.send(embed=embed, view=view, files=files, ephemeral=True)
+    view, files = await solo_question(store, run)
+    await interaction.response.edit_message(view=view, attachments=files)
 
 
 class SoloAnswer(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:sa:(?P<r>\d+):(?P<p>\d+):(?P<c>\d)"):
@@ -303,7 +309,8 @@ class SoloAnswer(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:sa:(?P
         store = store_of(interaction)
         run = store.get_run(self.run_id)
         if not run or run["user_id"] != interaction.user.id:
-            await interaction.response.send_message("This isn't your quiz. Start one with `/quiz`.", ephemeral=True)
+            await interaction.response.send_message("This isn't your quiz. Start one with `/quiz`.", ephemeral=True,
+                                                    delete_after=8)
             return
         s = run_settings(run)
         q = store.get_question(run["question_ids"][self.pos])
@@ -312,38 +319,32 @@ class SoloAnswer(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:sa:(?P
         late = bool(s.timer) and time.time() - (run.get("asked_at") or 0) > s.timer + SOLO_GRACE
         correct = stored == q["correct_index"] and not late
         if not store.advance_run(self.run_id, self.pos, correct, None if late else stored):
-            await interaction.response.send_message("You already answered that one.", ephemeral=True)
+            await interaction.response.send_message("You already answered that one.", ephemeral=True, delete_after=5)
             return
         if not late:
             store.record_attempt(q["id"], interaction.user.id, stored, correct)
         total = len(run["question_ids"])
-        view = discord.ui.View(timeout=None)
-        view.add_item(SoloNext(self.run_id, self.pos + 1 >= total))
-        for item in feedback_items(q["id"]):
-            view.add_item(item)
-
         number = self.pos + 1
+        controls = [SoloNext(self.run_id, self.pos + 1 >= total), *feedback_items(q["id"])]
+
         if not s.show_answers:
             note = "⏰ Too slow — that one counts as missed." if late else f"🔒 Locked in **{LETTERS[self.choice]}**."
-            embed = discord.Embed(title=f"Question {number} of {total}",
-                                  description=note + " Answers are shown at the end.", colour=PURPLE)
-            await interaction.response.edit_message(embed=embed, attachments=[], view=view)
+            view = solo_layout(PURPLE, [f"### Question {number} of {total}", note + " Answers are shown at the end.",
+                                        controls], [])
+            await interaction.response.edit_message(view=view, attachments=[])
             return
 
         verdict = "⏰ Too slow" if late else ("Correct!" if correct else "Not quite")
         shown_correct = order.index(q["correct_index"])
         png = await draw(cards.reveal_card, q, number, total, order=order, chosen=self.choice, banner=verdict,
                          right=f"{run['correct'] + int(correct)} correct") if s.cards else None
+        files = [card_file(png)] if png else []
         body = "" if png and not long_text(q) else f"**{q['stem']}**\n\n" + text_options(q, order, shown_correct, self.choice)
-        embed = discord.Embed(title=f"Question {number} of {total} — {verdict}", description=clip(body, 3800),
-                              colour=0x57F287 if correct else 0xED4245)
-        add_teaching_fields(embed, q, stored)
-        embed.set_footer(text=quality.labels(q) + " · Rate it: was this a good question?")
-        files = []
-        if png:
-            embed.set_image(url=f"attachment://{CARD}")
-            files.append(card_file(png))
-        await interaction.response.edit_message(embed=embed, attachments=files, view=view)
+        teaching = "\n".join(f"**{name}**\n{value}" for name, value in teaching_parts(q, stored))
+        parts = [f"### Question {number} of {total} — {verdict}", "card", body, teaching, controls,
+                 f"-# {quality.labels(q)} · was this a good question? 👍 👎 🚩"]
+        view = solo_layout(0x57F287 if correct else 0xED4245, parts, files)
+        await interaction.response.edit_message(view=view, attachments=files)
 
 
 class SoloNext(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:sn:(?P<r>\d+)"):
@@ -361,17 +362,21 @@ class SoloNext(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:sn:(?P<r
         store = store_of(interaction)
         run = store.get_run(self.run_id)
         if not run or run["user_id"] != interaction.user.id:
-            await interaction.response.send_message("This isn't your quiz. Start one with `/quiz`.", ephemeral=True)
+            await interaction.response.send_message("This isn't your quiz. Start one with `/quiz`.", ephemeral=True,
+                                                    delete_after=8)
             return
         if run["position"] >= len(run["question_ids"]):
-            embed, files = await solo_summary(store, run)
-            await interaction.response.edit_message(embed=embed, attachments=files, view=None)
-            return
-        embed, view, files = await solo_question(store, run)
-        await interaction.response.edit_message(embed=embed, attachments=files, view=view)
+            view, files = await solo_summary(store, run)
+        else:
+            view, files = await solo_question(store, run)
+        await interaction.response.edit_message(view=view, attachments=files)
 
 
 # --- live (everyone) -----------------------------------------------------------
+# The whole game is one public message, edited in place: question → reveal → next question → podium.
+# A/B/C/D sit right on it. Discord shows a click only to the person clicking, so everyone can
+# answer at once without anyone seeing anyone else's pick. Each click gets a private text reply
+# (pick, points, rank), and those replies are deleted when the answer is revealed.
 
 @dataclass
 class LiveGame:
@@ -381,6 +386,7 @@ class LiveGame:
     question_ids: list[int]
     time_limit: int
     settings: QuizSettings = field(default_factory=QuizSettings)
+    host_name: str = "the host"
     index: int = -1
     question: Optional[dict] = None
     order: list[int] = field(default_factory=list)  # displayed tile -> stored option index
@@ -393,6 +399,7 @@ class LiveGame:
     scores: dict[int, int] = field(default_factory=dict)
     streaks: dict[int, int] = field(default_factory=dict)
     names: dict[int, str] = field(default_factory=dict)
+    receipts: list[discord.Interaction] = field(default_factory=list)  # private replies to delete later
     timer: Optional[asyncio.Task] = None
     counter_pending: bool = False
     last_counter_edit: float = 0.0
@@ -429,6 +436,14 @@ def leaderboard(game: LiveGame, limit: int = 5) -> str:
     ) or "Nobody has scored yet."
 
 
+def live_header(game: LiveGame) -> str:
+    rules = [f"{game.total} questions", f"{game.time_limit}s each",
+             "faster = more points" if game.settings.speed else "1,000 per right answer"]
+    if game.settings.streak:
+        rules.append("🔥 streak bonus")
+    return f"🎮 **Live quiz** hosted by **{game.host_name}** · {' · '.join(rules)}"
+
+
 def live_question_embed(game: LiveGame) -> discord.Embed:
     q = game.question
     embed = discord.Embed(
@@ -437,7 +452,7 @@ def live_question_embed(game: LiveGame) -> discord.Embed:
         colour=PURPLE,
     )
     embed.add_field(name="​", value=f"🙋 **{len(game.answers)}** answered · ⏱️ ends <t:{int(game.deadline)}:R>", inline=False)
-    embed.set_footer(text=f"{quality.labels(q)} · Press ✋ Answer — your pick and score stay private")
+    embed.set_footer(text=f"{quality.labels(q)} · Tap a letter: only you see your pick")
     if game.card:
         embed.set_image(url=f"attachment://{CARD}")
     return embed
@@ -482,12 +497,14 @@ def live_controls(game: LiveGame, revealed: bool) -> discord.ui.View:
         last = game.index + 1 >= game.total
         view.add_item(LiveMine(game.id, game.index))
         view.add_item(LiveHost(game.id, "next", "🏁 Final results" if last else "Next ▶"))
+        view.add_item(LiveHost(game.id, "end", "⏹ End"))
         for item in feedback_items(game.question["id"]):
             view.add_item(item)
     else:
-        view.add_item(LiveJoin(game.id, game.index))
+        for item in answer_buttons(lambda i: LiveAnswer(game.id, game.index, i), len(game.order)):
+            view.add_item(item)
         view.add_item(LiveHost(game.id, "reveal", "⏭ Reveal"))
-    view.add_item(LiveHost(game.id, "end", "⏹ End"))
+        view.add_item(LiveHost(game.id, "end", "⏹ End"))
     return view
 
 
@@ -514,22 +531,38 @@ def permission_help(missing: list[str]) -> str:
 
 async def start_live(interaction: discord.Interaction, question_ids: list[int], settings: QuizSettings) -> None:
     bot = interaction.client
-    game = LiveGame(next(_game_ids), interaction.user.id, interaction.channel, question_ids, settings.live_timer, settings)
-    rules = [f"{game.total} questions", f"{game.time_limit}s each"]
-    rules.append("faster = more points" if settings.speed else "1,000 per right answer")
-    if settings.streak:
-        rules.append("🔥 streak bonus")
-    await interaction.response.edit_message(view=started_panel("🎮 **Live game started** in the channel."))
+    game = LiveGame(next(_game_ids), interaction.user.id, interaction.channel, question_ids, settings.live_timer,
+                    settings, host_name=interaction.user.display_name)
+    await interaction.response.edit_message(view=started_panel("🎮 **Live game starting** in the channel…"))
+    bot.live_games[game.id] = game  # type: ignore[attr-defined]
     try:
-        await interaction.channel.send(
-            f"🎮 **Live quiz** hosted by {interaction.user.mention}: {', '.join(rules)}. "
-            "Press **✋ Answer** on each question. Your pick and your score stay private."
-        )
+        await ask_next(bot, game)
     except discord.Forbidden:
+        bot.live_games.pop(game.id, None)  # type: ignore[attr-defined]
+        if game.timer:
+            game.timer.cancel()
         await interaction.edit_original_response(view=started_panel(permission_help(list(LIVE_PERMISSIONS.values()))))
         return
-    bot.live_games[game.id] = game  # type: ignore[attr-defined]
-    await ask_next(bot, game)
+    # The game message is all anyone needs now; the private settings panel goes away.
+    try:
+        await interaction.delete_original_response()
+    except discord.HTTPException:
+        pass
+
+
+async def show(game: LiveGame, **kw) -> None:
+    """Posts the game message the first time, then edits that same message."""
+    if game.message is None:
+        game.message = await game.channel.send(content=live_header(game), **kw)
+    else:
+        edited = await game.message.edit(**kw)
+        game.message = edited or game.message
+
+
+async def clean_receipts(game: LiveGame) -> None:
+    """Deletes the private replies from this round (interaction tokens last 15 minutes, so this is in time)."""
+    receipts, game.receipts = game.receipts, []
+    await asyncio.gather(*(i.delete_original_response() for i in receipts), return_exceptions=True)
 
 
 async def ask_next(bot, game: LiveGame) -> None:
@@ -537,14 +570,15 @@ async def ask_next(bot, game: LiveGame) -> None:
     if game.index >= game.total:
         await finish(bot, game)
         return
+    await clean_receipts(game)
     game.question = bot.store.get_question(game.question_ids[game.index])
     game.order = option_order(len(game.question["options"]), game.settings.shuffle, f"live:{game.id}:{game.index}")
     game.answers, game.gained, game.revealed = {}, {}, False
     game.card = await draw(cards.question_card, game.question, game.index + 1, game.total, order=game.order,
                            timer=f"{game.time_limit}s") if game.settings.cards else None
     game.deadline = time.time() + game.time_limit
-    files = [card_file(game.card)] if game.card else []
-    game.message = await game.channel.send(embed=live_question_embed(game), view=live_controls(game, False), files=files)
+    await show(game, embed=live_question_embed(game), view=live_controls(game, False),
+               attachments=[card_file(game.card)] if game.card else [])
     index = game.index
 
     async def timer():
@@ -566,16 +600,18 @@ async def reveal(game: LiveGame, index: int) -> None:
     png = await draw(cards.reveal_card, game.question, game.index + 1, game.total, order=game.order,
                      counts=live_counts(game), banner=f"Answer: {LETTERS[game.shown_correct]}") if game.settings.cards else None
     try:
-        await game.message.edit(embed=live_reveal_embed(game, png is not None), view=live_controls(game, True),
-                                attachments=[card_file(png)] if png else [])
+        await show(game, embed=live_reveal_embed(game, png is not None), view=live_controls(game, True),
+                   attachments=[card_file(png)] if png else [])
     except discord.HTTPException:
         log.exception("Couldn't reveal live question")
+    await clean_receipts(game)
 
 
 async def finish(bot, game: LiveGame, ended_early: bool = False) -> None:
     bot.live_games.pop(game.id, None)
-    if game.timer:
+    if game.timer and game.timer is not asyncio.current_task():
         game.timer.cancel()
+    await clean_receipts(game)
     ranked = sorted(game.scores.items(), key=lambda kv: kv[1], reverse=True)
     podium = "\n".join(
         f"{['🥇', '🥈', '🥉'][i]} **{game.names.get(uid, 'someone')}** — {pts:,}" for i, (uid, pts) in enumerate(ranked[:3])
@@ -593,7 +629,7 @@ async def finish(bot, game: LiveGame, ended_early: bool = False) -> None:
         if png:
             embed.set_image(url=f"attachment://{CARD}")
             files.append(card_file(png))
-    await game.channel.send(embed=embed, files=files)
+    await show(game, embed=embed, view=None, attachments=files)
 
 
 async def bump_counter(game: LiveGame) -> None:
@@ -605,7 +641,7 @@ async def bump_counter(game: LiveGame) -> None:
         await asyncio.sleep(max(0.0, game.last_counter_edit + COUNTER_EDIT_GAP - time.monotonic()))
         if not game.revealed and game.message:
             embed = live_question_embed(game)
-            # The sent message already holds the card; point at its uploaded copy instead of sending it again.
+            # The message already holds the card; point at its uploaded copy instead of sending it again.
             sent = getattr(game.message, "embeds", None)
             if game.card and sent and sent[0].image and sent[0].image.url:
                 embed.set_image(url=sent[0].image.url)
@@ -624,58 +660,16 @@ def live_game(interaction: discord.Interaction, game_id: int) -> Optional[LiveGa
 ENDED = "This live game has ended. Start a new one with `/quiz`."
 
 
-def personal_tag(game: LiveGame, uid: int) -> str:
-    if uid not in game.scores:
-        return "0 pts"
-    place, players = game.rank(uid)
-    streak = game.streaks.get(uid, 0)
-    return f"{game.scores[uid]:,} pts · #{place}/{players}" + (f" · {streak} streak" if streak >= 2 else "")
+async def private_note(interaction: discord.Interaction, text: str, seconds: float = 6) -> None:
+    await interaction.response.send_message(text, ephemeral=True, delete_after=seconds)
 
 
-class LiveJoin(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lj:(?P<g>\d+):(?P<i>\d+)"):
-    def __init__(self, game_id: int, index: int):
-        self.game_id, self.index = game_id, index
-        super().__init__(discord.ui.Button(
-            label="Answer", emoji="✋", style=discord.ButtonStyle.success, custom_id=f"sb:lj:{game_id}:{index}"
-        ))
+class LiveAnswer(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:la:(?P<g>\d+):(?P<i>\d+):(?P<c>\d)"):
+    """A/B/C/D on the public message. The click and the reply are private to the player."""
 
-    @classmethod
-    async def from_custom_id(cls, interaction, item, match: re.Match[str]):
-        return cls(int(match["g"]), int(match["i"]))
-
-    async def callback(self, interaction: discord.Interaction) -> None:
-        game = live_game(interaction, self.game_id)
-        if not game:
-            await interaction.response.send_message(ENDED, ephemeral=True)
-            return
-        if game.index != self.index or game.revealed:
-            await interaction.response.send_message("That question is closed. Wait for the next one!", ephemeral=True)
-            return
-        uid = interaction.user.id
-        if uid in game.answers:
-            choice = game.answers[uid][0]
-            await interaction.response.send_message(f"You're locked in on **{LETTERS[choice]}**.", ephemeral=True)
-            return
-        q = game.question
-        left = max(0, int(game.deadline - time.time()))
-        view = discord.ui.View(timeout=game.time_limit + 5)
-        for item in answer_buttons(lambda i: LivePick(game.id, game.index, i), len(game.order)):
-            view.add_item(item)
-        # The player's "phone": the same card, with their own score and rank in the corner.
-        png = await draw(cards.question_card, q, game.index + 1, game.total, order=game.order,
-                         right=personal_tag(game, uid), timer=f"{left}s") if game.card else None
-        embed = discord.Embed(description=question_body(q, game.order, png is not None), colour=PURPLE)
-        embed.set_footer(text=f"Only you can see this · ends in about {left}s")
-        if png:
-            embed.set_image(url=f"attachment://{CARD}")
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True,
-                                                files=[card_file(png)] if png else [])
-
-
-class LivePick(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lp:(?P<g>\d+):(?P<i>\d+):(?P<c>\d)"):
     def __init__(self, game_id: int, index: int, choice: int):
         self.game_id, self.index, self.choice = game_id, index, choice
-        super().__init__(styled(choice, f"sb:lp:{game_id}:{index}:{choice}"))
+        super().__init__(styled(choice, f"sb:la:{game_id}:{index}:{choice}"))
 
     @classmethod
     async def from_custom_id(cls, interaction, item, match: re.Match[str]):
@@ -684,18 +678,15 @@ class LivePick(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lp:(?P<g
     async def callback(self, interaction: discord.Interaction) -> None:
         game = live_game(interaction, self.game_id)
         if not game:
-            await interaction.response.edit_message(content=ENDED, embed=None, view=None, attachments=[])
+            await private_note(interaction, ENDED)
             return
         left = game.deadline - time.time()
         uid = interaction.user.id
         if game.index != self.index or game.revealed or left <= 0:
-            await interaction.response.edit_message(content="⏰ Time's up for that one.", embed=None, view=None, attachments=[])
+            await private_note(interaction, "⏰ Time's up for that one.")
             return
         if uid in game.answers:
-            await interaction.response.edit_message(
-                content=f"You're already locked in on **{LETTERS[game.answers[uid][0]]}**.", embed=None, view=None,
-                attachments=[],
-            )
+            await private_note(interaction, f"You're already locked in on **{LETTERS[game.answers[uid][0]]}**.")
             return
         q = game.question
         stored = game.order[self.choice]
@@ -710,21 +701,13 @@ class LivePick(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lp:(?P<g
         game.scores[uid] = game.scores.get(uid, 0) + pts
         interaction.client.store.record_attempt(q["id"], uid, stored, correct)  # type: ignore[attr-defined]
         fire = f" · 🔥 {streak} in a row" if streak >= 2 else ""
-        verdict = f"✅ Correct! **+{pts}**{fire}" if correct else "❌ Not this time"
+        verdict = f"✅ **+{pts}**{fire}" if correct else "❌ no points"
         place, players = game.rank(uid)
-        content = (f"Locked in **{LETTERS[self.choice]}**. {verdict}\n"
-                   f"Total: {game.scores[uid]:,} · #{place} of {players} so far · the channel sees the answer when time's up.")
-        files = []
-        embed = None
-        if game.card:
-            banner = f"Correct! +{pts}" if correct else "Not this time"
-            png = await draw(cards.reveal_card, q, game.index + 1, game.total, order=game.order, chosen=self.choice,
-                             banner=banner, right=personal_tag(game, uid))
-            if png:
-                embed = discord.Embed(colour=0x57F287 if correct else 0xED4245)
-                embed.set_image(url=f"attachment://{CARD}")
-                files.append(card_file(png))
-        await interaction.response.edit_message(content=content, embed=embed, view=None, attachments=files)
+        await interaction.response.send_message(
+            f"🔒 Locked in **{LETTERS[self.choice]}** · {verdict} · total **{game.scores[uid]:,}** · #{place} of {players}",
+            ephemeral=True,
+        )
+        game.receipts.append(interaction)
         asyncio.create_task(bump_counter(game))
 
 
@@ -744,10 +727,10 @@ class LiveMine(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lm:(?P<g
     async def callback(self, interaction: discord.Interaction) -> None:
         game = live_game(interaction, self.game_id)
         if not game:
-            await interaction.response.send_message(ENDED, ephemeral=True)
+            await private_note(interaction, ENDED)
             return
         if game.index != self.index:
-            await interaction.response.send_message("The game has moved on. Check the latest question.", ephemeral=True)
+            await private_note(interaction, "The game has moved on.")
             return
         uid = interaction.user.id
         pick = game.answers.get(uid)
@@ -755,18 +738,12 @@ class LiveMine(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lm:(?P<g
             line = "You didn't answer this one."
         else:
             pts = game.gained.get(uid, 0)
-            line = f"You picked **{LETTERS[pick[0]]}** — " + (f"✅ +{pts}" if pts else "❌ no points")
+            line = f"You picked **{LETTERS[pick[0]]}** · " + (f"✅ +{pts}" if pts else "❌ no points")
         place, players = game.rank(uid)
-        line += f"\nTotal **{game.scores.get(uid, 0):,}** · #{place} of {players}"
-        files, embed = [], discord.Embed(description=line, colour=PURPLE)
-        if game.settings.cards:
-            png = await draw(cards.reveal_card, game.question, game.index + 1, game.total, order=game.order,
-                             chosen=pick[0] if pick else None, counts=live_counts(game), right=personal_tag(game, uid),
-                             banner="Your result")
-            if png:
-                embed.set_image(url=f"attachment://{CARD}")
-                files.append(card_file(png))
-        await interaction.response.send_message(embed=embed, files=files, ephemeral=True)
+        streak = game.streaks.get(uid, 0)
+        line += f" · total **{game.scores.get(uid, 0):,}** · #{place} of {players}" + (f" · 🔥 {streak}" if streak >= 2 else "")
+        await interaction.response.send_message(line, ephemeral=True)
+        game.receipts.append(interaction)
 
 
 class LiveHost(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lh:(?P<g>\d+):(?P<a>next|reveal|end)"):
@@ -786,31 +763,19 @@ class LiveHost(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lh:(?P<g
     async def callback(self, interaction: discord.Interaction) -> None:
         game = live_game(interaction, self.game_id)
         if not game:
-            await interaction.response.send_message(ENDED, ephemeral=True)
+            await private_note(interaction, ENDED)
             return
         if interaction.user.id != game.host_id:
-            await interaction.response.send_message("Only the host can do that — hang tight!", ephemeral=True)
+            await private_note(interaction, "Only the host can do that — hang tight!")
             return
         await interaction.response.defer()
         if self.action == "reveal":
             await reveal(game, game.index)
         elif self.action == "next":
-            if not game.revealed:
-                return
-            await game.message.edit(view=live_controls_after_next(game))
-            await ask_next(interaction.client, game)
+            if game.revealed:
+                await ask_next(interaction.client, game)
         else:
-            if game.message and not game.revealed:
-                await reveal(game, game.index)
             await finish(interaction.client, game, ended_early=game.index + 1 < game.total)
-
-
-def live_controls_after_next(game: LiveGame) -> discord.ui.View:
-    """Once the host moves on, the old message keeps only the rating buttons."""
-    view = discord.ui.View(timeout=None)
-    for item in feedback_items(game.question["id"]):
-        view.add_item(item)
-    return view
 
 
 # --- the /quiz settings panel --------------------------------------------------
@@ -992,4 +957,4 @@ def set_summary(r) -> str:
     return " · ".join(parts + ([labels] if labels else []))
 
 
-DYNAMIC_ITEMS = (RateButton, FlagButton, SoloAnswer, SoloNext, LiveJoin, LivePick, LiveMine, LiveHost)
+DYNAMIC_ITEMS = (RateButton, FlagButton, SoloAnswer, SoloNext, LiveAnswer, LiveMine, LiveHost)
