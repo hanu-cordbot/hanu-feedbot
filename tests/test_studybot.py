@@ -914,8 +914,15 @@ def test_music_tracks_and_cues(tmp_path):
             played.append(source)
             afters.append(after)
 
+    assert len(music.QUESTION_TRACKS) >= 6 and len(music.LOBBY_TRACKS) >= 2
+    (tmp_path / "stale-v0.wav").write_bytes(b"x")
+    assert not (music.ensure_tracks(tmp_path) and (tmp_path / "stale-v0.wav").exists())  # old versions cleaned up
     gm = music.GameMusic()
-    gm.vc, gm.paths, gm.question_track = FakeVC(), paths, paths["question"]
+    gm.vc, gm.paths = FakeVC(), paths
+    gm.rotation = [paths[k] for k in music.QUESTION_TRACKS]
+    picks = [gm.pick("question") for _ in range(len(gm.rotation) + 1)]
+    assert len(set(picks)) == len(gm.rotation) and picks[-1] == picks[0]  # every loop once, then round again
+    assert gm.pick("lobby") != gm.pick("lobby")
     gm.cue("reveal", then="lobby")
     gm.cue("question")  # host skipped ahead during the sting
     afters[0](None)     # the stopped sting finishing must not start the lobby loop over the question music

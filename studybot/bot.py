@@ -11,7 +11,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import config, export, extract, ingest, interview, library, play, quality, questions
+from . import config, export, extract, ingest, interview, library, music, play, quality, questions
 from .db import Store
 from .render import EMBED_LIMIT, FIELD_LIMIT, clip
 
@@ -37,6 +37,8 @@ class StudyBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         self.add_dynamic_items(*play.DYNAMIC_ITEMS)
+        # Make the game music now, so the first live game with music doesn't wait for it.
+        asyncio.create_task(self._warm_music())
         await self.add_cog(StudyCog(self))
         if config.DEV_GUILD_ID:
             guild = discord.Object(id=config.DEV_GUILD_ID)
@@ -44,6 +46,12 @@ class StudyBot(commands.Bot):
             await self.tree.sync(guild=guild)
         else:
             await self.tree.sync()
+
+    async def _warm_music(self) -> None:
+        try:
+            await asyncio.to_thread(music.ensure_tracks)
+        except Exception:  # noqa: BLE001 - music is optional
+            log.exception("Couldn't generate game music")
 
     async def on_ready(self) -> None:
         log.info("Study bot ready as %s in %d server(s)", self.user, len(self.guilds))
