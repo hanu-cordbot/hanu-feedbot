@@ -685,13 +685,18 @@ def test_live_shuffle_scoring_and_personal_results():
         game = play.LiveGame(5, host_id=1, channel=Channel(), question_ids=[qid], time_limit=30, settings=s)
         client.live_games[5] = game
         await play.ask_next(client, game)
-        assert sent[-1]["files"] and sent[-1]["embed"].image.url == "attachment://card.png"
+        # One picture: the card as a plain attachment, no embed pointing at it (Discord would draw it twice).
+        assert sent[-1]["files"] and sent[-1]["embed"] is None and "**0** answered" in sent[-1]["content"]
         right = game.order.index(q["correct_index"])
         await play.LiveAnswer(5, 0, right).callback(inter(2))
         await play.LiveAnswer(5, 0, (right + 1) % len(game.order)).callback(inter(3))
         assert game.scores == {2: 1000, 3: 0} and "#1 of 1" in replies[0] and "#2 of 2" in replies[1]
+        await asyncio.sleep(play.COUNTER_EDIT_GAP + 0.1)
+        counter = edits[-1]
+        assert "**2** answered" in counter["content"] and "attachments" not in counter and counter["embed"] is None
         await play.reveal(game, 0)
         assert edits[-1]["attachments"]  # reveal card replaces the question card on the same message
+        assert not edits[-1]["embed"].image  # results text under the card, not a second copy of it
         await play.LiveMine(5, 0).callback(inter(3))
         assert "no points" in replies[-1] and "#2 of 2" in replies[-1]
         await play.LiveMine(5, 0).callback(inter(4))
@@ -700,6 +705,52 @@ def test_live_shuffle_scoring_and_personal_results():
         assert "🥇 **p2**" in edits[-1]["embed"].description and edits[-1]["attachments"]
 
     asyncio.run(scenario())
+
+
+def test_live_auto_advance_and_host_next_cancels_it():
+    import types
+    from studybot import play
+
+    store, _ = _deck_with_questions(3)
+    ids = [q["id"] for q in store.deck_questions(store.find_deck(9, "enzymes 101"))][:3]
+    edits = []
+
+    class Msg:
+        async def edit(self, **kw):
+            edits.append(kw)
+
+    class Channel:
+        async def send(self, *a, **kw):
+            return Msg()
+
+    client = types.SimpleNamespace(store=store, live_games={})
+
+    async def scenario():
+        s = play.QuizSettings(cards=False, auto_next=0.05)  # real choices are 3s+; short for the test
+        game = play.LiveGame(7, host_id=1, channel=Channel(), question_ids=ids, time_limit=30, settings=s,
+                             client=client)
+        client.live_games[7] = game
+        await play.ask_next(client, game)
+        await play.reveal(game, 0)
+        assert "Next question <t:" in edits[-1]["content"]
+        await asyncio.sleep(0.2)
+        assert game.index == 1 and not game.revealed  # moved on by itself
+
+        await play.reveal(game, 1)
+        pending = game.timer
+        await play.ask_next(client, game)  # host pressed Next first
+        await asyncio.sleep(0)
+        assert pending.cancelled()
+        assert game.index == 2
+        await play.reveal(game, 2)
+        assert "Final results <t:" in edits[-1]["content"]
+        await asyncio.sleep(0.2)
+        assert 7 not in client.live_games and "Game over" in edits[-1]["embed"].title
+        game.timer and game.timer.cancel()
+
+    asyncio.run(scenario())
+    assert play.QuizSettings.from_dict({"auto_next": 7}).auto_next == 0  # not a listed choice
+    assert play.QuizSettings.from_dict({"auto_next": 5}).auto_next == 5
 
 
 def test_quiz_panel_fits_discord_limits():

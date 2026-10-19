@@ -35,6 +35,7 @@ log = logging.getLogger(__name__)
 LENGTHS = (5, 10, 15, 20, 25, 30, 40, 50, 0)  # 0 = every question in the pool
 TIMERS = (0, 5, 10, 15, 20, 30, 45, 60, 90, 120)  # 0 = no timer (solo only)
 LIVE_DEFAULT_TIMER = 20
+AUTO_NEXT = (0, 3, 5, 8, 10, 15, 30)  # live: seconds on the answer screen before moving on; 0 = host presses Next
 COUNTER_EDIT_GAP = 2.0  # seconds between public "N answered" edits (rate limits)
 SOLO_GRACE = 1.5  # seconds of slack for the solo timer (button round trip)
 CARD = "card.png"
@@ -73,6 +74,7 @@ class QuizSettings:
     speed: bool = True
     streak: bool = True
     cards: bool = True
+    auto_next: int = 0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -85,6 +87,8 @@ class QuizSettings:
             s.order = "smart"
         if s.sources not in SOURCES:
             s.sources = "all"
+        if s.auto_next not in AUTO_NEXT:
+            s.auto_next = 0
         return s
 
     @property
@@ -401,6 +405,7 @@ class LiveGame:
     names: dict[int, str] = field(default_factory=dict)
     receipts: list[discord.Interaction] = field(default_factory=list)  # private replies to delete later
     timer: Optional[asyncio.Task] = None
+    client: object = None  # the bot, so auto-advance can move on without a button press
     counter_pending: bool = False
     last_counter_edit: float = 0.0
 
@@ -441,21 +446,39 @@ def live_header(game: LiveGame) -> str:
              "faster = more points" if game.settings.speed else "1,000 per right answer"]
     if game.settings.streak:
         rules.append("🔥 streak bonus")
+    if game.settings.auto_next:
+        rules.append(f"next after {game.settings.auto_next}s")
     return f"🎮 **Live quiz** hosted by **{game.host_name}** · {' · '.join(rules)}"
 
 
+def live_status(game: LiveGame) -> str:
+    return f"🙋 **{len(game.answers)}** answered · ⏱️ ends <t:{int(game.deadline)}:R>"
+
+
 def live_question_embed(game: LiveGame) -> discord.Embed:
+    """The text-only question screen (cards off)."""
     q = game.question
     embed = discord.Embed(
         title=f"🎮 Question {game.index + 1} of {game.total}",
-        description=question_body(q, game.order, game.card is not None),
+        description=question_body(q, game.order, False),
         colour=PURPLE,
     )
-    embed.add_field(name="​", value=f"🙋 **{len(game.answers)}** answered · ⏱️ ends <t:{int(game.deadline)}:R>", inline=False)
+    embed.add_field(name="​", value=live_status(game), inline=False)
     embed.set_footer(text=f"{quality.labels(q)} · Tap a letter: only you see your pick")
-    if game.card:
-        embed.set_image(url=f"attachment://{CARD}")
     return embed
+
+
+def live_question_message(game: LiveGame) -> dict:
+    """content + embed for the question screen. With cards on, the card is the only picture: it is sent as a
+    plain attachment (shown full size) and nothing points an embed at it, so Discord never draws it twice."""
+    if not game.card:
+        return {"content": live_header(game), "embed": live_question_embed(game)}
+    q = game.question
+    content = (f"{live_header(game)}\n**Question {game.index + 1} of {game.total}** · {live_status(game)}\n"
+               f"-# {quality.labels(q)} · Tap a letter: only you see your pick")
+    # Cards shrink long text; then the full wording goes in a text-only embed under the card.
+    embed = discord.Embed(description=question_body(q, game.order, False), colour=PURPLE) if long_text(q) else None
+    return {"content": content, "embed": embed}
 
 
 def live_counts(game: LiveGame) -> list[int]:
@@ -486,8 +509,6 @@ def live_reveal_embed(game: LiveGame, with_card: bool) -> discord.Embed:
     if game.settings.leaderboard:
         embed.add_field(name="Leaderboard", value=clip(leaderboard(game), FIELD_LIMIT), inline=False)
     embed.set_footer(text=quality.labels(q) + " · 📊 My result shows your own pick and rank")
-    if with_card:
-        embed.set_image(url=f"attachment://{CARD}")
     return embed
 
 
@@ -540,6 +561,7 @@ async def start_live(interaction: discord.Interaction, question_ids: list[int], 
     game = LiveGame(next(_game_ids), interaction.user.id, interaction.channel, question_ids, settings.live_timer,
                     settings, host_name=interaction.user.display_name)
     await interaction.response.edit_message(view=started_panel("🎮 **Live game starting** in the channel…"))
+    game.client = bot
     bot.live_games[game.id] = game  # type: ignore[attr-defined]
     try:
         await ask_next(bot, game)
@@ -558,6 +580,7 @@ async def start_live(interaction: discord.Interaction, question_ids: list[int], 
 
 async def show(game: LiveGame, **kw) -> None:
     """Posts the game message the first time, then edits that same message."""
+    kw.setdefault("content", live_header(game))
     if game.message is None:
         # send() takes files=, edit() takes attachments=.
         files = kw.pop("attachments", None)
@@ -566,7 +589,7 @@ async def show(game: LiveGame, **kw) -> None:
         channel = game.channel
         if isinstance(channel, discord.Thread) and channel.me is None and channel.is_private():
             await channel.join()  # the bot can't post in a private thread it isn't in
-        game.message = await channel.send(content=live_header(game), **kw)
+        game.message = await channel.send(**kw)
     else:
         edited = await game.message.edit(**kw)
         game.message = edited or game.message
@@ -579,6 +602,8 @@ async def clean_receipts(game: LiveGame) -> None:
 
 
 async def ask_next(bot, game: LiveGame) -> None:
+    if game.timer and game.timer is not asyncio.current_task():
+        game.timer.cancel()  # e.g. the host pressed Next before auto-advance fired
     game.index += 1
     if game.index >= game.total:
         await finish(bot, game)
@@ -590,7 +615,7 @@ async def ask_next(bot, game: LiveGame) -> None:
     game.card = await draw(cards.question_card, game.question, game.index + 1, game.total, order=game.order,
                            timer=f"{game.time_limit}s") if game.settings.cards else None
     game.deadline = time.time() + game.time_limit
-    await show(game, embed=live_question_embed(game), view=live_controls(game, False),
+    await show(game, **live_question_message(game), view=live_controls(game, False),
                attachments=[card_file(game.card)] if game.card else [])
     index = game.index
 
@@ -612,11 +637,24 @@ async def reveal(game: LiveGame, index: int) -> None:
             game.streaks[uid] = 0
     png = await draw(cards.reveal_card, game.question, game.index + 1, game.total, order=game.order,
                      counts=live_counts(game), banner=f"Answer: {LETTERS[game.shown_correct]}") if game.settings.cards else None
+    wait = game.settings.auto_next
+    content = live_header(game)
+    if wait:
+        last = game.index + 1 >= game.total
+        content += f"\n⏭️ {'Final results' if last else 'Next question'} <t:{int(time.time() + wait)}:R>"
     try:
-        await show(game, embed=live_reveal_embed(game, png is not None), view=live_controls(game, True),
-                   attachments=[card_file(png)] if png else [])
+        await show(game, content=content, embed=live_reveal_embed(game, png is not None),
+                   view=live_controls(game, True), attachments=[card_file(png)] if png else [])
     except discord.HTTPException:
         log.exception("Couldn't reveal live question")
+    if wait and game.client is not None:
+        async def advance():
+            await asyncio.sleep(wait)
+            # The host may have pressed Next or End meanwhile; then this question is no longer current.
+            if game.revealed and game.index == index and game.client.live_games.get(game.id) is game:
+                await ask_next(game.client, game)
+
+        game.timer = asyncio.create_task(advance())
     await clean_receipts(game)
 
 
@@ -640,7 +678,6 @@ async def finish(bot, game: LiveGame, ended_early: bool = False) -> None:
         png = await draw(cards.podium_card, [(game.names.get(uid, "someone"), pts) for uid, pts in ranked],
                          "Game over" + (" (ended early)" if ended_early else ""))
         if png:
-            embed.set_image(url=f"attachment://{CARD}")
             files.append(card_file(png))
     await show(game, embed=embed, view=None, attachments=files)
 
@@ -653,12 +690,8 @@ async def bump_counter(game: LiveGame) -> None:
     try:
         await asyncio.sleep(max(0.0, game.last_counter_edit + COUNTER_EDIT_GAP - time.monotonic()))
         if not game.revealed and game.message:
-            embed = live_question_embed(game)
-            # The message already holds the card; point at its uploaded copy instead of sending it again.
-            sent = getattr(game.message, "embeds", None)
-            if game.card and sent and sent[0].image and sent[0].image.url:
-                embed.set_image(url=sent[0].image.url)
-            await game.message.edit(embed=embed)
+            # No attachments argument: the card already on the message stays as it is (no re-upload).
+            await game.message.edit(**live_question_message(game))
             game.last_counter_edit = time.monotonic()
     except discord.HTTPException:
         pass
@@ -846,6 +879,8 @@ class QuizPicker(discord.ui.LayoutView):
         subject = f"{quality.subject_emoji(self.subject)} {self.subject.title()}" if self.subject else "🗂️ All subjects"
         length = "every question" if s.length == 0 else f"{min(s.length, pool)} questions"
         timer = f"{s.timer}s timer" if s.timer else f"no timer solo · {LIVE_DEFAULT_TIMER}s live"
+        if s.auto_next:
+            timer += f" · live moves on {s.auto_next}s after each answer"
         return (f"## 🎯 Start a quiz\n{subject} · **{len(rows)}** sets · **{pool}** questions in the pool\n"
                 f"Playing **{length}** · {ORDERS[s.order][1].lower()} · {timer}")
 
@@ -892,6 +927,13 @@ class QuizPicker(discord.ui.LayoutView):
             )
             for t in TIMERS
         ], "Timer"))
+        children.append(self._select(self.on_auto_next, [
+            discord.SelectOption(
+                label="Live: host presses Next" if t == 0 else f"Live: next question {t}s after the answer",
+                value=str(t), emoji="⏭️", default=t == s.auto_next,
+            )
+            for t in AUTO_NEXT
+        ], "Auto-advance (live)"))
         children.append(discord.ui.Separator())
         children.append(discord.ui.TextDisplay("### 🎛️ Options"))
         for attr, title, desc in TOGGLES:
@@ -936,6 +978,10 @@ class QuizPicker(discord.ui.LayoutView):
 
     async def on_timer(self, interaction: discord.Interaction) -> None:
         self.settings.timer = int(interaction.data["values"][0])
+        await self.refresh(interaction)
+
+    async def on_auto_next(self, interaction: discord.Interaction) -> None:
+        self.settings.auto_next = int(interaction.data["values"][0])
         await self.refresh(interaction)
 
     def draw(self, personal: bool) -> list[int]:
