@@ -513,12 +513,18 @@ LIVE_PERMISSIONS = {
     "view_channel": "View Channel", "send_messages": "Send Messages", "embed_links": "Embed Links",
     "attach_files": "Attach Files", "read_message_history": "Read Message History",
 }
+# Inside a thread Discord checks "Send Messages in Threads" instead of "Send Messages".
+THREAD_SEND = ("send_messages_in_threads", "Send Messages in Threads")
 
 
-def missing_live_permissions(perms: Optional[discord.Permissions]) -> list[str]:
+def missing_live_permissions(perms: Optional[discord.Permissions], in_thread: bool = False) -> list[str]:
     if perms is None:
         return []
-    return [label for attr, label in LIVE_PERMISSIONS.items() if not getattr(perms, attr, False)]
+    needed = dict(LIVE_PERMISSIONS)
+    if in_thread:
+        del needed["send_messages"]
+        needed[THREAD_SEND[0]] = THREAD_SEND[1]
+    return [label for attr, label in needed.items() if not getattr(perms, attr, False)]
 
 
 def permission_help(missing: list[str]) -> str:
@@ -553,7 +559,14 @@ async def start_live(interaction: discord.Interaction, question_ids: list[int], 
 async def show(game: LiveGame, **kw) -> None:
     """Posts the game message the first time, then edits that same message."""
     if game.message is None:
-        game.message = await game.channel.send(content=live_header(game), **kw)
+        # send() takes files=, edit() takes attachments=.
+        files = kw.pop("attachments", None)
+        if files:
+            kw["files"] = files
+        channel = game.channel
+        if isinstance(channel, discord.Thread) and channel.me is None and channel.is_private():
+            await channel.join()  # the bot can't post in a private thread it isn't in
+        game.message = await channel.send(content=live_header(game), **kw)
     else:
         edited = await game.message.edit(**kw)
         game.message = edited or game.message
@@ -938,7 +951,8 @@ class QuizPicker(discord.ui.LayoutView):
         await start_solo(interaction, ids, self.settings)
 
     async def on_live(self, interaction: discord.Interaction) -> None:
-        missing = missing_live_permissions(getattr(interaction, "app_permissions", None))
+        missing = missing_live_permissions(getattr(interaction, "app_permissions", None),
+                                           in_thread=isinstance(interaction.channel, discord.Thread))
         if missing:
             await interaction.response.send_message(permission_help(missing), ephemeral=True)
             return

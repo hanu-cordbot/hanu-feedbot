@@ -400,6 +400,7 @@ def test_live_game_is_one_message_with_private_picks():
 
     class Channel:
         async def send(self, *a, **kw):
+            assert "attachments" not in kw  # Messageable.send() only takes files=
             sent.append(kw)
             return Msg()
 
@@ -684,7 +685,7 @@ def test_live_shuffle_scoring_and_personal_results():
         game = play.LiveGame(5, host_id=1, channel=Channel(), question_ids=[qid], time_limit=30, settings=s)
         client.live_games[5] = game
         await play.ask_next(client, game)
-        assert sent[-1]["attachments"] and sent[-1]["embed"].image.url == "attachment://card.png"
+        assert sent[-1]["files"] and sent[-1]["embed"].image.url == "attachment://card.png"
         right = game.order.index(q["correct_index"])
         await play.LiveAnswer(5, 0, right).callback(inter(2))
         await play.LiveAnswer(5, 0, (right + 1) % len(game.order)).callback(inter(3))
@@ -799,4 +800,8 @@ def test_live_game_checks_channel_permissions():
     perms = discord.Permissions(view_channel=True, send_messages=True)
     assert play.missing_live_permissions(perms) == ["Embed Links", "Attach Files", "Read Message History"]
     assert play.missing_live_permissions(discord.Permissions.all()) == []
+    thread_perms = discord.Permissions(view_channel=True, send_messages_in_threads=True, embed_links=True,
+                                       attach_files=True, read_message_history=True)
+    assert play.missing_live_permissions(thread_perms, in_thread=True) == []
+    assert play.missing_live_permissions(thread_perms) == ["Send Messages"]
     assert "Edit Channel" in play.permission_help(["View Channel"])
