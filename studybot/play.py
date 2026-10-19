@@ -26,7 +26,8 @@ from typing import Optional
 
 import discord
 
-from . import cards, quality
+from . import cards, music, quality
+from . import powerups as pu
 from .db import Store
 from .render import FIELD_LIMIT, LETTERS, add_teaching_fields, clip, teaching_parts
 
@@ -75,6 +76,8 @@ class QuizSettings:
     streak: bool = True
     cards: bool = True
     auto_next: int = 0
+    powerups: bool = True
+    music: bool = True
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -100,10 +103,15 @@ class QuizSettings:
 TOGGLES = (
     ("shuffle", "🔀 Shuffle answer choices", "Mixes A/B/C/D every time. Leave off for questions like \"all of the above\"."),
     ("show_answers", "👀 Show answer after each question", "Solo. Off: you see every answer in a review at the end."),
-    ("leaderboard", "🏆 Leaderboard after each question", "Live. Off: scores only appear on the final podium."),
-    ("speed", "⚡ Faster answers score more", "Live. 500–1,000 points by speed. Off: every right answer is 1,000."),
-    ("streak", "🔥 Streak bonus", "Live. +50 for each answer in a row, up to +250."),
     ("cards", "🖼️ Quizizz-style cards", "Draws each question as a picture. Off: plain text, lighter on data."),
+)
+# Live-only switches share one multi-select (on/off buttons for each would overflow Discord's 40-component panel).
+LIVE_EXTRAS = (
+    ("leaderboard", "🏆", "Leaderboard after each question", "Off: scores only appear on the final podium"),
+    ("speed", "⏱️", "Faster answers score more", "500–1,000 points by speed. Off: every right answer is 1,000"),
+    ("streak", "🔥", "Streak bonus", "+50 for each answer in a row, up to +250"),
+    ("powerups", "⚡", "Power-ups", "50-50, 2x, Immunity, Gift… earned from streaks, used privately"),
+    ("music", "🎵", "Music in voice", "Plays game music in the host's voice channel"),
 )
 
 
@@ -406,6 +414,12 @@ class LiveGame:
     receipts: list[discord.Interaction] = field(default_factory=list)  # private replies to delete later
     timer: Optional[asyncio.Task] = None
     client: object = None  # the bot, so auto-advance can move on without a button press
+    powers: dict[int, pu.Powers] = field(default_factory=dict)
+    power_play: Optional[str] = None  # who used Power Play on the current question
+    events: list[str] = field(default_factory=list)  # public power-up news for the current question
+    music: Optional["music.GameMusic"] = None
+    idle: Optional[asyncio.Task] = None
+    rng: random.Random = field(default_factory=random.Random)
     counter_pending: bool = False
     last_counter_edit: float = 0.0
 
@@ -446,9 +460,15 @@ def live_header(game: LiveGame) -> str:
              "faster = more points" if game.settings.speed else "1,000 per right answer"]
     if game.settings.streak:
         rules.append("🔥 streak bonus")
+    if game.settings.powerups:
+        rules.append("⚡ power-ups")
     if game.settings.auto_next:
         rules.append(f"next after {game.settings.auto_next}s")
     return f"🎮 **Live quiz** hosted by **{game.host_name}** · {' · '.join(rules)}"
+
+
+def live_news(game: LiveGame) -> str:
+    return "".join(f"\n{e}" for e in game.events[-3:])
 
 
 def live_status(game: LiveGame) -> str:
@@ -472,9 +492,9 @@ def live_question_message(game: LiveGame) -> dict:
     """content + embed for the question screen. With cards on, the card is the only picture: it is sent as a
     plain attachment (shown full size) and nothing points an embed at it, so Discord never draws it twice."""
     if not game.card:
-        return {"content": live_header(game), "embed": live_question_embed(game)}
+        return {"content": live_header(game) + live_news(game), "embed": live_question_embed(game)}
     q = game.question
-    content = (f"{live_header(game)}\n**Question {game.index + 1} of {game.total}** · {live_status(game)}\n"
+    content = (f"{live_header(game)}\n**Question {game.index + 1} of {game.total}** · {live_status(game)}{live_news(game)}\n"
                f"-# {quality.labels(q)} · Tap a letter: only you see your pick")
     # Cards shrink long text; then the full wording goes in a text-only embed under the card.
     embed = discord.Embed(description=question_body(q, game.order, False), colour=PURPLE) if long_text(q) else None
@@ -524,6 +544,8 @@ def live_controls(game: LiveGame, revealed: bool) -> discord.ui.View:
     else:
         for item in answer_buttons(lambda i: LiveAnswer(game.id, game.index, i), len(game.order)):
             view.add_item(item)
+        if game.settings.powerups:
+            view.add_item(LivePowerMenu(game.id, game.index))
         view.add_item(LiveHost(game.id, "reveal", "⏭ Reveal"))
         view.add_item(LiveHost(game.id, "end", "⏹ End"))
     return view
@@ -563,6 +585,14 @@ async def start_live(interaction: discord.Interaction, question_ids: list[int], 
     await interaction.response.edit_message(view=started_panel("🎮 **Live game starting** in the channel…"))
     game.client = bot
     bot.live_games[game.id] = game  # type: ignore[attr-defined]
+    if settings.music:
+        voice = getattr(getattr(interaction.user, "voice", None), "channel", None)
+        if voice is None:
+            asyncio.create_task(_quiet_followup(
+                interaction, "🎵 Music is on, but you're not in a voice channel. Join one before starting a game to hear it."))
+        else:
+            game.music = music.GameMusic()
+            asyncio.create_task(start_music(game, voice, interaction))
     try:
         await ask_next(bot, game)
     except discord.Forbidden:
@@ -576,6 +606,29 @@ async def start_live(interaction: discord.Interaction, question_ids: list[int], 
         await interaction.delete_original_response()
     except discord.HTTPException:
         pass
+
+
+async def _quiet_followup(interaction: discord.Interaction, text: str) -> None:
+    try:
+        await interaction.followup.send(text, ephemeral=True)
+    except discord.HTTPException:
+        pass
+
+
+async def start_music(game: LiveGame, voice, interaction: discord.Interaction) -> None:
+    gm = game.music
+    problem = await gm.join(voice)
+    if problem:
+        game.music = None
+        await _quiet_followup(interaction, f"🎵 No music this game: {problem}.")
+        return
+    if game.music is not gm:  # the game ended while we were connecting
+        await gm.leave()
+        return
+    gm.cue("lobby" if game.revealed else "question")
+
+
+MUSIC_IDLE = 600  # leave voice after this long on one answer screen with nobody pressing Next
 
 
 async def show(game: LiveGame, **kw) -> None:
@@ -612,6 +665,13 @@ async def ask_next(bot, game: LiveGame) -> None:
     game.question = bot.store.get_question(game.question_ids[game.index])
     game.order = option_order(len(game.question["options"]), game.settings.shuffle, f"live:{game.id}:{game.index}")
     game.answers, game.gained, game.revealed = {}, {}, False
+    game.power_play, game.events = None, []
+    for p in game.powers.values():
+        p.new_question()
+    if game.idle:
+        game.idle.cancel()
+    if game.music:
+        game.music.cue("question")
     game.card = await draw(cards.question_card, game.question, game.index + 1, game.total, order=game.order,
                            timer=f"{game.time_limit}s") if game.settings.cards else None
     game.deadline = time.time() + game.time_limit
@@ -647,6 +707,16 @@ async def reveal(game: LiveGame, index: int) -> None:
                    view=live_controls(game, True), attachments=[card_file(png)] if png else [])
     except discord.HTTPException:
         log.exception("Couldn't reveal live question")
+    if game.music:
+        game.music.cue("reveal", then="lobby")
+        if not wait:
+            async def idle():
+                await asyncio.sleep(MUSIC_IDLE)
+                if game.revealed and game.index == index and game.music:
+                    gm, game.music = game.music, None
+                    await gm.leave()
+
+            game.idle = asyncio.create_task(idle())
     if wait and game.client is not None:
         async def advance():
             await asyncio.sleep(wait)
@@ -660,6 +730,11 @@ async def reveal(game: LiveGame, index: int) -> None:
 
 async def finish(bot, game: LiveGame, ended_early: bool = False) -> None:
     bot.live_games.pop(game.id, None)
+    if game.idle:
+        game.idle.cancel()
+    if game.music:
+        gm, game.music = game.music, None
+        asyncio.create_task(gm.finale())
     if game.timer and game.timer is not asyncio.current_task():
         game.timer.cancel()
     await clean_receipts(game)
@@ -734,27 +809,186 @@ class LiveAnswer(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:la:(?P
         if uid in game.answers:
             await private_note(interaction, f"You're already locked in on **{LETTERS[game.answers[uid][0]]}**.")
             return
+        p = game.powers.setdefault(uid, pu.Powers())
+        if self.choice in p.removed:
+            await private_note(interaction, f"**{LETTERS[self.choice]}** is erased for you. Pick another one.")
+            return
         q = game.question
         stored = game.order[self.choice]
         correct = stored == q["correct_index"]
-        game.answers[uid] = (self.choice, left)
         game.names[uid] = interaction.user.display_name
-        streak = game.streaks.get(uid, 0) + 1 if correct else 0
-        game.streaks[uid] = streak
-        s = game.settings
-        pts = points_for(correct, left, game.time_limit, streak - 1 if correct else 0, s.speed, s.streak)
-        game.gained[uid] = pts
-        game.scores[uid] = game.scores.get(uid, 0) + pts
         interaction.client.store.record_attempt(q["id"], uid, stored, correct)  # type: ignore[attr-defined]
+        if not correct and "immunity" in p.active:
+            p.active.discard("immunity")
+            p.removed.add(self.choice)
+            await interaction.response.send_message(
+                f"🛡️ **Immunity!** {LETTERS[self.choice]} was wrong. Pick again:",
+                view=private_answers(game, p), ephemeral=True)
+            game.receipts.append(interaction)
+            return
+        game.answers[uid] = (self.choice, left)
+        s = game.settings
+        before = game.streaks.get(uid, 0)
+        saved = not correct and "streak_saver" in p.active and before > 0
+        streak = before + 1 if correct else (before if saved else 0)
+        game.streaks[uid] = streak
+        clock = pu.effective_left(p, left)
+        base = points_for(correct, clock, game.time_limit, before if correct else 0, s.speed, s.streak)
+        right_value = points_for(True, clock, game.time_limit, 0, s.speed, False)
+        pts, notes = pu.adjust(base, correct, p, game.power_play is not None, right_value)
+        old = game.scores.get(uid, 0)
+        game.scores[uid] = max(0, old + pts)
+        pts = game.scores[uid] - old
+        game.gained[uid] = pts
+        extra = f" ({', '.join(notes)})" if notes else ""
         fire = f" · 🔥 {streak} in a row" if streak >= 2 else ""
-        verdict = f"✅ **+{pts}**{fire}" if correct else "❌ no points"
+        if correct:
+            verdict = f"✅ **+{pts:,}**{extra}{fire}"
+        elif pts < 0:
+            verdict = f"❌ **{pts:,}**{extra}"
+        else:
+            verdict = "❌ no points" + extra + (f" · 🔒 streak kept at {streak}" if saved else "")
         place, players = game.rank(uid)
-        await interaction.response.send_message(
-            f"🔒 Locked in **{LETTERS[self.choice]}** · {verdict} · total **{game.scores[uid]:,}** · #{place} of {players}",
-            ephemeral=True,
-        )
+        text = f"🔒 Locked in **{LETTERS[self.choice]}** · {verdict} · total **{game.scores[uid]:,}** · #{place} of {players}"
+        earned = pu.earned_after_answer(p, correct, streak, game.rng) if s.powerups else None
+        if earned:
+            text += f"\n🎁 New power-up: **{pu.label(earned)}**. Use it from ⚡ Power-ups on a later question."
+        await interaction.response.send_message(text, ephemeral=True)
         game.receipts.append(interaction)
         asyncio.create_task(bump_counter(game))
+
+
+def private_answers(game: LiveGame, p: pu.Powers) -> discord.ui.View:
+    """A/B/C/D minus the tiles this player has erased, for a private message."""
+    view = discord.ui.View(timeout=None)
+    for i in range(len(game.order)):
+        if i not in p.removed:
+            view.add_item(LiveAnswer(game.id, game.index, i))
+    return view
+
+
+def power_menu(game: LiveGame, uid: int, p: pu.Powers, note: str = "") -> dict:
+    """The private ⚡ menu: what you hold (tap to use), what's on, and your remaining answers after an erase."""
+    lines = [note] if note else []
+    if p.active or p.supersonic:
+        on = [pu.label(k) for k in sorted(p.active)] + ([f"🚀 Supersonic ×{p.supersonic}"] if p.supersonic else [])
+        lines.append("On now: " + ", ".join(on))
+    view = discord.ui.View(timeout=None)
+    if p.held:
+        lines.append("**Your power-ups** (tap one to use it on this question):")
+        for key in dict.fromkeys(p.held):
+            emoji, name, desc = pu.CATALOGUE[key]
+            n = p.held.count(key)
+            lines.append(f"{emoji} **{name}**{f' ×{n}' if n > 1 else ''} — {desc}")
+            view.add_item(LivePowerUse(game.id, game.index, key))
+    else:
+        lines.append(f"No power-ups yet. You get one with your first answer and another for every "
+                     f"{pu.EARN_EVERY} right in a row (you can hold {pu.MAX_HELD}).")
+    if p.removed and uid not in game.answers:
+        lines.append("**Your answers:**")
+        for item in private_answers(game, p).children:
+            view.add_item(item)
+    return {"content": "\n".join(lines), "view": view}
+
+
+class LivePowerMenu(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lpm:(?P<g>\d+):(?P<i>\d+)"):
+    """⚡ Power-ups on the public game message: opens your own power-up menu."""
+
+    def __init__(self, game_id: int, index: int):
+        self.game_id, self.index = game_id, index
+        super().__init__(discord.ui.Button(label="Power-ups", emoji="⚡", style=discord.ButtonStyle.primary,
+                                           custom_id=f"sb:lpm:{game_id}:{index}"))
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match: re.Match[str]):
+        return cls(int(match["g"]), int(match["i"]))
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        game = live_game(interaction, self.game_id)
+        if not game:
+            await private_note(interaction, ENDED)
+            return
+        if game.index != self.index or game.revealed:
+            await private_note(interaction, "That question is over.")
+            return
+        uid = interaction.user.id
+        game.names[uid] = interaction.user.display_name
+        p = game.powers.setdefault(uid, pu.Powers())
+        await interaction.response.send_message(**power_menu(game, uid, p), ephemeral=True)
+        game.receipts.append(interaction)
+
+
+class LivePowerUse(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lpu:(?P<g>\d+):(?P<i>\d+):(?P<k>[a-z_]+)"):
+    def __init__(self, game_id: int, index: int, key: str):
+        self.game_id, self.index, self.key = game_id, index, key
+        emoji, name, _ = pu.CATALOGUE.get(key, ("⚡", key, ""))
+        super().__init__(discord.ui.Button(label=name, emoji=emoji, style=discord.ButtonStyle.success,
+                                           custom_id=f"sb:lpu:{game_id}:{index}:{key}"))
+
+    @classmethod
+    async def from_custom_id(cls, interaction, item, match: re.Match[str]):
+        return cls(int(match["g"]), int(match["i"]), match["k"])
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        game = live_game(interaction, self.game_id)
+        if not game:
+            await private_note(interaction, ENDED)
+            return
+        if game.index != self.index or game.revealed or self.key not in pu.CATALOGUE:
+            await interaction.response.edit_message(content="That question is over. Your power-up is still yours.",
+                                                    view=None)
+            return
+        uid = interaction.user.id
+        p = game.powers.setdefault(uid, pu.Powers())
+        note, public = use_power(game, uid, interaction.user.display_name, p, self.key)
+        await interaction.response.edit_message(**power_menu(game, uid, p, note))
+        if public:
+            asyncio.create_task(bump_counter(game))
+
+
+def use_power(game: LiveGame, uid: int, name: str, p: pu.Powers, key: str) -> tuple[str, bool]:
+    """Applies one power-up. Returns (private note, whether the public message should update)."""
+    correct = game.shown_correct
+    wrong_left = sum(1 for i in range(len(game.order)) if i != correct and i not in p.removed)
+    others = [u for u in game.names if u != uid]
+    reason = pu.refuse_reason(key, p, uid in game.answers, game.power_play is not None, wrong_left, len(others))
+    if reason:
+        return f"⚠️ {reason}", False
+    p.held.remove(key)
+    label = pu.label(key)
+    if key in ("fifty", "eraser"):
+        gone = pu.erase(p, len(game.order), correct, 2 if key == "fifty" else 1, game.rng)
+        letters = " and ".join(LETTERS[i] for i in gone)
+        return f"{label}: **{letters}** {'is' if len(gone) == 1 else 'are'} gone. Pick from what's left:", False
+    if key == "freeze":
+        p.frozen_left = max(0.0, game.deadline - time.time())
+        p.active.add(key)
+        return f"{label}: your clock stopped at **{p.frozen_left:.0f}s**. Take your time (until the reveal).", False
+    if key in ("immunity", "double", "jeopardy", "streak_saver"):
+        p.active.add(key)
+        return f"{label} is on for this question.", False
+    if key == "streak_boost":
+        game.streaks[uid] = game.streaks.get(uid, 0) + pu.STREAK_BOOST
+        return f"{label}: your streak is now **{game.streaks[uid]}** 🔥", False
+    if key == "supersonic":
+        p.supersonic += pu.SUPERSONIC_ANSWERS
+        return f"{label}: +50% on your next {p.supersonic} right answers.", False
+    if key == "power_play":
+        game.power_play = name
+        # Right answers already locked in on this question get the boost too.
+        for other, (choice, _) in game.answers.items():
+            if choice == correct and game.gained.get(other, 0) > 0:
+                bonus = round(game.gained[other] * 0.5)
+                game.gained[other] += bonus
+                game.scores[other] = game.scores.get(other, 0) + bonus
+        game.events.append(f"⚡ **{name}** used Power Play: +50% for everyone on this question!")
+        return f"{label}: +50% for everyone on this question. Nice.", True
+    if key == "gift":
+        target = game.rng.choice(others)
+        game.scores[target] = game.scores.get(target, 0) + pu.GIFT_POINTS
+        game.events.append(f"🎁 **{name}** gifted {pu.GIFT_POINTS} points to **{game.names.get(target, 'someone')}**")
+        return f"{label}: {pu.GIFT_POINTS} points went to **{game.names.get(target, 'someone')}**.", True
+    return "", False
 
 
 class LiveMine(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lm:(?P<g>\d+):(?P<i>\d+)"):
@@ -784,7 +1018,9 @@ class LiveMine(discord.ui.DynamicItem[discord.ui.Button], template=r"sb:lm:(?P<g
             line = "You didn't answer this one."
         else:
             pts = game.gained.get(uid, 0)
-            line = f"You picked **{LETTERS[pick[0]]}** · " + (f"✅ +{pts}" if pts else "❌ no points")
+            ok = pick[0] == game.shown_correct
+            line = f"You picked **{LETTERS[pick[0]]}** · " + (
+                f"✅ +{pts:,}" if ok else (f"❌ {pts:,}" if pts < 0 else "❌ no points"))
         place, players = game.rank(uid)
         streak = game.streaks.get(uid, 0)
         line += f" · total **{game.scores.get(uid, 0):,}** · #{place} of {players}" + (f" · 🔥 {streak}" if streak >= 2 else "")
@@ -938,6 +1174,10 @@ class QuizPicker(discord.ui.LayoutView):
         children.append(discord.ui.TextDisplay("### 🎛️ Options"))
         for attr, title, desc in TOGGLES:
             children.append(discord.ui.Section(f"**{title}**\n-# {desc}", accessory=self._toggle(attr)))
+        children.append(self._select(self.on_extras, [
+            discord.SelectOption(label=title, value=attr, emoji=emoji, description=desc[:100], default=getattr(s, attr))
+            for attr, emoji, title, desc in LIVE_EXTRAS
+        ], "Live game extras (none on)", min_values=0, max_values=len(LIVE_EXTRAS)))
         children.append(discord.ui.Separator())
         solo = discord.ui.Button(label="Solo (private)", emoji="🧑‍🎓", style=discord.ButtonStyle.primary)
         solo.callback = self.on_solo
@@ -980,6 +1220,12 @@ class QuizPicker(discord.ui.LayoutView):
         self.settings.timer = int(interaction.data["values"][0])
         await self.refresh(interaction)
 
+    async def on_extras(self, interaction: discord.Interaction) -> None:
+        chosen = set(interaction.data.get("values", []))
+        for attr, *_ in LIVE_EXTRAS:
+            setattr(self.settings, attr, attr in chosen)
+        await self.refresh(interaction)
+
     async def on_auto_next(self, interaction: discord.Interaction) -> None:
         self.settings.auto_next = int(interaction.data["values"][0])
         await self.refresh(interaction)
@@ -1017,4 +1263,5 @@ def set_summary(r) -> str:
     return " · ".join(parts + ([labels] if labels else []))
 
 
-DYNAMIC_ITEMS = (RateButton, FlagButton, SoloAnswer, SoloNext, LiveAnswer, LiveMine, LiveHost)
+DYNAMIC_ITEMS = (RateButton, FlagButton, SoloAnswer, SoloNext, LiveAnswer, LiveMine, LiveHost, LivePowerMenu,
+                 LivePowerUse)

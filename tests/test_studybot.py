@@ -429,7 +429,7 @@ def test_live_game_is_one_message_with_private_picks():
         assert len(sent) == 1 and "🙋 **0** answered" in sent[0]["embed"].fields[0].value
         ids = [getattr(c, "item", c).custom_id for c in sent[0]["view"].children]
         # A/B/C/D are right on the public message, plus the host's controls.
-        assert [i.split(":")[1] for i in ids] == ["la"] * len(q["options"]) + ["lh", "lh"]
+        assert [i.split(":")[1] for i in ids] == ["la"] * len(q["options"]) + ["lpm", "lh", "lh"]
 
         right, wrong = interaction(2, "Ada"), interaction(3, "Bo")
         await play.LiveAnswer(1, 0, q["correct_index"]).callback(right)
@@ -765,6 +765,164 @@ def test_live_auto_advance_and_host_next_cancels_it():
     asyncio.run(scenario())
     assert play.QuizSettings.from_dict({"auto_next": 7}).auto_next == 0  # not a listed choice
     assert play.QuizSettings.from_dict({"auto_next": 5}).auto_next == 5
+
+
+def test_powerup_rules():
+    import random as _random
+    from studybot import powerups as pu
+
+    rng = _random.Random(1)
+    p = pu.Powers()
+    assert pu.earned_after_answer(p, False, 0, rng) in pu.CATALOGUE  # starter, even on a wrong answer
+    assert pu.earned_after_answer(p, True, 1, rng) is None
+    assert pu.earned_after_answer(p, True, 3, rng) and len(p.held) == 2
+    p.held += ["x", "y"]
+    assert pu.award(p, rng) is None  # full hands
+    p = pu.Powers()
+    assert pu.erase(p, 4, correct=2, count=2, rng=rng) and len(p.removed) == 2 and 2 not in p.removed
+    assert pu.erase(p, 4, correct=2, count=1, rng=rng) == []  # always leaves one wrong answer
+    p.active = {"double"}
+    assert pu.adjust(800, True, p, power_play=True, right_value=800)[0] == 2400
+    p.active = {"jeopardy"}
+    assert pu.adjust(0, False, p, power_play=False, right_value=900)[0] == -900
+    p.active, p.supersonic = set(), 1
+    assert pu.adjust(1000, True, p, False, 1000)[0] == 1500 and p.supersonic == 0
+    p.frozen_left = 18.0
+    assert pu.effective_left(p, 2.0) == 18.0
+    p.held = ["double", "jeopardy", "gift"]
+    p.active = {"double"}
+    assert "don't stack" in pu.refuse_reason("jeopardy", p, False, False, 3, 1)
+    assert "before you pick" in pu.refuse_reason("double", pu.Powers(held=["double"]), True, False, 3, 1)
+    assert "Nobody else" in pu.refuse_reason("gift", p, False, False, 3, 0)
+    assert pu.refuse_reason("gift", p, True, False, 3, 2) is None  # gifts work after answering
+
+
+def test_live_powerups_in_a_game():
+    import types
+    from studybot import play, powerups as pu
+
+    store, _ = _deck_with_questions(2)
+    ids = [q["id"] for q in store.deck_questions(store.find_deck(9, "enzymes 101"))][:2]
+    edits = []
+
+    class Msg:
+        async def edit(self, **kw):
+            edits.append(kw)
+
+    class Channel:
+        async def send(self, *a, **kw):
+            return Msg()
+
+    client = types.SimpleNamespace(store=store, live_games={})
+
+    def inter(uid):
+        log = []
+
+        async def send_message(text=None, **kw):
+            log.append((text or kw.get("content"), kw))
+
+        async def edit_message(**kw):
+            log.append((kw.get("content"), kw))
+
+        async def delete_original_response():
+            pass
+
+        return types.SimpleNamespace(client=client, user=types.SimpleNamespace(id=uid, display_name=f"p{uid}"), log=log,
+                                     response=types.SimpleNamespace(send_message=send_message, edit_message=edit_message),
+                                     delete_original_response=delete_original_response)
+
+    async def scenario():
+        s = play.QuizSettings(cards=False, speed=False, streak=False)
+        game = play.LiveGame(9, host_id=1, channel=Channel(), question_ids=ids, time_limit=30, settings=s, client=client)
+        client.live_games[9] = game
+        await play.ask_next(client, game)
+        right = game.shown_correct
+        wrong = [i for i in range(len(game.order)) if i != right]
+
+        # p2 holds 50-50, Immunity and 2x; p3 holds Double Jeopardy; p4 holds Gift and Power Play.
+        game.powers[2] = pu.Powers(held=["fifty", "immunity", "double"], started=True)
+        game.powers[3] = pu.Powers(held=["jeopardy"], started=True)
+        game.powers[4] = pu.Powers(held=["gift", "power_play"], started=True)
+        menu = inter(2)
+        await play.LivePowerMenu(9, 0).callback(menu)
+        assert "50-50" in menu.log[0][0] and menu.log[0][1]["ephemeral"]
+        await play.LivePowerUse(9, 0, "fifty").callback(menu)
+        assert len(game.powers[2].removed) == 2 and "gone" in menu.log[-1][0]
+        erased = sorted(game.powers[2].removed)[0]
+        tap = inter(2)
+        await play.LiveAnswer(9, 0, erased).callback(tap)
+        assert "erased for you" in tap.log[0][0] and 2 not in game.answers
+        await play.LivePowerUse(9, 0, "immunity").callback(menu)
+        await play.LivePowerUse(9, 0, "double").callback(menu)
+        last_wrong = next(i for i in wrong if i not in game.powers[2].removed)
+        await play.LiveAnswer(9, 0, last_wrong).callback(tap)
+        assert "Immunity" in tap.log[-1][0] and 2 not in game.answers  # second try
+        await play.LiveAnswer(9, 0, right).callback(tap)
+        assert game.scores[2] == 2000 and "2x" in tap.log[-1][0]
+
+        p3 = inter(3)
+        await play.LivePowerUse(9, 0, "jeopardy").callback(p3)
+        await play.LiveAnswer(9, 0, wrong[0]).callback(p3)
+        assert game.scores[3] == 0 and "🎲" in p3.log[-1][0]  # can't go below zero
+
+        p4 = inter(4)
+        await play.LiveAnswer(9, 0, right).callback(p4)
+        assert game.scores[4] == 1000
+        await play.LivePowerUse(9, 0, "power_play").callback(p4)
+        assert game.scores[4] == 1500 and game.scores[2] == 3000  # right answers already in get +50% too
+        before = dict(game.scores)
+        await play.LivePowerUse(9, 0, "gift").callback(p4)
+        gifted = [u for u in (2, 3) if game.scores[u] == before[u] + pu.GIFT_POINTS]
+        assert len(gifted) == 1 and any("gifted" in e for e in game.events) and any("Power Play" in e for e in game.events)
+        await asyncio.sleep(play.COUNTER_EDIT_GAP + 0.1)
+        assert "gifted" in edits[-1]["content"]  # news shows on the public message
+        await play.reveal(game, 0)
+        await play.ask_next(client, game)
+        assert not game.powers[2].removed and not game.powers[2].active and not game.events
+        game.timer and game.timer.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_music_tracks_and_cues(tmp_path):
+    import types
+    import wave
+    from studybot import music
+
+    paths = music.ensure_tracks(tmp_path)
+    for name, path in paths.items():
+        with wave.open(str(path)) as w:
+            assert w.getframerate() == music.SR and w.getnframes() > music.SR  # at least a second of audio
+    played, afters = [], []
+
+    class FakeVC:
+        client = types.SimpleNamespace(loop=types.SimpleNamespace(call_soon_threadsafe=lambda fn: fn()))
+
+        def is_connected(self):
+            return True
+
+        def is_playing(self):
+            return bool(played)
+
+        def is_paused(self):
+            return False
+
+        def stop(self):
+            pass
+
+        def play(self, source, after=None):
+            played.append(source)
+            afters.append(after)
+
+    gm = music.GameMusic()
+    gm.vc, gm.paths, gm.question_track = FakeVC(), paths, paths["question"]
+    gm.cue("reveal", then="lobby")
+    gm.cue("question")  # host skipped ahead during the sting
+    afters[0](None)     # the stopped sting finishing must not start the lobby loop over the question music
+    assert len(played) == 2
+    gm.cue("reveal", then="lobby")
+    afters[-1](None)
+    assert len(played) == 4  # sting finished normally → lobby loop
 
 
 def test_quiz_panel_fits_discord_limits():
