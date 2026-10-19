@@ -97,8 +97,9 @@ class DayForecast:
 
     @property
     def uv_category(self) -> tuple[str, str]:
+        uv = round(self.uv_index_max or 0)  # 7.25 must land in a bucket, not between (6, 7) and (8, 10)
         for (low, high), (desc, emoji) in UV_CATEGORIES.items():
-            if low <= self.uv_index_max <= high:
+            if low <= uv <= high:
                 return (desc, emoji)
         return ("Unknown", "❓")
 
