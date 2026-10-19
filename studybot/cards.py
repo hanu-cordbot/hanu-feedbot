@@ -1,4 +1,4 @@
-"""Quizizz-style question cards, drawn with Pillow and sent as an embed image.
+"""Quizizz-style question cards, drawn with Pillow and sent as an image.
 
 One function per screen: the question, the answer reveal (solo or live, with how many
 people picked each tile), the live podium and the solo score. Each returns PNG bytes.
@@ -7,14 +7,20 @@ rather than shown as boxes.
 """
 import io
 import unicodedata
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-W, H = 1280, 720
+W, H = 1280, 720  # H is the usual height; a card with a lot of text grows taller instead of cutting it
+MAX_H = 1600
+GROW_H = 960  # a 2x2 grid may make the card this tall to keep long answers readable
 PAD = 36
+GAP = 18
+TILE_MIN = 26  # smallest answer text before switching layout or growing the card
+STEM_MIN = 28
 LETTERS = "ABCDEF"
 
 BG_TOP, BG_BOTTOM = (58, 20, 82), (24, 8, 38)
@@ -115,15 +121,15 @@ def draw_block(d: ImageDraw.ImageDraw, box: tuple[int, int, int, int], text: str
         y += line_h
 
 
-def background() -> Image.Image:
-    img = Image.new("RGB", (W, H), BG_BOTTOM)
-    top = Image.new("RGB", (W, H), BG_TOP)
-    mask = Image.linear_gradient("L").resize((W, H)).point(lambda v: 255 - v)
+def background(h: int = H) -> Image.Image:
+    img = Image.new("RGB", (W, h), BG_BOTTOM)
+    top = Image.new("RGB", (W, h), BG_TOP)
+    mask = Image.linear_gradient("L").resize((W, h)).point(lambda v: 255 - v)
     img.paste(top, (0, 0), mask)
     # A few soft circles, like the Quizizz game screen.
-    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    glow = Image.new("RGBA", (W, h), (0, 0, 0, 0))
     g = ImageDraw.Draw(glow)
-    for cx, cy, r, a in ((140, 120, 220, 26), (1180, 640, 260, 22), (1040, 90, 120, 18)):
+    for cx, cy, r, a in ((140, 120, 220, 26), (1180, h - 80, 260, 22), (1040, 90, 120, 18)):
         g.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(170, 90, 220, a))
     img.paste(glow.filter(ImageFilter.GaussianBlur(40)), (0, 0), glow.filter(ImageFilter.GaussianBlur(40)))
     return img
@@ -160,16 +166,82 @@ def _darker(colour: tuple[int, int, int], f: float = 0.72) -> tuple[int, int, in
     return tuple(int(c * f) for c in colour)
 
 
-def tiles(img: Image.Image, options: list[str], top: int, *, correct: Optional[int] = None,
+def text_height(text: str, width: int, size: int, bold: bool = True) -> int:
+    return len(wrap(clean(text) or " ", font(size, bold), width)) * int(size * 1.18)
+
+
+@dataclass
+class Layout:
+    height: int      # whole card
+    panel_bottom: int
+    cols: int
+    rows: int
+    tile_h: int
+    text_size: int   # one size for every answer, so no tile looks more important than another
+
+
+def _bottom(counts) -> int:
+    return 84 if counts is not None else 16  # the vote bar plus its count above it
+
+
+def _tile_reserved(counts) -> int:
+    return 70 + 8 + _bottom(counts)  # letter badge, 3D edge, vote bar
+
+
+def plan(stem: str, options: list[str], counts: Optional[list[int]] = None) -> Layout:
+    """Picks the layout that shows every word: answers in one row if they're short, a 2x2 (or 2x3) grid if
+    they're long, a smaller question box if the question is short, and a taller card as the last resort."""
+    n = max(1, len(options))
+    stem_w = W - 2 * PAD - 80
+    panel_top = 92
+    full_panel = _split(n) - panel_top
+    # The question box keeps its usual size unless the question needs more, or less while answers need room.
+    stem_need = text_height(stem, stem_w, STEM_MIN) + 44
+    panel = max(full_panel, stem_need)
+    compact = max(110, stem_need, min(full_panel, text_height(stem, stem_w, 36) + 44))
+    largest = 40 if n <= 4 else 34
+    reserved = _tile_reserved(counts)
+    grids = [(n, 1), (2, 2)] if n <= 4 else [(3, 2), (2, 3)]
+    if n <= 2:
+        grids = [(n, 1)]
+    if n == 3:
+        grids = [(3, 1), (1, 3)]
+
+    def candidate(panel_h: int, cols: int, rows: int) -> Optional[Layout]:
+        """Biggest uniform text size for this grid. A one-row layout keeps the usual height; a grid may
+        grow the card up to GROW_H, which is what makes 2x2 worth it for long answers."""
+        top = panel_top + panel_h + 24
+        text_w = (W - 2 * PAD - GAP * (cols - 1)) // cols - 44
+        usual = (H - top - PAD - GAP * (rows - 1)) // rows
+        for size in range(largest, TILE_MIN - 1, -2):
+            need = max(text_height(o, text_w, size) for o in options) + reserved
+            tile_h = max(need, usual) if rows > 1 else usual
+            height = top + rows * tile_h + GAP * (rows - 1) + PAD
+            if need <= tile_h and height <= (GROW_H if rows > 1 else H):
+                return Layout(height, panel_top + panel_h, cols, rows, tile_h, size)
+        return None
+
+    # Biggest answer text wins; on a tie, the shorter card, then the usual layout.
+    found = [c for ph in (panel, compact) for cols, rows in grids if (c := candidate(ph, cols, rows))]
+    if found:
+        return max(found, key=lambda c: (c.text_size, -c.height))
+    # Still too much text: keep the widest grid and make the card taller.
+    cols, rows = grids[-1]
+    text_w = (W - 2 * PAD - GAP * (cols - 1)) // cols - 44
+    tile_h = max(text_height(o, text_w, TILE_MIN) for o in options) + reserved + 10
+    top = panel_top + compact + 24
+    height = min(MAX_H, top + rows * tile_h + GAP * (rows - 1) + PAD)
+    tile_h = (height - top - PAD - GAP * (rows - 1)) // rows
+    return Layout(height, panel_top + compact, cols, rows, tile_h, TILE_MIN)
+
+
+def tiles(img: Image.Image, options: list[str], layout: Layout, *, correct: Optional[int] = None,
           chosen: Optional[int] = None, counts: Optional[list[int]] = None) -> None:
     """The coloured answer tiles. With `correct` set, the card shows the reveal."""
     d = ImageDraw.Draw(img, "RGBA")
-    n = len(options)
-    cols = n if n <= 4 else 3
-    rows = 1 if n <= 4 else 2
-    gap = 18
+    cols, gap, tile_h = layout.cols, GAP, layout.tile_h
+    top = layout.panel_bottom + 24
     tile_w = (W - 2 * PAD - gap * (cols - 1)) // cols
-    tile_h = (H - top - PAD - gap * (rows - 1)) // rows
     total = max(1, sum(counts)) if counts else 1
     for i, opt in enumerate(options):
         r, c = divmod(i, cols)
@@ -192,9 +264,9 @@ def tiles(img: Image.Image, options: list[str], top: int, *, correct: Optional[i
         d.rounded_rectangle((x0 + 14, y0 + 14, x0 + 62, y0 + 62), radius=12, fill=(0, 0, 0, 70))
         lf = font(28)
         d.text((x0 + 38 - lf.getlength(LETTERS[i]) / 2, y0 + 19), LETTERS[i], font=lf, fill=WHITE)
-        bottom_reserved = 54 if counts is not None else 16
+        bottom_reserved = _bottom(counts)
         text_colour = WHITE if not revealed or is_right or is_wrong_pick else (225, 225, 225)
-        draw_block(d, (x0 + 22, y0 + 70, x1 - 22, y1 - 8 - bottom_reserved), opt, 40 if n <= 4 else 34, 16, text_colour)
+        draw_block(d, (x0 + 22, y0 + 70, x1 - 22, y1 - 8 - bottom_reserved), opt, layout.text_size, 16, text_colour)
         if is_right or is_wrong_pick:
             check(d, x1 - 38, y0 + 38, 24, is_right)
         if counts is not None:
@@ -226,6 +298,15 @@ def _question_panel(d: ImageDraw.ImageDraw, stem: str, top: int, bottom: int) ->
     draw_block(d, (PAD + 40, top + 22, W - PAD - 40, bottom - 22), stem, 50, 20)
 
 
+def _question_screen(q: dict, order: list[int], counts=None) -> tuple[Image.Image, ImageDraw.ImageDraw, Layout, list[str]]:
+    options = [q["options"][i] for i in order]
+    layout = plan(q["stem"], options, counts)
+    img = background(layout.height)
+    d = ImageDraw.Draw(img, "RGBA")
+    _question_panel(d, q["stem"], 92, layout.panel_bottom)
+    return img, d, layout, options
+
+
 def _split(n_options: int) -> int:
     """Where the question panel ends and the tiles begin."""
     return 300 if n_options <= 4 else 250
@@ -235,12 +316,9 @@ def question_card(q: dict, number: int, total: int, *, order: Optional[list[int]
                   timer: Optional[str] = None) -> bytes:
     """The question with blank answer tiles. `order` maps displayed tile -> stored option index."""
     order = order or list(range(len(q["options"])))
-    img = background()
-    d = ImageDraw.Draw(img, "RGBA")
+    img, d, layout, options = _question_screen(q, order)
     _top_bar(d, number, total, right, timer, progress=(number - 1) / max(1, total))
-    split = _split(len(order))
-    _question_panel(d, q["stem"], 92, split)
-    tiles(img, [q["options"][i] for i in order], split + 24)
+    tiles(img, options, layout)
     return png(img)
 
 
@@ -249,8 +327,7 @@ def reveal_card(q: dict, number: int, total: int, *, order: Optional[list[int]] 
     """The answer screen. `chosen` and `counts` are in displayed order; counts are for live games."""
     order = order or list(range(len(q["options"])))
     correct = order.index(q["correct_index"])
-    img = background()
-    d = ImageDraw.Draw(img, "RGBA")
+    img, d, layout, options = _question_screen(q, order, counts)
     _top_bar(d, number, total, right, progress=number / max(1, total))
     if banner:
         ok = chosen == correct
@@ -260,9 +337,7 @@ def reveal_card(q: dict, number: int, total: int, *, order: Optional[list[int]] 
         x = (W - bw) // 2
         d.rounded_rectangle((x, PAD - 8, x + bw, PAD + 44), radius=26, fill=colour)
         d.text((x + 30, PAD - 4), banner, font=bf, fill=WHITE)
-    split = _split(len(order))
-    _question_panel(d, q["stem"], 92, split)
-    tiles(img, [q["options"][i] for i in order], split + 24, correct=correct, chosen=chosen, counts=counts)
+    tiles(img, options, layout, correct=correct, chosen=chosen, counts=counts)
     return png(img)
 
 

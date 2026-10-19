@@ -609,6 +609,20 @@ def test_cards_render_every_screen():
     assert cards.clean("Lan Anh 🌸✨") == "Lan Anh"
 
 
+def test_cards_show_long_answers_whole():
+    from studybot import cards
+
+    long = "Tư tưởng Hồ Chí Minh là kết quả của sự vận dụng sáng tạo và phát triển chủ nghĩa Mác - Lênin vào điều kiện"
+    q = {"stem": "Chọn phương án trả lời đúng nhất?", "options": [long, long + " cụ thể", "Ngắn", long], "correct_index": 0}
+    layout = cards.plan(q["stem"], q["options"])
+    assert (layout.cols, layout.rows) == (2, 2) and layout.text_size >= 34 and layout.height <= cards.GROW_H
+    tile_w = (cards.W - 2 * cards.PAD - cards.GAP) // 2 - 44
+    for o in q["options"]:  # every answer fits whole at the chosen size: nothing is cut with "…"
+        assert cards.text_height(o, tile_w, layout.text_size) + cards._tile_reserved(None) <= layout.tile_h
+    short = cards.plan("Q?", ["Đại hội VII", "Đại hội IX", "Đại hội XI", "Đại hội XIII"])
+    assert (short.cols, short.rows, short.height) == (4, 1, cards.H)  # short answers keep the one-row card
+
+
 def test_solo_run_with_timer_and_hidden_answers(tmp_path):
     import types
     from studybot import play
