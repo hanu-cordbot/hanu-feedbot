@@ -9,10 +9,15 @@ An always-on Discord bot that turns the files you already have into quizzes peop
    - **Answers come from the file** wherever it puts them: `Answer: B` lines, an *Answer key* section at the end, a starred `*` / `(correct)` option, or a **bold or highlighted** option in Word files.
    - **No answer in the file?** AI suggests one, and that question is marked **⚠️ answer suggested by AI** everywhere it appears.
    - **No questions in the file at all?** It's saved as study material, and the bot warns that AI-written questions can be wrong. You choose whether to have AI write some; those are marked **⚠️ AI-written**.
-2. **`/quiz`**: opens a private picker. Choose a **subject**, one or more **question sets**, a length, and a timer, then:
-   - **🧑‍🎓 Solo (private)**: only you see the questions, your picks and your score. Questions you missed come up more often. Solo quizzes keep working after a bot restart.
-   - **🎮 Live for everyone** (Quizizz-style): each question is posted publicly with a countdown and **"🙋 N answered"**. Nobody's picks or reaction counts show. Press **✋ Answer** and the options pop up privately. Faster correct answers score more (500–1000 points, plus a streak bonus 🔥). When time runs out, or the host presses ⏭, the message reveals the answer, how everyone voted, the explanation, and a leaderboard. The game ends with a 🥇🥈🥉 podium. Only the host can move to the next question or end the game.
-   - Questions are a **random mix** across the chosen sets, weighted toward better ones (below).
+2. **`/quiz`**: opens a private settings panel, and remembers your last settings:
+   - **What to play:** subject, question sets, which questions (all / only answers from the file / skip AI-written), order (🧠 smart mix / 🎲 random / 📑 file order), length (5–50 or every question), timer (none, or 5–120 s) and auto-advance (live: next question 3–30 s after the answer, or the host presses Next).
+   - **Options (on/off):** 🔀 shuffle answer choices · 👀 show the answer after each question (solo; off = review at the end) · 🖼️ Quizizz-style cards.
+   - **Live game extras** (one multi-select): 🏆 leaderboard after each question · ⏱️ faster answers score more (off = 1,000 per right answer) · 🔥 streak bonus · ⚡ power-ups · 🎵 music in voice.
+   - **🧑‍🎓 Solo (private)**: only you see the questions, your picks and your score. With a timer, late answers count as missed. Questions you missed come up more often. Solo quizzes keep working after a bot restart.
+   - **🎮 Live for everyone** (Quizizz-style): the whole game is one channel message: the question card, a countdown and **"🙋 N answered"**, with A/B/C/D right on it. A click is private, so nobody sees anyone's pick; you get a private reply with your points and rank. When time runs out (or the host presses ⏭) the card reveals the answer and how many picked each tile, plus a leaderboard; **📊 My result** shows your own pick, points and rank. The game ends with a podium. Only the host can move on or end the game. Works in threads too.
+   - **⚡ Power-ups** (live): everyone gets a random one with their first answer and another for every 3 right in a row (hold up to 3). **⚡ Power-ups** on the game message opens your private menu. 🌗 50-50 and 🧽 Eraser remove wrong answers for you · 🛡️ Immunity gives a second try · ⏸️ Time Freeze stops your clock (full speed points) · ✌️ 2x doubles your points · 🎲 Double Jeopardy doubles them, or takes that much away if you're wrong · 🔒 Streak Saver keeps your streak through a wrong answer · 📈 Streak Booster adds 2 to your streak · 🚀 Supersonic gives +50% on your next 3 right answers · ⚡ Power Play gives everyone +50% on that question · 🎁 Gift hands 800 points to a random player. Power Play and Gift are announced on the game message. Quizizz doesn't publish exact numbers; these follow how its power-ups are usually described.
+   - **🎵 Music** (live): if the host is in a voice channel when the game starts, the bot joins it and plays music during each question, a sting on each reveal, a calmer loop between questions and a fanfare at the end, then leaves (or after 10 idle minutes on one answer screen). There are six question loops (drive, arcade, bounce, groove, tension, space) and two between-question loops; each question plays the next one in a shuffled rotation, levelled to the same loudness. The music is synthesised by the bot (original, nothing to license). Audio files (mp3/ogg/wav/flac/m4a) you put in `data/studybot/music/` join the question rotation. Needs ffmpeg and libopus on the host.
+   - **Cards:** each question is drawn as a Quizizz-style picture (coloured answer tiles, with buttons in matching colours). Long answers switch to a 2×2 grid and the card grows taller rather than cutting text. Turn cards off for plain text.
 3. **`/library`**: every subject and question set, with label counts.
 4. **`/share deck`**: a standalone study page and an Anki file anyone can use without the bot.
 
@@ -40,7 +45,7 @@ Also available: `/interview` (answer out loud with a voice message and get grade
 | Messy layouts the parser can't fully account for (tables, odd formatting) | Gemini *copies* the questions out, with explicit instructions not to write or fix anything. Every copied question is then **checked against the file's own text**, and anything that doesn't match is discarded. |
 | Photos, screenshots, scanned PDFs (no text layer) | Gemini reads the image and copies the questions out. These can't be checked against text, so give them a quick look. |
 
-Supported files: PDF, DOCX, PPTX, TXT/MD/CSV/HTML, PNG/JPG/WEBP/HEIC. Questions with 2–6 options are supported.
+Supported files: PDF, DOCX, PPTX, TXT/MD/CSV/HTML, JSON, PNG/JPG/WEBP/HEIC. JSON question banks (any object with a question, a list of options and, optionally, an answer such as `{"q", "options", "correctIndex", "explanation"}`, at any depth) are read directly with no AI; other JSON is read as text. Questions with 2–6 options are supported.
 
 ## How AI-written questions are vetted (`/generate`)
 
@@ -91,7 +96,7 @@ GitHub Actions can't host this: jobs are capped at 6 hours, and the existing fee
 ### Setup
 
 1. In the [Discord developer portal](https://discord.com/developers/applications): open your application, go to **Bot**, and enable **Message Content Intent**. You can reuse the feed bot's application or make a new one.
-2. Invite it with the `bot` and `applications.commands` scopes, plus these permissions: Send Messages, Embed Links, Attach Files, Read Message History, Create Public Threads, Send Messages in Threads.
+2. Invite it with the `bot` and `applications.commands` scopes, plus these permissions: Send Messages, Embed Links, Attach Files, Read Message History, Create Public Threads, Send Messages in Threads, and Connect + Speak for game music.
 3. Set the following in `.env` (see `.env.example`):
    - nothing for the model by default: it runs GPT Luna through the Codex CLI (see **Models**). For Gemini instead, set `STUDYBOT_PROVIDER=gemini` and `GEMINI_API_KEY`.
    - `STUDYBOT_TOKEN` (falls back to `DISCORD_BOT_TOKEN`)

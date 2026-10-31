@@ -1,6 +1,8 @@
-discord.py>=2.4
+discord.py[voice]>=2.7  # voice = game music (PyNaCl + davey); also needs ffmpeg and libopus
+numpy  # synthesises the game music
 google-genai>=1.0
 python-dotenv
 pypdf
 python-docx
 python-pptx
+pillow
