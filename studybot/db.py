@@ -85,6 +85,10 @@ CREATE TABLE IF NOT EXISTS quiz_runs (
     correct INTEGER NOT NULL DEFAULT 0,
     created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS quiz_prefs (
+    user_id INTEGER PRIMARY KEY,
+    settings TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS question_flags (
     question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL,
@@ -120,6 +124,14 @@ class Store:
         ):
             if name not in cols:
                 self.conn.execute(f"ALTER TABLE questions ADD COLUMN {ddl}")
+        run_cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(quiz_runs)")}
+        for name, ddl in (
+            ("settings", "settings TEXT NOT NULL DEFAULT '{}'"),
+            ("picks", "picks TEXT NOT NULL DEFAULT '[]'"),
+            ("asked_at", "asked_at REAL NOT NULL DEFAULT 0"),
+        ):
+            if name not in run_cols:
+                self.conn.execute(f"ALTER TABLE quiz_runs ADD COLUMN {ddl}")
         self.conn.commit()
 
     # --- decks -----------------------------------------------------------
@@ -143,6 +155,22 @@ class Store:
         )
         self.conn.commit()
         return cur.lastrowid
+
+    def get_deck(self, deck_id: int) -> Optional[sqlite3.Row]:
+        return self.conn.execute("SELECT * FROM decks WHERE id = ?", (deck_id,)).fetchone()
+
+    def set_deck_subject(self, deck_id: int, subject: str) -> None:
+        self.conn.execute("UPDATE decks SET subject = ? WHERE id = ?", (subject.strip().lower() or "general", deck_id))
+        self.conn.commit()
+
+    def rename_deck(self, deck_id: int, name: str) -> bool:
+        """False if another set in the server already has that name."""
+        try:
+            self.conn.execute("UPDATE decks SET name = ? WHERE id = ?", (name.strip().lower(), deck_id))
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
 
     def subjects(self, guild_id: int, prefix: str = "") -> list[str]:
         rows = self.conn.execute(
@@ -345,10 +373,10 @@ class Store:
         ).fetchone()[0]
 
     # --- solo quiz runs (persisted so private quizzes survive restarts) ---
-    def create_run(self, user_id: int, question_ids: list[int]) -> int:
+    def create_run(self, user_id: int, question_ids: list[int], settings: Optional[dict] = None) -> int:
         cur = self.conn.execute(
-            "INSERT INTO quiz_runs (user_id, question_ids, created_at) VALUES (?, ?, ?)",
-            (user_id, json.dumps(question_ids), time.time()),
+            "INSERT INTO quiz_runs (user_id, question_ids, settings, created_at) VALUES (?, ?, ?, ?)",
+            (user_id, json.dumps(question_ids), json.dumps(settings or {}), time.time()),
         )
         self.conn.commit()
         return cur.lastrowid
@@ -359,16 +387,35 @@ class Store:
             return None
         run = dict(row)
         run["question_ids"] = json.loads(run["question_ids"])
+        run["settings"] = json.loads(run.get("settings") or "{}")
+        run["picks"] = json.loads(run.get("picks") or "[]")
         return run
 
-    def advance_run(self, run_id: int, expected_position: int, correct: bool) -> bool:
-        """Moves a run past one answer. False if that position was already answered (double click)."""
+    def advance_run(self, run_id: int, expected_position: int, correct: bool, pick: Optional[int] = None) -> bool:
+        """Moves a run past one answer. False if that position was already answered (double click).
+        `pick` is the stored option index chosen (None for a timeout), kept for the end-of-quiz review."""
         cur = self.conn.execute(
-            "UPDATE quiz_runs SET position = position + 1, correct = correct + ? WHERE id = ? AND position = ?",
-            (int(correct), run_id, expected_position),
+            "UPDATE quiz_runs SET position = position + 1, correct = correct + ?, "
+            "picks = json_insert(COALESCE(picks, '[]'), '$[#]', ?) WHERE id = ? AND position = ?",
+            (int(correct), pick, run_id, expected_position),
         )
         self.conn.commit()
         return cur.rowcount == 1
+
+    def mark_asked(self, run_id: int, when: float) -> None:
+        """When the current question was shown, for the solo timer."""
+        self.conn.execute("UPDATE quiz_runs SET asked_at = ? WHERE id = ?", (when, run_id))
+        self.conn.commit()
+
+    def get_prefs(self, user_id: int) -> dict:
+        row = self.conn.execute("SELECT settings FROM quiz_prefs WHERE user_id = ?", (user_id,)).fetchone()
+        return json.loads(row["settings"]) if row else {}
+
+    def set_prefs(self, user_id: int, settings: dict) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO quiz_prefs (user_id, settings) VALUES (?, ?)", (user_id, json.dumps(settings))
+        )
+        self.conn.commit()
 
     def deck_sources(self, deck_id: int) -> list[str]:
         rows = self.conn.execute(

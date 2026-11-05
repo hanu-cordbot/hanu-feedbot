@@ -268,6 +268,10 @@ def dedupe(items: list[Extracted]) -> list[Extracted]:
 
 async def find_questions(filename: str, data: bytes, text: str) -> ExtractionResult:
     """Best effort at getting the file's own questions, without ever writing new ones."""
+    if filename.lower().endswith(".json"):
+        found = parse_json_mcqs(data)
+        if found:
+            return ExtractionResult(dedupe(found), "parser")
     if ingest.needs_vision(filename, text):
         if len(data) > 18 * 1024 * 1024:
             return ExtractionResult()
@@ -286,6 +290,87 @@ async def find_questions(filename: str, data: bytes, text: str) -> ExtractionRes
     if len(copied) > len(parsed):
         return ExtractionResult(copied, "ai-copy", dropped)
     return ExtractionResult(parsed, "parser", dropped)
+
+
+# --- 2b. JSON question banks ----------------------------------------------
+
+STEM_KEYS = ("q", "question", "stem", "prompt", "questionText", "question_text", "text")
+OPTION_KEYS = ("options", "choices", "answers", "alternatives", "answerOptions", "answer_options")
+ANSWER_KEYS = ("correctIndex", "correct_index", "answerIndex", "answer_index", "correctOption", "correct_option",
+               "correctAnswer", "correct_answer", "correct", "answer", "key", "solution")
+EXPLANATION_KEYS = ("explanation", "explain", "rationale", "reason", "feedback", "solution_text")
+OPTION_TEXT_KEYS = ("text", "label", "option", "value", "content", "answer")
+MAX_JSON_QUESTIONS = 5000
+
+
+def _json_options(raw) -> tuple[list[str], Optional[int]]:
+    """Options as plain strings, plus the answer if the options themselves mark it."""
+    if isinstance(raw, dict):  # {"A": "...", "B": "..."}
+        raw = [raw[k] for k in sorted(raw)]
+    if not isinstance(raw, list):
+        return [], None
+    opts, marked = [], None
+    for i, o in enumerate(raw):
+        if isinstance(o, dict):
+            text = next((o[k] for k in OPTION_TEXT_KEYS if isinstance(o.get(k), (str, int, float))), None)
+            if o.get("correct") is True or o.get("isCorrect") is True or o.get("is_correct") is True:
+                marked = i
+            o = text
+        if isinstance(o, (int, float)) and not isinstance(o, bool):
+            o = str(o)
+        if not isinstance(o, str) or not o.strip():
+            return [], None
+        opts.append(o.strip())
+    return opts, marked
+
+
+def _json_answer(item: dict, options: list[str]) -> Optional[int]:
+    """Only answers the file states unambiguously; anything else is left for an AI suggestion (marked ⚠️)."""
+    for key in ANSWER_KEYS:
+        if key not in item:
+            continue
+        v = item[key]
+        if isinstance(v, bool):
+            continue
+        if isinstance(v, int):
+            if "index" in key.lower() or "option" in key.lower():
+                return v if 0 <= v < len(options) else None
+            return 0 if v == 0 else None  # "answer": 2 could be 0- or 1-based
+        if isinstance(v, str):
+            s = v.strip()
+            if len(s) == 1 and s.upper() in LABELS[:len(options)]:
+                return LABELS.index(s.upper())
+            norm = [_norm(o) for o in options]
+            if _norm(s) in norm:
+                return norm.index(_norm(s))
+    return None
+
+
+def parse_json_mcqs(data: bytes) -> list[Extracted]:
+    """Finds every {question, options, answer}-shaped object anywhere in a JSON file."""
+    try:
+        root = json.loads(data.decode("utf-8-sig", errors="replace"))
+    except (json.JSONDecodeError, RecursionError):
+        return []
+    out: list[Extracted] = []
+    stack = [root]
+    while stack and len(out) < MAX_JSON_QUESTIONS:
+        node = stack.pop()
+        if isinstance(node, list):
+            stack.extend(reversed(node))
+            continue
+        if not isinstance(node, dict):
+            continue
+        stem = next((node[k] for k in STEM_KEYS if isinstance(node.get(k), str) and node[k].strip()), None)
+        raw_opts = next((node[k] for k in OPTION_KEYS if isinstance(node.get(k), (list, dict))), None)
+        options, marked = _json_options(raw_opts) if raw_opts is not None else ([], None)
+        if stem and 2 <= len(options) <= len(LABELS):
+            answer = marked if marked is not None else _json_answer(node, options)
+            explanation = next((node[k] for k in EXPLANATION_KEYS if isinstance(node.get(k), str)), "")
+            out.append(Extracted(stem.strip(), options, answer, explanation.strip()))
+            continue
+        stack.extend(reversed(list(node.values())))
+    return out
 
 
 # --- 3. answers the file doesn't give --------------------------------------
