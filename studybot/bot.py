@@ -11,7 +11,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from . import config, export, extract, ingest, interview, play, quality, questions
+from . import config, export, extract, ingest, interview, library, music, play, quality, questions
 from .db import Store
 from .render import EMBED_LIMIT, FIELD_LIMIT, clip
 
@@ -27,13 +27,18 @@ class StudyBot(commands.Bot):
     def __init__(self, store: Store):
         intents = discord.Intents.default()
         intents.message_content = True  # read typed interview answers
-        super().__init__(command_prefix=commands.when_mentioned, intents=intents)
+        # Question text comes from uploaded files, so it must never be able to ping @everyone, roles or users.
+        super().__init__(
+            command_prefix=commands.when_mentioned, intents=intents, allowed_mentions=discord.AllowedMentions.none()
+        )
         self.store = store
         self.interviews: dict[int, interview.InterviewSession] = {}
         self.live_games: dict[int, play.LiveGame] = {}
 
     async def setup_hook(self) -> None:
         self.add_dynamic_items(*play.DYNAMIC_ITEMS)
+        # Make the game music now, so the first live game with music doesn't wait for it.
+        asyncio.create_task(self._warm_music())
         await self.add_cog(StudyCog(self))
         if config.DEV_GUILD_ID:
             guild = discord.Object(id=config.DEV_GUILD_ID)
@@ -41,6 +46,12 @@ class StudyBot(commands.Bot):
             await self.tree.sync(guild=guild)
         else:
             await self.tree.sync()
+
+    async def _warm_music(self) -> None:
+        try:
+            await asyncio.to_thread(music.ensure_tracks)
+        except Exception:  # noqa: BLE001 - music is optional
+            log.exception("Couldn't generate game music")
 
     async def on_ready(self) -> None:
         log.info("Study bot ready as %s in %d server(s)", self.user, len(self.guilds))
@@ -89,43 +100,32 @@ class StudyCog(commands.Cog):
     def _deck(self, interaction: discord.Interaction, name: str) -> Optional[int]:
         return self.store.find_deck(interaction.guild_id or 0, name)
 
-    @app_commands.command(name="upload", description="Add any file: existing questions in it are pulled out, the rest is kept as study material")
-    @app_commands.describe(
-        file="PDF, Word, PowerPoint, text, or a photo/screenshot of a worksheet",
-        deck="Question set to add it to (defaults to the file name)",
-        subject="Subject it belongs to, e.g. biology (used to group sets in /library and /quiz)",
-    )
-    @app_commands.guild_only()
-    async def upload_cmd(
-        self, interaction: discord.Interaction, file: discord.Attachment, deck: Optional[str] = None, subject: Optional[str] = None
-    ):
-        if file.size > config.MAX_UPLOAD_BYTES:
-            await interaction.response.send_message("That file is over 25MB.", ephemeral=True)
-            return
-        deck = (deck or export.slugify(file.filename.rsplit(".", 1)[0])).strip().lower()
-        await interaction.response.defer(thinking=True)
-        data = await file.read()
+    async def ingest_file(
+        self, guild_id: int, user_id: int, filename: str, data: bytes, deck: Optional[str], subject: Optional[str]
+    ) -> tuple[str, Optional[discord.ui.View]]:
+        """Reads one file into a question set. Shared by /upload and the library's ➕ Add files form.
+        Returns the message to post and, when the file had no questions, the offer to generate some."""
+        if len(data) > config.MAX_UPLOAD_BYTES:
+            return f"`{filename}` is over 25MB.", None
+        deck = (deck or export.slugify(filename.rsplit(".", 1)[0])).strip().lower()
         try:
-            text = await asyncio.to_thread(ingest.extract_text, file.filename, data)
+            text = await asyncio.to_thread(ingest.extract_text, filename, data)
         except ingest.UnsupportedFile as exc:
-            await interaction.followup.send(str(exc))
-            return
+            return str(exc), None
         except Exception as exc:
-            log.exception("Failed to read %s", file.filename)
-            await interaction.followup.send(f"Couldn't read `{file.filename}`: {exc}")
-            return
+            log.exception("Failed to read %s", filename)
+            return f"Couldn't read `{filename}`: {exc}", None
 
-        deck_id = self.store.get_or_create_deck(interaction.guild_id, deck, interaction.user.id, subject)
+        deck_id = self.store.get_or_create_deck(guild_id, deck, user_id, subject)
         chunks = ingest.chunk_text(text) if len(text) >= 200 else []
-        doc_id = self.store.add_document(deck_id, file.filename, ingest.sha256(data), chunks, interaction.user.id)
+        doc_id = self.store.add_document(deck_id, filename, ingest.sha256(data), chunks, user_id)
         if doc_id is None:
-            await interaction.followup.send(f"`{file.filename}` is already in **{deck}**.")
-            return
+            return f"`{filename}` is already in **{deck}**.", None
 
         try:
-            found = await extract.find_questions(file.filename, data, text)
+            found = await extract.find_questions(filename, data, text)
         except Exception:
-            log.exception("Question extraction failed for %s", file.filename)
+            log.exception("Question extraction failed for %s", filename)
             found = extract.ExtractionResult(extract.parse_mcqs(text), "parser")
         items = found.questions
         suggestions: dict[int, dict] = {}
@@ -155,7 +155,7 @@ class StudyCog(commands.Cog):
         added = from_file + ai_answer
         if added:
             how = "read directly from the file" if found.method == "parser" else "copied out with AI help, each one checked against the file's text"
-            lines = [f"📚 Found **{added}** question(s) in `{file.filename}` → deck **{deck}** ({how})."]
+            lines = [f"📚 Found **{added}** question(s) in `{filename}` → deck **{deck}** ({how})."]
             if from_file:
                 lines.append(f"✅ {from_file} with answers from the file itself.")
             if ai_answer:
@@ -167,25 +167,49 @@ class StudyCog(commands.Cog):
             if found.dropped:
                 lines.append(f"Ignored {found.dropped} that didn't match the file's text.")
             lines.append(f"Play it with `/quiz`, or share it with `/share deck:{deck}`.")
-            await interaction.followup.send(clip("\n".join(lines), 1990))
-            return
+            return clip("\n".join(lines), 1990), None
 
         if not chunks:
-            await interaction.followup.send(
-                f"I couldn't find any multiple-choice questions or enough readable text in `{file.filename}`. "
+            return (
+                f"I couldn't find any multiple-choice questions or enough readable text in `{filename}`. "
                 "If it's a photo, try a clearer, straight-on shot."
-            )
-            return
-        await interaction.followup.send(
-            f"📄 Saved `{file.filename}` to **{deck}** as study material. **I didn't find any multiple-choice questions in it.**\n"
+            ), None
+        return (
+            f"📄 Saved `{filename}` to **{deck}** as study material. **I didn't find any multiple-choice questions in it.**\n"
             "I can write some from it, but **AI-written questions can be wrong or ambiguous**. They'll be labelled ⚠️ "
-            "everywhere they appear, and anyone can flag them. Questions from real past papers or worksheets are always better.",
-            view=GenerateOffer(self, interaction.user.id, deck_id, deck),
+            "everywhere they appear, and anyone can flag them. Questions from real past papers or worksheets are always better."
+        ), GenerateOffer(self, user_id, deck_id, deck)
+
+    @app_commands.command(name="upload", description="Add any file: existing questions in it are pulled out, the rest is kept as study material")
+    @app_commands.describe(
+        file="PDF, Word, PowerPoint, text, JSON question bank, or a photo/screenshot of a worksheet",
+        deck="Existing set to add it to, or a new name (defaults to the file name)",
+        subject="Subject it belongs to, e.g. biology (used to group sets in /library and /quiz)",
+    )
+    @app_commands.guild_only()
+    async def upload_cmd(
+        self, interaction: discord.Interaction, file: discord.Attachment, deck: Optional[str] = None, subject: Optional[str] = None
+    ):
+        if file.size > config.MAX_UPLOAD_BYTES:
+            await interaction.response.send_message("That file is over 25MB.", ephemeral=True)
+            return
+        await interaction.response.defer(thinking=True)
+        text, view = await self.ingest_file(
+            interaction.guild_id, interaction.user.id, file.filename, await file.read(), deck, subject
         )
+        await interaction.followup.send(text, **({"view": view} if view else {}))
 
     @upload_cmd.autocomplete("deck")
     async def _upload_ac(self, interaction, current):
-        return await self.deck_autocomplete(interaction, current)
+        """Existing sets, labelled with their subject; sets in the subject already typed come first."""
+        subject = (getattr(interaction.namespace, "subject", None) or "").strip().lower()
+        rows = [r for r in self.store.library(interaction.guild_id or 0) if current.lower() in r["name"]]
+        rows.sort(key=lambda r: (r["subject"] != subject, r["name"]))
+        return [
+            app_commands.Choice(name=clip(f"{r['name']} — {quality.subject_emoji(r['subject'])} {r['subject']}", 100),
+                                value=r["name"][:100])
+            for r in rows[:25]
+        ]
 
     @upload_cmd.autocomplete("subject")
     async def _subject_ac(self, interaction, current):
@@ -272,7 +296,7 @@ class StudyCog(commands.Cog):
         if not picker.visible_sets():
             await interaction.response.send_message("No questions yet. Add a file with `/upload` first.", ephemeral=True)
             return
-        await interaction.response.send_message(embed=picker.embed(), view=picker, ephemeral=True)
+        await interaction.response.send_message(view=picker, ephemeral=True)
 
     @app_commands.command(name="share", description="Get a deck as a standalone study pack (HTML quiz + review sheet) and Anki file")
     @app_commands.describe(deck="Which deck")
@@ -300,24 +324,10 @@ class StudyCog(commands.Cog):
     async def _share_ac(self, interaction, current):
         return await self.deck_autocomplete(interaction, current)
 
-    @app_commands.command(name="library", description="Browse every subject and question set in this server")
+    @app_commands.command(name="library", description="Subjects and their question sets: add files, move or rename sets")
     @app_commands.guild_only()
     async def library_cmd(self, interaction: discord.Interaction):
-        rows = self.store.library(interaction.guild_id)
-        if not rows:
-            await interaction.response.send_message("The library is empty. Start with `/upload`.", ephemeral=True)
-            return
-        embed = discord.Embed(title="📚 Library", colour=0x5865F2)
-        by_subject: dict[str, list] = {}
-        for r in rows:
-            by_subject.setdefault(r["subject"], []).append(r)
-        for subject, sets in list(by_subject.items())[:25]:
-            lines = [f"`{r['name']}` — {play.set_summary(r)}" for r in sets]
-            embed.add_field(
-                name=f"{quality.subject_emoji(subject)} {subject.title()}", value=clip("\n".join(lines), FIELD_LIMIT), inline=False
-            )
-        embed.set_footer(text=quality.LEGEND + " · /quiz to play")
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await library.open_library(self, interaction)
 
     @app_commands.command(name="stats", description="Your quiz accuracy")
     @app_commands.describe(deck="Optional: limit to one deck")
